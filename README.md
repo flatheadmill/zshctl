@@ -1,0 +1,21 @@
+## Diary
+
+### Wed Apr  2 12:20:15 AM CDT 2025
+
+We can change delegate to use a map, it can include both `zshctl:` and `user:` command, searching for them and adding to the map without the prefix. The value of the map will include the source file to find the usage, and the original name, also to fine the usage.
+
+Thoughts like that suggest a way to perform white labeling, but we have already decided against white-labeling. It's probably not a good idea and it really doesn't make sense to have two programs with identitcal names.
+
+Instead of white-labeling, you can install your program with an installer that places `zshctl` in a /usr/libexec/ and make your shebang line use that program directly. We can add other programs as needed.
+
+Need to register `zshctl.sh` and `zshctl.com`.
+
+We can have a curl installer `sh -c "$(curl -L zshctl.sh)"`. Everything can be sored in GitHub. We can use `flatheadmill.github.io/zshctl` for APT, yum, apk and aur. Gentoo and Homebrew can pull their tarballs from elsewhere, so we can pull them from GitHub downloads. There are limits on downloads and such, but we are not going to reach them, because this will never gain traction. We are not going to hit the repository limits any time soon. I only release things very rarely, and when that happens, all we're doing is storing zipped archive files. We can always squash and force push to keep the size minimal.
+
+Homebew and ebuild can use a `homebrew` and `ebuild` branch, so Homebrew will set up quickly. For apt and apk, which will be early, we need to create the github pages website.
+
+To build we use Docker to get all the different operating system versions. It is a no-arch build so it can be run on any architecture. We clone the repository in the build, I suppose, rather than mounting it, and we design it so that it only really builds releases.
+
+We can see if we can use GitHub pages to host our root domain.
+
+No, we host on S3 or GCS and probably GCS because there's a free-tier.
