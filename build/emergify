@@ -1,0 +1,85 @@
+#!/zshctl/bin/zshctl
+
+# TODO Ensure that `heredoc` can allow tabs.
+function ebuild_conf {
+# An `.ebuild` is just a Bash program. It must be indented with tabs and not with spaces.
+cat <<EOF
+# Copyright 2022 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+EAPI=8
+
+DESCRIPTION="ZSH CLI application framework."
+HOMEPAGE="https://github.com/flatheadmill/zshctl"
+SRC_URI="https://zshctl.sh/downloads/zshctl-$version.tar.gz"
+
+LICENSE="MIT"
+SLOT="0"
+KEYWORDS="~amd64"
+
+DEPEND=""
+RDEPEND="\${DEPEND} app-shells/zsh dev-vcs/git sys-apps/groff sys-apps/less"
+BDEPEND=""
+S=\${WORKDIR}
+
+src_install() {
+    dobin zshctl
+}
+EOF
+}
+
+function emergify {
+    typeset version=$(zsh compiled/zshctl version)
+    export FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox"
+    gpg --import /run/secrets/gpg
+    gpg --list-secret-keys --keyid-format=long
+    git config --global user.email 'alan@prettyrobots.com'
+    git config --global user.name 'Alan Gutierrez'
+    git config --global user.signingkey 8262C8D6D0959C6F
+    git config --global commit.gpgsign true
+    git config --global init.defaultBranch main
+    mkdir -p /etc/portage/repos.conf
+    if [[ -e previous/zero ]]; then
+        mkdir previous/ebuild.git
+        git -C previous/ebuild.git init
+        git -C previous/ebuild.git commit --allow-empty -m 'Initial commit.'
+        mkdir previous/ebuild.git/metadata
+        heredoc <<'        EOF' > previous/ebuild.git/metadata/layout.conf
+            masters = gentoo
+        EOF
+        git -C previous/ebuild.git add .
+        git -C previous/ebuild.git commit --allow-empty -m 'Add `layout.conf`.'
+        git -C previous/ebuild.git log -n 1
+    fi
+    heredoc <<'    EOF' > /etc/portage/repos.conf/zshctl.conf
+        [zshctl]
+        location = /work/ebuild
+        sync-type = git
+        sync-uri = /work/previous/ebuild.git
+    EOF
+    emaint --repo zshctl sync ||
+        abend 'cannot run `email sync`'
+    # TODO Better classification?
+    mkdir -p /work/ebuild/app-misc/zshctl/
+    ebuild_conf > /work/ebuild/app-misc/zshctl/zshctl-$version.ebuild
+    mkdir -p /var/cache/distfiles/
+    cp /work/compiled/zshctl-$version.tar.gz /var/cache/distfiles/
+    cp /work/compiled/zshctl-$version.tar.gz .
+    export GPG_TTY=$(tty)
+    mkdir -p /work/ebuild/app-misc/zshctl/
+    printf 'DIST zshctl-%s.tar.gz %s SHA512 %s\n' \
+        $version \
+        $(wc -c zshctl-$version.tar.gz | cut -d' ' -f1) \
+        $(sha512sum zshctl-$version.tar.gz | cut -d' ' -f1) >> /work/ebuild/app-misc/zshctl/Manifest
+    ebuild /work/ebuild/app-misc/zshctl/zshctl-$version.ebuild manifest ||
+        abend '`ebuild` failed'
+    git -C ebuild add .
+    git -C ebuild branch -m main
+    git -C ebuild commit -S -m 'Release `zshctl` '$version'.'
+    git -C ebuild log -p -n 2
+    mkdir -p /html
+    git -C /html clone --bare /work/ebuild
+    git -C /html/ebuild.git update-server-info
+}
+
+# vim: ft=zsh:

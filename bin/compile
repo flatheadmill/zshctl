@@ -1,0 +1,18 @@
+#!/usr/bin/env zshctl
+
+function configuration {
+    print "0.0.0 $(date +%s)"
+}
+
+function compile {
+    printf '#!/usr/bin/env zsh\n\n'
+    cat ${ZSH_ARGZERO:A:h:h}/src/header.zsh
+    typeset lib
+    for lib in ${ZSH_ARGZERO:A:h:h}/lib/*.zsh; do
+        cat $lib
+        print
+    done
+    cat ${ZSH_ARGZERO:A:h:h}/src/main.zsh
+}
+
+# vim: ft=zsh:

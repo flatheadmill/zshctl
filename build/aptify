@@ -1,0 +1,80 @@
+#!/zshctl/bin/zshctl
+
+function do_hash {
+    HASH_NAME=$1
+    HASH_CMD=$2
+    echo "${HASH_NAME}:"
+    for f in $(find -type f); do
+        f=$(echo $f | cut -c3-) # remove ./ prefix
+        if [ "$f" = "Release" ]; then
+            continue
+        fi
+        echo " $(${HASH_CMD} ${f}  | cut -d" " -f1) $(wc -c $f)"
+    done
+}
+
+function generate_release {
+    # TODO Example Repository?
+    heredoc -f "$(date -Ru)" << '    EOF'
+        Origin: Example Repository
+        Label: Example
+        Suite: stable
+        Codename: stable
+        Version: 1.0
+        Architectures: all
+        Components: main
+        Description: An example software repository
+        Date: %s
+    EOF
+    do_hash "MD5Sum" "md5sum"
+    do_hash "SHA1" "sha1sum"
+    do_hash "SHA256" "sha256sum"
+}
+
+function aptify {
+    typeset version=$(zsh compiled/zshctl version)
+    typeset stem=zshctl_${version}_all
+    mkdir -p deb/$stem/DEBIAN
+    { heredoc -f $version > deb/$stem/DEBIAN/control; } <<'    EOF'
+    Package: zshctl
+    Version: %s
+    Architecture: all
+    Maintainer: Alan Gutierrez <alan@prettyrobots.com>
+    Description: Zsh CLI application framework.
+     A collection of Zsh utilities in a program that runs Zsh programs. Major
+     features include argument parsing, mandoc help, and shell completions.
+    Depends: zsh, less, groff-base
+    EOF
+    mkdir -p deb/$stem/usr/bin
+    install -m 755 compiled/zshctl deb/$stem/usr/bin/zshctl
+    dpkg-deb --build --root-owner-group deb/$stem
+    # get current repository
+    mkdir /html
+    if [[ ! -e /work/previous/zero ]]; then
+        mv /work/previous/apt/ /html/apt/
+    fi
+    mkdir -p /html/apt/dists/stable/main/binary-all/
+    mkdir -p /html/apt/pool/main/
+    cp deb/$stem.deb /html/apt/pool/main/
+    pushd /html/apt
+    dpkg-scanpackages --multiversion --arch all pool/ > dists/stable/main/binary-all/Packages
+    popd
+    cat /html/apt/dists/stable/main/binary-all/Packages |
+        gzip -9 > /html/apt/dists/stable/main/binary-all/Packages.gz
+    cat /html/apt/dists/stable/main/binary-all/Packages
+    mkdir -p /html/apt/dists/stable
+    pushd /html/apt/dists/stable
+    generate_release > Release
+    popd
+    gpg --import /run/secrets/gpg
+    gpg --list-secret-keys --keyid-format=long
+    cat /html/apt/dists/stable/Release | gpg --default-key 'Package Signing' -abs > /html/apt/dists/stable/Release.gpg ||
+        abend 'unable to sign'
+    cat /html/apt/dists/stable/Release | gpg --default-key 'Package Signing' -abs --clearsign > /html/apt/dists/stable/InRelease ||
+        abend 'unable to clearsign'
+
+    mkdir -p /html/apt/doc
+    gpg --armor --export 'Package Signing' > /html/apt/doc/apt-key.gpg
+}
+
+# vim: ft=zsh:

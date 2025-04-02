@@ -1,0 +1,14 @@
+#!/usr/bin/env zsh
+
+source ${ZSH_ARGZERO:A:h:h}/src/header.zsh
+
+function {
+    typeset lib
+    for lib in ${ZSH_ARGZERO:A:h:h}/lib/*.zsh; do
+        source $lib
+    done
+}
+
+source ${ZSH_ARGZERO:A:h:h}/src/main.zsh
+
+main "$@"; exit

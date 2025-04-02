@@ -1,0 +1,86 @@
+#!/zshctl/bin/zshctl
+
+function yumify {
+    export GPG_TTY=$(tty)
+    typeset version=$(zsh compiled/zshctl version)
+    mkdir -p /html
+    if [[ -d previous/yum ]]; then
+        mv previous/yum /html/yum
+    else
+        mkdir /html/yum
+    fi
+    gpg --import /run/secrets/gpg
+    gpg --list-secret-keys --keyid-format=long
+    rpmdev-setuptree
+    tar -C compiled --transform "s,zshctl,zshctl-$version/zshctl," -czvf ~/rpmbuild/SOURCES/zshctl-$version.tar.gz zshctl > /dev/null
+    # create an RPM spec
+    heredoc -f $version <<'    EOF' | tee zshctl.spec
+    Name:       zshctl
+    Version:    %s
+    Release:    1
+    Summary:    Zsh CLI application framework.
+    License:    MIT
+    BuildArch:  noarch
+
+    Source0:    %%{name}-%%{version}.tar.gz
+
+    Requires:   groff-base, less, zsh
+
+    %%description
+    Zsh CLI application framework.
+
+    %%global debug_package %%{nil}
+
+    %%prep
+    # we have no source, so nothing here
+    %%setup -q
+
+    %%build
+
+    %%install
+    rm -rf $RPM_BUILD_ROOT
+    mkdir -p $RPM_BUILD_ROOT/%%{_bindir}
+    find .
+    install -m 755 zshctl $RPM_BUILD_ROOT/%%{_bindir}/zshctl
+
+    %%files
+    %%{_bindir}/zshctl
+
+    %%changelog
+    # let's skip this for now
+    EOF
+    rpmbuild -ba zshctl.spec ||
+        abend '`rpmbuild` failed.'
+    touch passphrase
+    heredoc <<'    EOF' > ~/.rpmmacros
+    %_signature gpg
+    %_gpg_path /root/.gnupg
+    %_gpg_name Package Signing
+    %_gpgbin /usr/bin/gpg2
+    %__gpg_sign_cmd %{__gpg} gpg --force-v3-sigs --batch --verbose --no-armor --passphrase-file /work/passphrase --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} --digest-algo sha256 %{__plaintext_filename}'
+    EOF
+    gpg --list-keys
+    # sign
+    rpm --addsign /root/rpmbuild/RPMS/noarch/zshctl-$version-1.noarch.rpm ||
+        abend '`rpm --addsign` failed.'
+    gpg --export --armor 'Package Signing' > public.key
+    rpm --import public.key
+    rpm -q gpg-pubkey --qf '%{name}-%{version}-%{release} --> %{summary}\n'
+    # verify
+    rpm -K /root/rpmbuild/RPMS/noarch/zshctl-$version-1.noarch.rpm ||
+        abend '`rpm -K` failed.'
+    # install
+    rpm -i /root/rpmbuild/RPMS/noarch/zshctl-$version-1.noarch.rpm ||
+        abend '`rpm -i` failed.'
+    [[ "$(=zshctl version)" = $version ]] ||
+        abend 'install falled.'
+    mkdir -p /html/yum/repo
+    cp /root/rpmbuild/RPMS/noarch/zshctl-$version-1.noarch.rpm /html/yum/repo
+    gpg --armor --export 'Package Signing' > /html/yum/gpg
+    gpg --armor --export 'Package Signing' > /html/gpg
+    createrepo /html/yum/repo || abend '`createrepo` failed.'
+    gpg --detach-sign --armor /html/yum/repo/repodata/repomd.xml ||
+        abend '`gpg --detach-sign` failed.'
+}
+
+# vim: ft=zsh:

@@ -1,0 +1,67 @@
+#!/zshctl/bin/zshctl
+
+function aurify {
+    typeset version
+    version=$(zsh compiled/zshctl version) || abend 'cannot get version'
+    mkdir /gpg/build
+    export GNUPG_HOME=/gpg/build
+    chmod 700 /gpg/build
+    gpg --import /run/secrets/gpg
+    gpg --list-secret-keys --keyid-format=long
+    heredoc <<'    EOF' > PKGBUILD
+    # Maintainer: Alan Gutierrez <alan@prettyrobots.com>
+    pkgname=zshctl
+    pkgrel=1
+    epoch=
+    pkgdesc=""
+    arch=("any")
+    url=""
+    license=('UNLICENSED')
+    groups=()
+    depends=("zsh" "groff")
+    makedepends=()
+    checkdepends=()
+    optdepends=()
+    provides=()
+    conflicts=()
+    replaces=()
+    backup=()
+    options=()
+    install=
+    changelog=
+    source=("zshctl.tar.gz")
+    noextract=()
+    md5sums=()
+    validpgpkeys=()
+
+    prepare() {
+        true
+    }
+
+    build() {
+        true
+    }
+
+    check() {
+        true
+    }
+
+    package() {
+        mkdir -p "$pkgdir/usr/bin"
+        cp zshctl "$pkgdir/usr/bin"
+        ls -la "$pkgdir"
+    }
+
+    md5sums=('SKIP')
+    EOF
+    echo "pkgver=$version" >> PKGBUILD
+    cp compiled/zshctl-$version.tar.gz zshctl.tar.gz
+    makepkg --sign || abend '`makepkg` failed.'
+    mkdir -p /html/aur
+    mv zshctl-$version-1-any.pkg.tar.* /html/aur
+    repo-add --sign /html/aur/zshctl.db.tar.gz /html/aur/zshctl-$version-1-any.pkg.tar.zst ||
+        abend '`repo-add --sign` failed.'
+    gpg --armor --export 'Package Signing' > /html/aur/gpg
+}
+
+# vim: ft=zsh:

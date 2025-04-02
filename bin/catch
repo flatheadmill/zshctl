@@ -1,0 +1,14 @@
+#!/usr/bin/env zsh
+
+source ${ZSH_ARGZERO:A:h:h}/lib/catch.zsh
+
+function {
+    [[ $1 == 'toplevel' ]] || return
+    typeset out err
+    catch out err print hello hello
+    printf 'code %d, out <%s>, err <%s>\n' $? "$out" "$err"
+    catch out err print -u 2 hello hello
+    printf 'code %d, out <%s>, err <%s>\n' $? "$out" "$err"
+    catch out err false
+    printf 'code %d\n' $?
+} $ZSH_EVAL_CONTEXT
