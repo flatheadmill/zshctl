@@ -1,0 +1,77 @@
+#!/usr/bin/env zsh
+
+source ${ZSH_ARGZERO:A:h:h}/lib/parser.zsh
+
+function error {
+    typeset func=${1:-} reason=${2:-} flag=${3:-}
+    case $reason:$flag in
+        required:* )
+            printf '`%s` is a required argument.\n' $flag 1>&2
+            exit 1
+            ;;
+        execute:help )
+            print "here's some help"
+            exit
+    esac
+}
+
+function required {
+    #parser error -b a,alfa -s b,bravo -a c,charlie -c d,delta -A f,foxtrot -- "$@"
+    parser error 2 -sr a,alfa -br c,charlie -Ar b,bravo -- "$@"
+}
+
+function strict {
+    #parser error -b a,alfa -s b,bravo -a c,charlie -c d,delta -A f,foxtrot -- "$@"
+    parser error 2 -bx h,help -s a,alfa -A b,bravo -- "$@"
+}
+
+function sprinkle {
+    #parser error -b a,alfa -s b,bravo -a c,charlie -c d,delta -A f,foxtrot -- "$@"
+    typeset o_negate=1 o_foxtrot=foxtrot
+    parser error 2 -@ -bx h,help -db! n,negate -s a,alfa -d f,foxtrot -A b,bravo -b c,charlie ,delta -a e,echo -t g,golf -c v,verbose -- "$@"
+}
+
+function {
+    [[ $1 == 'toplevel' ]] || return
+    required -ahello -c -b key=value
+    print -- --
+    required --alfa hello --charlie --bravo key=value
+    print -- --
+    required --charlie --bravo key=value
+    print -- --
+    sprinkle --verbose -vvv
+    print -- --
+    sprinkle -g --golf
+    print -- --
+    sprinkle --negate
+    print -- ---
+    sprinkle --no-negate
+    print -- ---
+    sprinkle -n
+    print -- ---
+    sprinkle -!n
+    print -- ---
+    sprinkle --help
+    print -- ---
+    sprinkle --alf a
+    print -- ---
+    sprinkle --bra key value
+    print -- ---
+    sprinkle --bravo key=value
+    print -- ---
+    sprinkle bar --bravo key=value baz -- --qux
+    print -- ---
+    strict bar --bravo key=value baz -- --qux
+    print -- --
+    sprinkle -cafoo -h
+    print -- --
+    sprinkle --delta
+    print -- --
+    sprinkle -b key=value
+    print -- --
+    sprinkle bar -e hello --ec world
+    print -- --
+    sprinkle --verbose
+    print -- --
+    sprinkle --alfa=hello
+} $ZSH_EVAL_CONTEXT

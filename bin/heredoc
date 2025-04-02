@@ -1,0 +1,46 @@
+#!/usr/bin/env zsh
+
+source ${ZSH_ARGZERO:A:h:h}/lib/heredoc.zsh
+
+function {
+    [[ $1 == 'toplevel' ]] || return
+    heredoc -q <<'    EOF'
+        hello, world
+
+        hello, world
+    EOF
+    return
+    heredoc - <<'    EOF'
+        hello, world
+    EOF
+    typeset hello=hello world=world value
+    heredoc -v value -q <<'    EOF'
+        $hello, $world
+    EOF
+    heredoc -f hello world <<'    EOF'
+        %s, %s
+    EOF
+    heredoc -f -- hello world <<'    EOF'
+        %s, %s
+    EOF
+    print -- -- values --
+    value=
+    heredoc -v value <<'    EOF'
+        hello, world
+    EOF
+    printf -- $value
+    value=
+    heredoc -v value -f hello world <<'    EOF'
+        %s, %s
+    EOF
+    printf -- $value
+    value=
+    heredoc -f -v value -- hello world <<'    EOF'
+        %s, %s
+    EOF
+    value=
+    heredoc -v value -q <<'    EOF'
+        $hello, $world
+    EOF
+    printf -- $value
+} $ZSH_EVAL_CONTEXT
