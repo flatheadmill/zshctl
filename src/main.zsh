@@ -15,6 +15,7 @@ function {
         "$(head -c 14 $shebang)" = '#!/usr/bin/env' &&
         "$(head -n 1 $shebang)" =~ ^#!/usr/bin/env\ +zshctl\ *$
     ]]; then
+        shift
         ZSHCTL_ARGZERO=$shebang
         commands ${ZSHCTL_ARGZERO:A}
         source ${ZSHCTL_ARGZERO:A}

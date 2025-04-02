@@ -5,6 +5,16 @@ function commands {
     COMMANDS+=( "${(@f)$(sed -n 's/^function  *\('$ctl':[^:][^ ]*\) *{$/\1/p' $argzero)}" )
 }
 
+function resource {
+    typeset name=${1:-} file=${2:-${ZSHCTL_ARGZERO:A}}
+    awk '
+        /^(# )?___ '$name' ___/ { flag=1; next }
+        flag && /^(# )?___/ { exit }
+        flag && /^# / { print substr($0, 3); next }
+        flag
+    ' $file
+}
+
 # Extracts a string using `resource` and runs it through `groff` on Linux or
 # `mandoc` on OS X to create a man page when the user requests help.
 #
@@ -22,6 +32,9 @@ function commands {
 #
 function usage {
     typeset usage=${1:-$funcstack[2]} cols="$(tput cols)"
+    typeset -A configuration
+    zshctl:configuration
+    typeset release_date=$(date --date=@$configuration[release_date] +'%B %-d, %Y')
     function {
         if (( cols > 120 )); then
             cols=120
@@ -34,11 +47,9 @@ function usage {
             GROFF_NO_SGR=1 groff -rLL=${cols}n -rLT=${cols}n -Wall -mtty-char -Tutf8 -man -c "$1"
         fi
     } =(
-        resource $usage | sed -e "$(
-            printf 's/__VERSION__/acrectl %s/' $ACRECTL_VERSION
-        )" -e "$(
-            printf 's/__RELEASE_DATE__/%s/' $ACRECTL_RELEASE_DATE
-        )"
+        printf '.TH ACRECTL-OP 1 %s %s %s\n' \
+            ${(qqq)release_date} ${(qqq)configuration[version]} ${(qqq)configuration[man_title]}
+        resource $usage
     ) | less
     exit
 }
@@ -183,6 +194,45 @@ function _parser_stash_error {
     typeset func=${1:-} reason=${3:-}
     __complete[reason]=$reason
     printf '__complete=( %s )\n' ${(j: :)"${(@qq)${(@kv)__complete}}"}
+}
+
+function zshctl:args:error {
+    typeset func=${1:-} reason=${2:-} flag=${3:-}
+    case $reason in
+        unknown )
+            printf 'unknown argument `%s`.\n' $flag 1>&2
+            exit 1
+            ;;
+        required )
+            printf '`%s` is a required argument.\n' $flag 1>&2
+            exit 1
+            ;;
+        execute )
+            acrectl $funcstack[3]
+            exit
+    esac
+}
+
+function zshctl:args:user:error {
+    zshctl:args:user:error "$@"
+}
+
+function args {
+    parser zshctl:args:user:error 3 $acrectl_registers[string_resources] "$@"
+}
+
+# Invoke the next sub-command from the extracted commands. The prefix is the
+# underbar delimited path of commands visited so far.
+function delegate {
+    typeset prefix=$funcstack[2]
+    if (( ! $# )); then
+        (( parse[complete] )) && return
+        abend 'fatal: %s expects a command argument' ${prefix//:/ }
+    fi
+    typeset delegate=$prefix:$1
+    shift
+    if (( $_COMMANDS[(Ie)$delegate] )) || abend 'fatal: no such command `%s`.' ${delegate//:/ }
+    $delegate "$@"
 }
 
 function parser {
