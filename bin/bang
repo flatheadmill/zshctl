@@ -1,0 +1,7 @@
+#!/usr/bin/env shebang
+
+function bangctl {
+    utility
+}
+
+# vim: ft=zsh:

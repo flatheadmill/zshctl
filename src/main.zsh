@@ -1,6 +1,6 @@
-ZSHCTL_CONFIGURATION[version]=0.0.0
-ZSHCTL_CONFIGURATION[release_date]=$(date +%s)
-ZSHCTL_CONFIGURATION[man_title]='Zshctl Manuals'
+zshctl[version]=0.0.0
+zshctl[release_date]=$(date +%s)
+zshctl[man_title]='Zshctl Manuals'
 
 # ___ zshctl:completion ___
 # .SH NAME
@@ -41,7 +41,7 @@ function zshctl:completion {
 }
 
 function zshctl:completion:bash {
-    { heredoc | sed -e 's/zshctl/'$ZSHCTL_CONFIGURATION[program]'/'; } <<'    EOF'
+    { heredoc | sed -e 's/zshctl/'$zshctl[program]'/'; } <<'    EOF'
     # bash completion V2 for zshctl                                  -*- shell-script -*-
 
     __zshctl_debug()
@@ -384,7 +384,7 @@ function zshctl:completion:bash {
 }
 
 function zshctl:completion:zsh {
-    { heredoc | sed -e 's/zshctl/'$ZSHCTL_CONFIGURATION[program]'/'; } <<'    EOF'
+    { heredoc | sed -e 's/zshctl/'$zshctl[program]'/'; } <<'    EOF'
     #compdef zshctl
     compdef _zshctl zshctl
 
@@ -600,7 +600,7 @@ function zshctl:completion:zsh {
     EOF
 }
 
-typeset -xgA ZSHCTL_CONFIGURATION
+typeset -xgA zshctl
 
 function _mandoc:zshctl:version {
     # TODO You could scan the document quickly and create bogo-load functions,
@@ -679,13 +679,13 @@ function zshctl:version {
     eval "$(args -d o,output -bx h,help -- "$@")"
     case $o_output in
         terse )
-            print $ZSHCTL_CONFIGURATION[version]
+            print $zshctl[version]
             ;;
         verbose )
-            print "$ZSHCTL_CONFIGURATION[version] $ZSHCTL_CONFIGURATION[release_date]"
+            print "$zshctl[version] $zshctl[release_date]"
             ;;
         shell )
-            print "${(qq)ZSHCTL_CONFIGURATION[version]} ${(qq)ZSHCTL_CONFIGURATION[release_date]}"
+            print "${(qq)zshctl[version]} ${(qq)zshctl[release_date]}"
             ;;
     esac
 }
@@ -696,7 +696,7 @@ function zshctl {
 }
 
 function shebang {
-    typeset shebang=${1:-} expected=${2:-} match=()
+    typeset shebang=${1:-} match=()
     [[
         ( $shebang =~ ^\. || $shebang =~ / ) &&
         -f $shebang &&
@@ -704,29 +704,33 @@ function shebang {
             (
                 "$(head -c 14 $shebang)" = '#!/usr/bin/env' &&
                 "$(head -n 1 $shebang)" =~ ^#!/usr/bin/env\ +([^ ]+)\ *$ &&
-                $match[1] = $expected
+                $match[1] = ${zshctl[argzero]:t}
             ) ||
             (
                 "$(head -n 1 $shebang)" =~ ^#!(/[^ ]+)\ *$ &&
-                $match[1] = $ZSH_ARGZERO
+                $match[1] = $zshctl[argzero]
             )
         )
     ]]
 }
 
+zshctl[shebangable]=1
+zshctl[main]=zshctl
+
 # ___ main ___
 # We're getting awfully close to white-labeling again.
 # ___
-function main {
+function skip {
     typeset shebang=${1:-}
     typeset -A COMMANDS=()
     typeset commands=() func src pattern
     if shebang $shebang zshctl; then
         shift
         ZSHCTL_ARGZERO=$shebang
+        print $ZSHCTL_ARGZERO
         source ${ZSHCTL_ARGZERO:A}
-        if (( ${+ZSHCTL_CONFIGURATION[commands]} )); then
-            commands=( "${(@QA)${(z)ZSHCTL_CONFIGURATION}}" )
+        if (( ${+zshctl[commands]} )); then
+            commands=( "${(@QA)${(z)zshctl}}" )
         else
             commands=( 'zshctl:*' "${shebang:t}:*" )
         fi
@@ -737,14 +741,44 @@ function main {
             done
         done
         [[ -z $functions_source[${shebang:t}] ]] && abend 'shell function not found'
-        ZSHCTL_CONFIGURATION[program]=${shebang:t}
+        zshctl[program]=${shebang:t}
         ${shebang:t} "$@"
     else
         for func in "${(@k)functions_source}"; do
             [[ $func = zshctl:* ]] || continue
             COMMANDS[${func#*:}]=$func
         done
-        ZSHCTL_CONFIGURATION[program]=zshctl
+        zshctl[program]=zshctl
         zshctl "$@"
     fi
 }
+
+function {
+    typeset -A COMMANDS=()
+    typeset commands=() func src pattern
+    integer seek=1
+    typeset argzero=$ZSH_ARGZERO ZSHCTL_ARGZERO
+    zshctl[argzero]=$ZSH_ARGZERO
+    while (( $# && seek )); do
+        if (( zshctl[shebangable] )) && shebang $1; then
+            zshctl[argzero]=$1
+            shift
+            source ${zshctl[argzero]:A}
+            if (( ${+zshctl[commands]} )); then
+                commands=( "${(@QA)${(z)zshctl}}" )
+            else
+                commands=( 'zshctl:*' "${zshctl[argzero]:t}:*" )
+            fi
+            for func in "${(@k)functions_source}"; do
+                for pattern in "${(@)commands}"; do
+                    [[ $func = $~pattern ]] || continue
+                    COMMANDS[${func#*:}]=$func
+                done
+            done
+            zshctl[program]=${zshctl[argzero]:t}
+        else
+            seek=0
+        fi
+    done
+    $zshctl[main] "$@"
+} "$@"

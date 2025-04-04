@@ -16,8 +16,6 @@ function zshctl:compile {
     cat $dir/src/main.zsh
     print
 
-    printf 'ZSHCTL_CONFIGURATION[release_date]=%s\n' ${(q)o_release_date}
-    printf 'ZSHCTL_CONFIGURATION[version]=%s\n' ${(q)o_version}
-
-    print '\nmain "$@"; exit'
+    printf 'zshctl[release_date]=%s\n' ${(q)o_release_date}
+    printf 'zshctl[version]=%s\n' ${(q)o_version}
 }

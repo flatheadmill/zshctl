@@ -10,5 +10,3 @@ function {
 }
 
 source ${ZSH_ARGZERO:A:h:h}/src/main.zsh
-
-main "$@"; exit

@@ -27,8 +27,8 @@ function resource {
 #
 function usage {
     typeset usage=${1:-$funcstack[2]} cols="$(tput cols)"
-    typeset release_date=$(date --date=@$ZSHCTL_CONFIGURATION[release_date] +'%B %-d, %Y')
-    typeset capitalized=${usage//*:/$ZSHCTL_CONFIGURATION[program]:}
+    typeset release_date=$(date --date=@$zshctl[release_date] +'%B %-d, %Y')
+    typeset capitalized=${usage//*:/$zshctl[program]:}
     capitalized=${${capitalized//:/-}:u}
     typeset mandoc=() lines=() line
     lines=( "${(@Af)"$(resource $usage $functions_source[$usage])"}" )
@@ -45,7 +45,7 @@ function usage {
         else
             cols=$(( cols - 7 ))
         fi
-        if (( $ZSHCTL_CONFIGURATION[mandoc]] )); then
+        if (( $zshctl[osx]] )); then
             mandoc -O width=${cols}  -T utf8 $1
         else
             GROFF_NO_SGR=1 groff -rLL=${cols}n -rLT=${cols}n -Wall -mtty-char -Tutf8 -man -c "$1"
@@ -54,8 +54,8 @@ function usage {
         printf '.TH %s 1 %s %s %s\n' \
             ${(qqq)capitalized} \
             ${(qqq)release_date} \
-            ${(qqq)ZSHCTL_CONFIGURATION[version]} \
-            ${(qqq)ZSHCTL_CONFIGURATION[man_title]}
+            ${(qqq)osx[version]} \
+            ${(qqq)osx[man_title]}
         print -rl "${(@)mandoc}"
     ) | less
     exit
