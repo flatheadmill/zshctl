@@ -10,5 +10,6 @@ function bangctl {
 
 zshctl[main]=bangctl
 zshctl[shebangable]=1
+zshctl[autoload_path]=BANGCTL_PATH
 
 # vim: ft=zsh:

@@ -45,7 +45,7 @@ function usage {
         else
             cols=$(( cols - 7 ))
         fi
-        if (( $zshctl[osx]] )); then
+        if (( $zshctl[osx] )); then
             mandoc -O width=${cols}  -T utf8 $1
         else
             GROFF_NO_SGR=1 groff -rLL=${cols}n -rLT=${cols}n -Wall -mtty-char -Tutf8 -man -c "$1"

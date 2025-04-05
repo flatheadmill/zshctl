@@ -753,13 +753,29 @@ function skip {
     fi
 }
 
+function include {
+    typeset func path=foo src
+    while (( $# )); do
+        func=${1:-}
+        shift
+        for path in "${(@)include_path}"; do
+            src="${${:-"$path/include/$func.zsh"}:A}"
+            if [[ -f $src && $functions_source[$func] != $src ]]; then
+                source $src
+            fi
+        done
+    done
+}
+
 function {
     typeset -A COMMANDS=()
     typeset commands=() func src pattern
     integer seek=1
+    typeset include_path=()
     typeset argzero=$ZSH_ARGZERO ZSHCTL_ARGZERO
     zshctl[argzero]=$ZSH_ARGZERO
     while (( $# && seek )); do
+        include_path+=( ${zshctl[argzero]:A:h:h} )
         if (( zshctl[shebangable] )) && shebang $1; then
             zshctl[argzero]=$1
             shift
@@ -780,5 +796,6 @@ function {
             seek=0
         fi
     done
+    include_path=( "${(@Oa)include_path}" )
     $zshctl[main] "$@"
 } "$@"

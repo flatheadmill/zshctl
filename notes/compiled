@@ -1,0 +1,7 @@
+#!/usr/bin/env
+
+zmodload zsh/parameter
+
+source notes/uncompiled.zsh
+
+print "${(@kv)functions_source}"

@@ -19,7 +19,71 @@ Second, for autoloading, we have the ability to auto-generate your commands
 section. It will be a sorted list of commands that are available according to
 the command discovery mechanism, which is still in flux.
 
+## Checklist
+
+- [ ] Documentation.
+    - [ ] Document completion commands.
+    - [ ] Document version.
+- [ ] Autoload new commands.
+    - [ ] Create a tied search path.
+    - [ ] Search search path at startup, use globs or some such to find
+    directories, or a file like `commands.zsh`.
+    - [ ] Discover commands in `git` repositories.
+    - [ ] Create a git clone in `~/.local/var` or similiar.
+    - [ ] Compile on `git clone` and `git pull`.
+    - [ ] Skip compilation of symlinked commands.
+    - [ ] Implement command description MANDOC generation.
+- [ ] Autoload functions.
+    - [ ] Weakly mimic `autoload`.
+
 ## Diary
+
+### Sat Apr  5 11:40:47 AM CDT 2025
+
+Appears that we explicitly load libraries and automatically load commands.
+
+### Sat Apr  5 09:24:24 AM CDT 2025
+
+Considering autoloading. Compiled Zsh is opportunistic. The source is supposed
+to live next the compiled Zsh and it is supposed to be recompiled as needed.
+The source path is still reported from `functions_source` when the compiled
+Zsh is used. This means we can stick with using `awk` to fetch our MANDOC and
+we can easily add additional MANDOC for a description to include in options.
+
+Occurs to me that, we can either symlink to your checkout of the project, or
+we can clone the project for you, then symlink to that, so we can have an
+`asdf` like extensibility mechanism. In fact, we can prompt you to ask, if
+you're in a repo, if you want to link here, or cache a copy.
+
+Could be an extensible dependency installer, then. We're already keeping a
+database. Let's make sure that we've correctly white-labeled and that we
+create a database for your application, not for `zshctl` in general.
+
+Do you maintain a search path? Or do you have a local path? Search path with
+strict rules, I suppose.
+
+We can go ahead and add libraries while you're at it. This is going to make it
+easier for someone to pick and choose what they include, and make us feel
+better about fiddling with new libraries. We will end up duplicating them on
+disk. We might have `block.zsh` for `alfactl` in its search path and another
+`block.zsh` in for `bravoctl` in its search path. This bothers me not at all.
+If it bothers me later on, try not to let it bother you, me.
+
+Now that we have shebangable programs, we may as well have a go at
+autoloading. Make it like `autoload` but let's not delve too deep into
+`autoload`. We can learn more about it as we work on our dotfiles. We'll come
+back to it when we're ready to benchmark `zshctl` performance.
+
+Two extensions might want to include the same library but at different
+versions. We can make this a downstream problem, or else we have to think of a
+way to autoload the correct version for a command. Probably the latter. Then
+we have a rule that if you go down a command path, you're building a
+particular version of a program, so if you want to call another one of your
+commands, you should fork a new process and have it do it's resolution.
+
+Note that if you have `charliectl` and you wanto make `zshctl` properties
+visible you can just copy it, and maybe then it's a `zshctl` property to know
+which one to use?
 
 ### Fri Apr  4 12:28:27 AM CDT 2025
 
@@ -124,24 +188,52 @@ commands 'blurdyctl:*' 'zshctl:*'
 
 ### Wed Apr  2 12:20:15 AM CDT 2025
 
-We can change delegate to use a map, it can include both `zshctl:` and `user:` command, searching for them and adding to the map without the prefix. The value of the map will include the source file to find the usage, and the original name, also to fine the usage.
+We can change delegate to use a map, it can include both `zshctl:` and `user:`
+command, searching for them and adding to the map without the prefix. The
+value of the map will include the source file to find the usage, and the
+original name, also to fine the usage.
 
-Thoughts like that suggest a way to perform white labeling, but we have already decided against white-labeling. It's probably not a good idea and it really doesn't make sense to have two programs with identitcal names.
+Thoughts like that suggest a way to perform white labeling, but we have
+already decided against white-labeling. It's probably not a good idea and it
+really doesn't make sense to have two programs with identitcal names.
 
-Instead of white-labeling, you can install your program with an installer that places `zshctl` in a /usr/libexec/ and make your shebang line use that program directly. We can add other programs as needed.
+Instead of white-labeling, you can install your program with an installer that
+places `zshctl` in a /usr/libexec/ and make your shebang line use that program
+directly. We can add other programs as needed.
 
 Need to register `zshctl.sh` and `zshctl.com`.
 
-We can have a curl installer `sh -c "$(curl -L zshctl.sh)"`. Everything can be sored in GitHub. We can use `flatheadmill.github.io/zshctl` for APT, yum, apk and aur. Gentoo and Homebrew can pull their tarballs from elsewhere, so we can pull them from GitHub downloads. There are limits on downloads and such, but we are not going to reach them, because this will never gain traction. We are not going to hit the repository limits any time soon. I only release things very rarely, and when that happens, all we're doing is storing zipped archive files. We can always squash and force push to keep the size minimal.
+We can have a curl installer `sh -c "$(curl -L zshctl.sh)"`. Everything can be
+sored in GitHub. We can use `flatheadmill.github.io/zshctl` for APT, yum, apk
+and aur. Gentoo and Homebrew can pull their tarballs from elsewhere, so we can
+pull them from GitHub downloads. There are limits on downloads and such, but
+we are not going to reach them, because this will never gain traction. We are
+not going to hit the repository limits any time soon. I only release things
+very rarely, and when that happens, all we're doing is storing zipped archive
+files. We can always squash and force push to keep the size minimal.
 
-Homebew and ebuild can use a `homebrew` and `ebuild` branch, so Homebrew will set up quickly. For apt and apk, which will be early, we need to create the github pages website.
+Homebew and ebuild can use a `homebrew` and `ebuild` branch, so Homebrew will
+set up quickly. For apt and apk, which will be early, we need to create the
+github pages website.
 
-To build we use Docker to get all the different operating system versions. It is a no-arch build so it can be run on any architecture. We clone the repository in the build, I suppose, rather than mounting it, and we design it so that it only really builds releases.
+To build we use Docker to get all the different operating system versions. It
+is a no-arch build so it can be run on any architecture. We clone the
+repository in the build, I suppose, rather than mounting it, and we design it
+so that it only really builds releases.
 
-We can see if we can use GitHub pages to host our root domain. No, we host on S3 or GCS and probably GCS because there's a free-tier.
+We can see if we can use GitHub pages to host our root domain. No, we host on
+S3 or GCS and probably GCS because there's a free-tier.
 
-Need to make some decisions about required commands, like `completion`. Are they optional or are they conventional. Conventional, I assume. Which means we also have to have conventions, or we could have conventions for `version` and `version --long`. If we want to disable these commands, we can deleted them from the `COMMANDS` array in our application.
+Need to make some decisions about required commands, like `completion`. Are
+they optional or are they conventional. Conventional, I assume. Which means we
+also have to have conventions, or we could have conventions for `version` and
+`version --long`. If we want to disable these commands, we can deleted them
+from the `COMMANDS` array in our application.
 
-Okay, we can white-label. Apparently, I can trace back a function to its source now, so we can have a compile that keeps a global list of prefixes to farm for function names. This would be a shorter path to getting the existing applications out because I don't have to develop a build for `zshctl`.
+Okay, we can white-label. Apparently, I can trace back a function to its
+source now, so we can have a compile that keeps a global list of prefixes to
+farm for function names. This would be a shorter path to getting the existing
+applications out because I don't have to develop a build for `zshctl`.
 
-Note that another reason we cannot universally intersperse arguments is because we need to detect a shebang line.
+Note that another reason we cannot universally intersperse arguments is
+because we need to detect a shebang line.
