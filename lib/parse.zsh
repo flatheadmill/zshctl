@@ -239,11 +239,16 @@ function delegate {
         (( parse[complete] )) && return
         abend 'fatal: %s expects a command argument' ${func//:/ }
     fi
-    typeset delegate=$func:$next cmd argzero
-    delegate=${delegate#*:}
+    typeset delegate=$func:$next cmd argzero qualified
     shift
     (( ${+COMMANDS[$delegate]} )) || abend 'fatal: no such command `%s`.' ${delegate//:/ }
-    $COMMANDS[$delegate] "$@"
+    if [[ ${${COMMANDS[$delegate]}[1]} = '/' ]]; then
+        source $COMMANDS[$delegate]
+        (( ${+functions_source[$delegate]} )) ||
+            abend 'unable to source `%s`.' $delegate
+        COMMANDS[$delegate]=':'
+    fi
+    $delegate "$@"
 }
 
 function parser {

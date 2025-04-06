@@ -38,6 +38,49 @@ the command discovery mechanism, which is still in flux.
 
 ## Diary
 
+### Sun Apr  6 09:39:37 AM CDT 2025
+
+Had the idea that the developer could specify which commands they wanted to
+include in their application by providing patterns like `zshctl:*`. I'd have
+no use for it. It would be a feature. I'd have no use for it because I'd never
+want to exclude `version`, nor the `complition`. I don't always need
+completion, for things that are purely programmatic, but I don't need
+Zsh builtin `getopts` either, so I just don't call it.
+
+Why do this and add code and wait five years and wonder why I added it and
+delete it? Thought about alternatives, like saying that the user could just
+remove commands from the `COMMANDS` array, but now I'm providing hooks upon
+hooks. Oh, well, I suppose the user could do this with an anonymous function,
+so I suppose that settles that.
+
+So, you see? You create these features, but it's Zsh and you'll have something
+easier and more obvious if you just pursue the path that smiplifies the core
+complexities we're attempting to add to the program.
+
+### Sat Apr  5 12:04:47 PM CDT 2025
+
+Seeing that for local commands we can't quite have something as simple as
+having a `./deltactl` directory in a reposiory unless we really want to link
+it hard. Oh, well, I suppose we could link all of the individual command
+directories, but then we can't extend and existing command without a lot of
+thinking about linking.
+
+Easier to have a search path. So a directory structure. If there is a
+`command.zsh` then we run that. Now, if we want to go by what we see in the
+directory structure, we can link that way, or we can have a configuration file
+that is named something like `link-as` and in it we can have `my-project` or
+similar, and we can soft link to that directory, but with a different name.
+
+Acceptable.
+
+Loading a library, we be able to get the function name, probably, but probably
+not. Not when we are in a nested function, so then we have to go up the stack,
+but we would know definitively if we hit a command because we'll have our
+command hash.
+
+Or when we source the command and execute it, we update the include path,
+which is even easier, isn't it? And we can do it for each command.
+
 ### Sat Apr  5 11:40:47 AM CDT 2025
 
 Appears that we explicitly load libraries and automatically load commands.

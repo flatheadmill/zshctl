@@ -2,7 +2,7 @@ zshctl[version]=0.0.0
 zshctl[release_date]=$(date +%s)
 zshctl[man_title]='Zshctl Manuals'
 
-# ___ zshctl:completion ___
+# ___ execute:completion ___
 # .SH NAME
 # zshctl\ completion \- generate shell completions
 # .SH SYNOPSIS
@@ -34,13 +34,13 @@ zshctl[man_title]='Zshctl Manuals'
 # .br
 # Generate shell compltions for Zsh.
 # ___
-function zshctl:completion {
+function execute:completion {
     eval "$(args -F -bx h,help -- "$@")"
     (( $# || parse[complete] )) || usage
     delegate "$@"
 }
 
-function zshctl:completion:bash {
+function execute:completion:bash {
     { heredoc | sed -e 's/zshctl/'$zshctl[program]'/'; } <<'    EOF'
     # bash completion V2 for zshctl                                  -*- shell-script -*-
 
@@ -383,7 +383,7 @@ function zshctl:completion:bash {
     EOF
 }
 
-function zshctl:completion:zsh {
+function execute:completion:zsh {
     { heredoc | sed -e 's/zshctl/'$zshctl[program]'/'; } <<'    EOF'
     #compdef zshctl
     compdef _zshctl zshctl
@@ -602,95 +602,7 @@ function zshctl:completion:zsh {
 
 typeset -xgA zshctl
 
-function _mandoc:zshctl:version {
-    # TODO You could scan the document quickly and create bogo-load functions,
-    # or actually, you don't have to scan the document quickly, you can
-    # determine from the source, where function is defined and you can create
-    # bogo-load functions. In fact, you don't need bogo-load functions...
-    # At mandoc time, you can check to see if the mandoc function is defined,
-    # if it is, then you can just call it, otherwise, you can see if you have
-    # the source and source it.
-    heredoc -v MANDOC <<'    EOF'
-        .SH NAME
-        .PG zshctl\ version \- generate shell completions
-        .PG .SY zshctl\ version
-        .I command
-        .RI [ arguments ]
-        .PG .SY zshctl\ completion
-        .RB [ \-h | \-\-help ]
-        .YS
-        .SH DESCRIPTION
-        .PG .B zshctl\ completions
-        generates completions for Zsh and Bash.
-        .SH OPTIONS
-        .TP
-        .BR \-h ,\  \-\-help
-        Help for
-        .PG .BR zshctl\ completions .
-        .SH COMMANDS
-        The following command can be invoked to perform 1Password operations. You can
-        learn more about the each command by invoking the command with the
-        .B --help
-        option.
-        .TP
-        .B zsh
-        .br
-        Generate shell compltions for Bash.
-        .TP
-        .B zsh
-        .br
-        Generate shell compltions for Zsh.
-    EOF
-}
-
-# ___ zshctl:version _ mandoc ___
-# .SH NAME
-# .PG zshctl\ version \- display version
-# .SH SYNOPSIS
-# .PG .SY zshctl\ version
-# .I command
-# .RI [ arguments ]
-# .PG .SY zshctl\ version
-# .RB [ \-h | \-\-help ]
-# .YS
-# .SH DESCRIPTION
-# .PG .B zshctl\ completion
-# generates completions for Zsh and Bash.
-# .SH OPTIONS
-# .TP
-# .BR \-h ,\  \-\-help
-# Help for
-# .PG .BR zshctl\ version .
-# .SH COMMANDS
-# You can learn more about the each command by invoking the command with the
-# .B --help
-# option.
-# .TP
-# .B bash
-# .br
-# Generate shell compltions for Bash.
-# .TP
-# .B zsh
-# .br
-# Generate shell compltions for Zsh.
-# ___
-function zshctl:version {
-    typeset o_output=terse
-    eval "$(args -d o,output -bx h,help -- "$@")"
-    case $o_output in
-        terse )
-            print $zshctl[version]
-            ;;
-        verbose )
-            print "$zshctl[version] $zshctl[release_date]"
-            ;;
-        shell )
-            print "${(qq)zshctl[version]} ${(qq)zshctl[release_date]}"
-            ;;
-    esac
-}
-
-function zshctl {
+function execute {
     eval "$(args -F -bx h,help -- "$@")"
     delegate "$@"
 }
@@ -715,43 +627,8 @@ function shebang {
 }
 
 zshctl[shebangable]=1
+zshctl[commandable]=1
 zshctl[main]=zshctl
-
-# ___ main ___
-# We're getting awfully close to white-labeling again.
-# ___
-function skip {
-    typeset shebang=${1:-}
-    typeset -A COMMANDS=()
-    typeset commands=() func src pattern
-    if shebang $shebang zshctl; then
-        shift
-        ZSHCTL_ARGZERO=$shebang
-        print $ZSHCTL_ARGZERO
-        source ${ZSHCTL_ARGZERO:A}
-        if (( ${+zshctl[commands]} )); then
-            commands=( "${(@QA)${(z)zshctl}}" )
-        else
-            commands=( 'zshctl:*' "${shebang:t}:*" )
-        fi
-        for func in "${(@k)functions_source}"; do
-            for pattern in "${(@)commands}"; do
-                [[ $func = $~pattern ]] || continue
-                COMMANDS[${func#*:}]=$func
-            done
-        done
-        [[ -z $functions_source[${shebang:t}] ]] && abend 'shell function not found'
-        zshctl[program]=${shebang:t}
-        ${shebang:t} "$@"
-    else
-        for func in "${(@k)functions_source}"; do
-            [[ $func = zshctl:* ]] || continue
-            COMMANDS[${func#*:}]=$func
-        done
-        zshctl[program]=zshctl
-        zshctl "$@"
-    fi
-}
 
 function include {
     typeset func path=foo src
@@ -768,34 +645,44 @@ function include {
 }
 
 function {
-    typeset -A COMMANDS=()
+    typeset -A COMMANDS=() AUTO_COMMANDS=()
     typeset commands=() func src pattern
     integer seek=1
-    typeset include_path=()
+    typeset include_path=() command_path=() base dir
     typeset argzero=$ZSH_ARGZERO ZSHCTL_ARGZERO
     zshctl[argzero]=$ZSH_ARGZERO
-    while (( $# && seek )); do
+    while
         include_path+=( ${zshctl[argzero]:A:h:h} )
-        if (( zshctl[shebangable] )) && shebang $1; then
+        if (( $zshctl[commandable] )); then
+            command_path+=( "${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}" )
+        fi
+        commands+=( "${zshctl[argzero]:t}:*" )
+        zshctl[program]=${zshctl[argzero]:t}
+        if (( $# && zshctl[shebangable] )) && shebang $1; then
             zshctl[argzero]=$1
             shift
+            zshctl[shebangable]=0
             source ${zshctl[argzero]:A}
-            if (( ${+zshctl[commands]} )); then
-                commands=( "${(@QA)${(z)zshctl}}" )
-            else
-                commands=( 'zshctl:*' "${zshctl[argzero]:t}:*" )
-            fi
-            for func in "${(@k)functions_source}"; do
-                for pattern in "${(@)commands}"; do
-                    [[ $func = $~pattern ]] || continue
-                    COMMANDS[${func#*:}]=$func
-                done
-            done
-            zshctl[program]=${zshctl[argzero]:t}
+            true
         else
-            seek=0
+            false
         fi
+    do; :; done
+    # The value for uncompiled functions is the path to the source, so we use
+    # ":" functions because it is not a popular file name.
+    for dir in "${(@)command_path}"; do
+        base=${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}
+        for cmd in "$base"/*/commands/**/command.zsh(N); do
+            func=${${cmd#$base/*/commands/}%/command.zsh}
+            # TODO Apply filter.
+            for pattern in "${(@)commands}"; do
+                COMMANDS[execute:$func]=$cmd
+            done
+        done
     done
-    include_path=( "${(@Oa)include_path}" )
-    $zshctl[main] "$@"
+    for func in "${(@k)functions_source}"; do
+        [[ $func = execute:* ]] || continue
+        COMMANDS[$func]=':'
+    done
+    execute "$@"
 } "$@"
