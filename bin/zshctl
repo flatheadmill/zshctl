@@ -5,31 +5,6 @@ zmodload zsh/parameter
 typeset -xgA zshctl
 
 zshctl[man_title]='Zshctl Manuals'
-
-function execute {
-    eval "$(args -F -bx h,help -- "$@")"
-    delegate "$@"
-}
-
-function shebang {
-    typeset shebang=${1:-} match=()
-    [[
-        ( $shebang =~ ^\. || $shebang =~ / ) &&
-        -f $shebang &&
-        (
-            (
-                "$(head -c 14 $shebang)" = '#!/usr/bin/env' &&
-                "$(head -n 1 $shebang)" =~ ^#!/usr/bin/env\ +([^ ]+)\ *$ &&
-                $match[1] = ${zshctl[argzero]:t}
-            ) ||
-            (
-                "$(head -n 1 $shebang)" =~ ^#!(/[^ ]+)\ *$ &&
-                $match[1] = $zshctl[argzero]
-            )
-        )
-    ]]
-}
-
 zshctl[shebangable]=1
 zshctl[commandable]=1
 zshctl[main]=zshctl
@@ -50,21 +25,38 @@ function include {
     done
 }
 
+function execute {
+    eval "$(args -F -bx h,help -- "$@")"
+    delegate "$@"
+}
+
 function {
-    typeset -A INCLUDES=() COMMANDS=() AUTO_COMMANDS=()
-    typeset commands=() func src pattern
-    integer seek=1
-    typeset include_path=() command_path=() base dir
-    typeset argzero=$ZSH_ARGZERO ZSHCTL_ARGZERO
+    typeset -A INCLUDES=() COMMANDS=()
+    typeset include_path=() command_path=() match=()
+    typeset shebang dir base func src
     zshctl[argzero]=$ZSH_ARGZERO
     while
         include_path+=( ${zshctl[argzero]:A:h:h} )
         if (( $zshctl[commandable] )); then
             command_path+=( "${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}" )
         fi
-        commands+=( "${zshctl[argzero]:t}:*" )
         zshctl[program]=${zshctl[argzero]:t}
-        if (( $# && zshctl[shebangable] )) && shebang $1; then
+        shebang=$1
+        if (( $# && zshctl[shebangable] )) && [[
+            ( $shebang =~ ^\. || $shebang =~ / ) &&
+            -f $shebang &&
+            (
+                (
+                    "$(head -c 14 $shebang)" = '#!/usr/bin/env' &&
+                    "$(head -n 1 $shebang)" =~ ^#!/usr/bin/env\ +([^ ]+)\ *$ &&
+                    $match[1] = ${zshctl[argzero]:t}
+                ) ||
+                (
+                    "$(head -n 1 $shebang)" =~ ^#!(/[^ ]+)\ *$ &&
+                    $match[1] = $zshctl[argzero]
+                )
+            )
+        ]]; then
             zshctl[argzero]=$1
             shift
             zshctl[shebangable]=0
@@ -80,10 +72,7 @@ function {
         base=${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}
         for src in "$base"/*/commands/**/command.zsh(N); do
             func=${${src#$base/*/commands/}%/command.zsh}
-            # TODO Apply filter.
-            for pattern in "${(@)commands}"; do
-                COMMANDS[execute:$func]=$src
-            done
+            COMMANDS[execute:$func]=$src
         done
         for src in "$base"/*/include/*.zsh(N); do
             INCLUDES[${src:t:r}]=$src
