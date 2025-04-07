@@ -684,7 +684,7 @@ function {
         for src in "$base"/*/include/*.zsh(N); do
             INCLUDES[${src:t:r}]=$src
         done
-        for src in "$base"/$zshctl[argzero]/release.zsh(N); do
+        for src in $base/release.zsh(N); do
             source $src
         done
     done
