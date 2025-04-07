@@ -231,26 +231,6 @@ function args {
     parser args:user:error 3 "$@"
 }
 
-# Invoke the next sub-command from the extracted commands. The prefix is the
-# underbar delimited path of commands visited so far.
-function delegate {
-    typeset func=$funcstack[2] next=${1:-}
-    if (( ! $# )); then
-        (( parse[complete] )) && return
-        abend 'fatal: %s expects a command argument' ${func//:/ }
-    fi
-    typeset delegate=$func:$next cmd argzero qualified
-    shift
-    (( ${+COMMANDS[$delegate]} )) || abend 'fatal: no such command `%s`.' ${delegate//:/ }
-    if [[ ${${COMMANDS[$delegate]}[1]} = '/' ]]; then
-        source $COMMANDS[$delegate]
-        (( ${+functions_source[$delegate]} )) ||
-            abend 'unable to source `%s`.' $delegate
-        COMMANDS[$delegate]=':'
-    fi
-    $delegate "$@"
-}
-
 function parser {
     setopt localoptions extendedglob
     typeset error=$1 depth=$2

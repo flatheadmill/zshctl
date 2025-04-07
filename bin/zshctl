@@ -25,6 +25,26 @@ function include {
     done
 }
 
+# Invoke the next sub-command from the extracted commands. The prefix is the
+# underbar delimited path of commands visited so far.
+function delegate {
+    typeset func=$funcstack[2] next=${1:-}
+    if (( ! $# )); then
+        (( parse[complete] )) && return
+        abend 'fatal: %s expects a command argument' ${func//:/ }
+    fi
+    typeset delegate=$func:$next cmd argzero qualified
+    shift
+    (( ${+COMMANDS[$delegate]} )) || abend 'fatal: no such command `%s`.' ${delegate//:/ }
+    if [[ ${${COMMANDS[$delegate]}[1]} = '/' ]]; then
+        source $COMMANDS[$delegate]
+        (( ${+functions_source[$delegate]} )) ||
+            abend 'unable to source `%s`.' $delegate
+        COMMANDS[$delegate]=':'
+    fi
+    $delegate "$@"
+}
+
 function execute {
     eval "$(args -F -bx h,help -- "$@")"
     delegate "$@"
@@ -69,15 +89,14 @@ function {
     # The value for uncompiled functions is the path to the source, so we use
     # ":" functions because it is not a popular file name.
     for dir in "${(@)command_path}"; do
-        base=${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}
-        for src in "$base"/*/commands/**/command.zsh(N); do
+        for src in "$dir"/*/commands/**/command.zsh(N); do
             func=${${src#$base/*/commands/}%/command.zsh}
             COMMANDS[execute:$func]=$src
         done
-        for src in "$base"/*/include/*.zsh(N); do
+        for src in "$dir"/*/include/*.zsh(N); do
             INCLUDES[${src:t:r}]=$src
         done
-        for src in $base/release.zsh(N); do
+        for src in $dir/release.zsh(N); do
             source $src
         done
     done
@@ -85,6 +104,7 @@ function {
         [[ $func = execute:* ]] || continue
         COMMANDS[$func]=':'
     done
+    include heredoc
     include parse
     execute "$@"
 } "$@"
