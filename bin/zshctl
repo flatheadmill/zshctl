@@ -52,11 +52,10 @@ function execute {
 
 function {
     typeset -A INCLUDES=() COMMANDS=()
-    typeset include_path=() command_path=() match=()
+    typeset command_path=() match=()
     typeset shebang dir base func src
     zshctl[argzero]=$ZSH_ARGZERO
     while
-        include_path+=( ${zshctl[argzero]:A:h:h} )
         if (( $zshctl[commandable] )); then
             command_path+=( "${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}" )
         fi
