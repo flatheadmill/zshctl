@@ -631,21 +631,23 @@ zshctl[commandable]=1
 zshctl[main]=zshctl
 
 function include {
-    typeset func path=foo src
     while (( $# )); do
-        func=${1:-}
+        case "${INCLUDES[$1]}" in
+            /* )
+                source $INCLUDES[$1]
+                INCLUDES[$1]=':'
+                ;;
+            : )
+                ;;
+            * )
+                abend 'unable to include %s' "${(qqq)1}"
+        esac
         shift
-        for path in "${(@)include_path}"; do
-            src="${${:-"$path/include/$func.zsh"}:A}"
-            if [[ -f $src && $functions_source[$func] != $src ]]; then
-                source $src
-            fi
-        done
     done
 }
 
 function {
-    typeset -A COMMANDS=() AUTO_COMMANDS=()
+    typeset -A INCLUDES=() COMMANDS=() AUTO_COMMANDS=()
     typeset commands=() func src pattern
     integer seek=1
     typeset include_path=() command_path=() base dir
@@ -672,17 +674,24 @@ function {
     # ":" functions because it is not a popular file name.
     for dir in "${(@)command_path}"; do
         base=${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}
-        for cmd in "$base"/*/commands/**/command.zsh(N); do
-            func=${${cmd#$base/*/commands/}%/command.zsh}
+        for src in "$base"/*/commands/**/command.zsh(N); do
+            func=${${src#$base/*/commands/}%/command.zsh}
             # TODO Apply filter.
             for pattern in "${(@)commands}"; do
-                COMMANDS[execute:$func]=$cmd
+                COMMANDS[execute:$func]=$src
             done
+        done
+        for src in "$base"/*/include/*.zsh(N); do
+            INCLUDES[${src:t:r}]=$src
+        done
+        for src in "$base"/$zshctl[argzero]/release.zsh(N); do
+            source $src
         done
     done
     for func in "${(@k)functions_source}"; do
         [[ $func = execute:* ]] || continue
         COMMANDS[$func]=':'
     done
+    include parse
     execute "$@"
 } "$@"
