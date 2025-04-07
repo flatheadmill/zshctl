@@ -1,12 +1,101 @@
 #!/usr/bin/env zsh
 
-source ${ZSH_ARGZERO:A:h:h}/src/header.zsh
+zmodload zsh/parameter
 
-function {
-    typeset lib
-    for lib in ${ZSH_ARGZERO:A:h:h}/lib/*.zsh; do
-        source $lib
+typeset -xgA zshctl
+
+zshctl[man_title]='Zshctl Manuals'
+
+function execute {
+    eval "$(args -F -bx h,help -- "$@")"
+    delegate "$@"
+}
+
+function shebang {
+    typeset shebang=${1:-} match=()
+    [[
+        ( $shebang =~ ^\. || $shebang =~ / ) &&
+        -f $shebang &&
+        (
+            (
+                "$(head -c 14 $shebang)" = '#!/usr/bin/env' &&
+                "$(head -n 1 $shebang)" =~ ^#!/usr/bin/env\ +([^ ]+)\ *$ &&
+                $match[1] = ${zshctl[argzero]:t}
+            ) ||
+            (
+                "$(head -n 1 $shebang)" =~ ^#!(/[^ ]+)\ *$ &&
+                $match[1] = $zshctl[argzero]
+            )
+        )
+    ]]
+}
+
+zshctl[shebangable]=1
+zshctl[commandable]=1
+zshctl[main]=zshctl
+
+function include {
+    while (( $# )); do
+        case "${INCLUDES[$1]}" in
+            /* )
+                source $INCLUDES[$1]
+                INCLUDES[$1]=':'
+                ;;
+            : )
+                ;;
+            * )
+                abend 'unable to include %s' "${(qqq)1}"
+        esac
+        shift
     done
 }
 
-source ${ZSH_ARGZERO:A:h:h}/src/main.zsh
+function {
+    typeset -A INCLUDES=() COMMANDS=() AUTO_COMMANDS=()
+    typeset commands=() func src pattern
+    integer seek=1
+    typeset include_path=() command_path=() base dir
+    typeset argzero=$ZSH_ARGZERO ZSHCTL_ARGZERO
+    zshctl[argzero]=$ZSH_ARGZERO
+    while
+        include_path+=( ${zshctl[argzero]:A:h:h} )
+        if (( $zshctl[commandable] )); then
+            command_path+=( "${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}" )
+        fi
+        commands+=( "${zshctl[argzero]:t}:*" )
+        zshctl[program]=${zshctl[argzero]:t}
+        if (( $# && zshctl[shebangable] )) && shebang $1; then
+            zshctl[argzero]=$1
+            shift
+            zshctl[shebangable]=0
+            source ${zshctl[argzero]:A}
+            true
+        else
+            false
+        fi
+    do; :; done
+    # The value for uncompiled functions is the path to the source, so we use
+    # ":" functions because it is not a popular file name.
+    for dir in "${(@)command_path}"; do
+        base=${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}
+        for src in "$base"/*/commands/**/command.zsh(N); do
+            func=${${src#$base/*/commands/}%/command.zsh}
+            # TODO Apply filter.
+            for pattern in "${(@)commands}"; do
+                COMMANDS[execute:$func]=$src
+            done
+        done
+        for src in "$base"/*/include/*.zsh(N); do
+            INCLUDES[${src:t:r}]=$src
+        done
+        for src in $base/release.zsh(N); do
+            source $src
+        done
+    done
+    for func in "${(@k)functions_source}"; do
+        [[ $func = execute:* ]] || continue
+        COMMANDS[$func]=':'
+    done
+    include parse
+    execute "$@"
+} "$@"
