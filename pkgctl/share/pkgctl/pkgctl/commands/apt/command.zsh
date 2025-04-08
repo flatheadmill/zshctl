@@ -31,22 +31,24 @@ function generate_release {
     do_hash "SHA256" "sha256sum"
 }
 
-function aptify {
-    typeset version=$(zsh compiled/zshctl version)
-    typeset stem=zshctl_${version}_all
+function execute:apt {
+    typeset version
+    version=$(zsh compiled/$conf[program]/bin/$conf[program] version) ||
+        abend 'fatal: cannot get version'
+    typeset stem=$conf[program]_${version}_all
     mkdir -p deb/$stem/DEBIAN
-    { heredoc -f $version > deb/$stem/DEBIAN/control; } <<'    EOF'
-    Package: zshctl
-    Version: %s
-    Architecture: all
-    Maintainer: Alan Gutierrez <alan@prettyrobots.com>
-    Description: Zsh CLI application framework.
-     A collection of Zsh utilities in a program that runs Zsh programs. Major
-     features include argument parsing, mandoc help, and shell completions.
-    Depends: zsh, less, groff-base
+    {
+        heredoc -q > deb/$stem/DEBIAN/control
+    } <<'    EOF'
+        Package: $conf[program]
+        Version: $version
+        Architecture: all
+        Maintainer: $conf[user.name] <$conf[user.email]>
+        Description: $conf[description]
+        Depends: $conf[apt.dependencies]
     EOF
     mkdir -p deb/$stem/usr/bin
-    install -m 755 compiled/zshctl deb/$stem/usr/bin/zshctl
+    install -m 755 compiled/$conf[program] deb/$stem/usr/bin/$conf[program]
     dpkg-deb --build --root-owner-group deb/$stem
     # get current repository
     mkdir /html

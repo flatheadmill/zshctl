@@ -2,34 +2,38 @@
 
 # TODO Ensure that `heredoc` can allow tabs.
 function ebuild_conf {
+# TODO noarch?
 # An `.ebuild` is just a Bash program. It must be indented with tabs and not with spaces.
-cat <<EOF
-# Copyright 2022 Gentoo Authors
-# Distributed under the terms of the GNU General Public License v2
+    heredoc -q <<'    EOF'
+        # Copyright 2022 Gentoo Authors
+        # Distributed under the terms of the GNU General Public License v2
 
-EAPI=8
+        EAPI=8
 
-DESCRIPTION="ZSH CLI application framework."
-HOMEPAGE="https://github.com/flatheadmill/zshctl"
-SRC_URI="https://zshctl.sh/downloads/zshctl-$version.tar.gz"
+        DESCRIPTION=${(qqq)conf[description]}
+        HOMEPAGE=${(qqq)conf[url.home]}
+        SRC_URI="${conf[url.repo]}/downloads/zshctl-$version.tar.gz"
 
-LICENSE="MIT"
-SLOT="0"
-KEYWORDS="~amd64"
+        LICENSE=${(qqq)conf[license]}
+        SLOT="0"
+        KEYWORDS="~amd64"
 
-DEPEND=""
-RDEPEND="\${DEPEND} app-shells/zsh dev-vcs/git sys-apps/groff sys-apps/less"
-BDEPEND=""
-S=\${WORKDIR}
+        DEPEND=""
+        RDEPEND="\${DEPEND} app-shells/zsh dev-vcs/git sys-apps/groff sys-apps/less"
+        BDEPEND=""
+        S=\${WORKDIR}
 
-src_install() {
-    dobin zshctl
+        src_install() {
+            dobin bin/$conf[program]
+            cp -r share/$conf[program] \${ED}/share/$conf[program]
+        }
+    EOF
 }
-EOF
-}
 
-function emergify {
-    typeset version=$(zsh compiled/zshctl version)
+function execute:emerge {
+    typeset version
+    version=$(compiled/$conf[program]/bin/$conf[program] version) ||
+        abend 'fatal: cannot get version'
     export FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox"
     gpg --import /run/secrets/gpg
     gpg --list-secret-keys --keyid-format=long
@@ -51,31 +55,33 @@ function emergify {
         git -C previous/ebuild.git commit --allow-empty -m 'Add `layout.conf`.'
         git -C previous/ebuild.git log -n 1
     fi
-    heredoc <<'    EOF' > /etc/portage/repos.conf/zshctl.conf
-        [zshctl]
+    heredoc -q <<'    EOF' > /etc/portage/repos.conf/$conf[program].conf
+        [$conf[program]]
         location = /work/ebuild
         sync-type = git
         sync-uri = /work/previous/ebuild.git
     EOF
-    emaint --repo zshctl sync ||
-        abend 'cannot run `email sync`'
+    emaint --repo $conf[program] sync || abend 'cannot run `emaint sync`'
     # TODO Better classification?
-    mkdir -p /work/ebuild/app-misc/zshctl/
-    ebuild_conf > /work/ebuild/app-misc/zshctl/zshctl-$version.ebuild
+    mkdir -p /work/ebuild/app-misc/$conf[program]
+    ebuild_conf > /work/ebuild/app-misc/$conf[program]/$conf[program]-$version.ebuild
+    cat /work/ebuild/app-misc/$conf[program]/$conf[program]-$version.ebuild
     mkdir -p /var/cache/distfiles/
-    cp /work/compiled/zshctl-$version.tar.gz /var/cache/distfiles/
-    cp /work/compiled/zshctl-$version.tar.gz .
+    cp /work/compiled/$conf[program]-$version.tar.gz /var/cache/distfiles/
+    cp /work/compiled/$conf[program]-$version.tar.gz .
     export GPG_TTY=$(tty)
-    mkdir -p /work/ebuild/app-misc/zshctl/
-    printf 'DIST zshctl-%s.tar.gz %s SHA512 %s\n' \
-        $version \
+    mkdir -p /work/ebuild/app-misc/$conf[program]
+    printf 'DIST %s-%s.tar.gz %s SHA512 %s\n' \
+        $conf[program] $version \
         $(wc -c zshctl-$version.tar.gz | cut -d' ' -f1) \
         $(sha512sum zshctl-$version.tar.gz | cut -d' ' -f1) >> /work/ebuild/app-misc/zshctl/Manifest
-    ebuild /work/ebuild/app-misc/zshctl/zshctl-$version.ebuild manifest ||
+    ebuild /work/ebuild/app-misc/$conf[program]/$conf[program]-$version.ebuild manifest ||
         abend '`ebuild` failed'
     git -C ebuild add .
     git -C ebuild branch -m main
-    git -C ebuild commit -S -m 'Release `zshctl` '$version'.'
+    typeset message
+    printf -v message 'Release `%s` %s.' $conf[program] $version
+    git -C ebuild commit -S -m $message
     git -C ebuild log -p -n 2
     mkdir -p /html
     git -C /html clone --bare /work/ebuild

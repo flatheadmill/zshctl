@@ -1,6 +1,6 @@
-ARG ZSHCTL_PREVIOUS_VERSION
+ARG PREVIOUS_VERSION
 
-FROM ghcr.io/flatheadmill/zshctl:v${ZSHCTL_PREVIOUS_VERSION} AS fetched
+FROM ghcr.io/flatheadmill/zshctl:v${PREVIOUS_VERSION} AS fetched
 
 FROM fetched AS previous
 
@@ -8,21 +8,21 @@ COPY --from=fetched /var/zshctl.github.io/ /html/
 
 FROM alpine AS compiled
 
-ARG ZSHCTL_NEXT_VERSION
+ARG NEXT_VERSION
 RUN apk update && apk add zsh git gpg gpg-agent
 COPY ./ /zshctl/
 WORKDIR /work
-RUN --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/build/compile
+RUN --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/pkgctl/bin/pkgctl compile
 RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
 FROM alpine AS brew
 
-RUN apk update && apk add zsh wget git
+RUN apk update && apk add zsh wget git ruby
 COPY --from=previous /html/ /work/previous/
 COPY --from=compiled /work/ /work/compiled/
 COPY ./ /zshctl/
 WORKDIR /work
-RUN /zshctl/build/brewify
+RUN /zshctl/pkgctl/bin/pkgctl brew
 
 FROM ubuntu:noble AS apt
 
@@ -31,7 +31,7 @@ COPY --from=previous /html/ /work/previous/
 COPY --from=compiled /work/ /work/compiled/
 COPY ./ /zshctl/
 WORKDIR /work
-RUN --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/build/aptify
+RUN --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/pkgctl/bin/pkgctl apt
 RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
 FROM alpine AS apk
@@ -44,7 +44,7 @@ WORKDIR /work
 # Separate invocation to copy the public key to the operating system's `/etc` as root.
 RUN --mount=type=secret,id=rsa openssl rsa -in /run/secrets/rsa -pubout -out /etc/apk/keys/alan@prettyrobots.com-67eee297.rsa.pub
 USER build
-RUN --mount=type=secret,id=rsa,uid=1983 --mount=type=tmpfs,dst=/home/build/.abuild /zshctl/build/apkify
+RUN --mount=type=secret,id=rsa,uid=1983 --mount=type=tmpfs,dst=/home/build/.abuild /zshctl/pkgctl/bin/pkgctl apk
 RUN zsh -c '[[ ! -d /home/build/.abuild ]]'
 
 FROM fedora AS yum
@@ -55,7 +55,7 @@ COPY --from=compiled /work/ /work/compiled/
 COPY ./ /zshctl/
 WORKDIR /work
 
-RUN --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/build/yumify
+RUN --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/pkgctl/bin/pkgctl yum
 RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
 FROM archlinux AS aur
@@ -72,7 +72,7 @@ COPY --chown=1983 --from=previous /html/ /work/previous/
 COPY ./ /zshctl/
 WORKDIR /work
 USER build
-RUN --mount=type=secret,id=gpg,uid=1983 --mount=type=tmpfs,dst=/gpg /zshctl/build/aurify
+RUN --mount=type=secret,id=gpg,uid=1983 --mount=type=tmpfs,dst=/gpg /zshctl/pkgctl/bin/pkgctl aur
 RUN zsh -c '[[ ! -d /gpg ]]'
 
 FROM gentoo/portage:latest AS portage
@@ -84,7 +84,7 @@ COPY --from=compiled /work/ /work/compiled/
 COPY --from=previous /html/ /work/previous/
 COPY ./ /zshctl/
 WORKDIR /work
-RUN --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/build/emergify
+RUN --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/pkgctl/bin/pkgctl emerge
 RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
 FROM alpine AS index
