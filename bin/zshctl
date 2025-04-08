@@ -27,6 +27,14 @@ function include {
     done
 }
 
+# Extract a string resource from this source file. String resources are within
+# comments. They begin with a resource name surrounded by three underbars. We're
+# rather particular about white space, there should be only one space separating
+# the comment the underbars and the resource name. Furthermore, the comment must
+# begin on the first column. The string resource is terminated by a line that
+# has a comment followed by three underbars, so either the next string resource
+# or a sole three underbar terminator.
+
 # Invoke the next sub-command from the extracted commands. The prefix is the
 # underbar delimited path of commands visited so far.
 function delegate {
