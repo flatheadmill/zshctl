@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 
 zmodload zsh/parameter
+zmodload zsh/datetime
 
 typeset -xgA zshctl
 
