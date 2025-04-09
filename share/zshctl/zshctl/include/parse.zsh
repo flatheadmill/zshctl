@@ -54,8 +54,8 @@ function usage {
         printf '.TH %s 1 %s %s %s\n' \
             ${(qqq)capitalized} \
             ${(qqq)release_date} \
-            ${(qqq)osx[version]} \
-            ${(qqq)osx[man_title]}
+            ${(qqq)zshctl[version]} \
+            ${(qqq)zshctl[man_title]}
         print -rl "${(@)mandoc}"
     ) | less
     exit
