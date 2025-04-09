@@ -239,9 +239,20 @@ function _parser_stash_error {
     printf '__complete=( %s )\n' ${(j: :)"${(@qq)${(@kv)__complete}}"}
 }
 
+# What if we called this something other than error, something like helper,
+# but, of course, not helper, like controller. It could be the patch that
+# let's us separate the parser from completions.
 function args:error {
     typeset func=${1:-} reason=${2:-} flag=${3:-}
+    shift 3
     case $reason in
+        complete )
+            if (( ${+functions[complete:$func]} )); then
+                printf 'complete:%s "$@"\n' $func
+            else
+                printf 'delegate %s\n' "${(j: :)${(qq)@}}"
+            fi
+            ;;
         unknown )
             printf 'unknown argument `%s`.\n' $flag 1>&2
             exit 1
@@ -299,7 +310,7 @@ function parser {
     typeset -A option=( kind scalar defined 0 required 0 ) short options missing
     typeset split=() long=() declared=() stack=( "${(@Oa)@}" )
     typeset popped on_zeroed state=option typesets
-    integer top=${#stack} intersperse=0 fallthrough=0
+    integer top=${#stack} intersperse=0 fallthrough=0 usage=0 completable=0
     while (( top )); do
         popped=$stack[$top]
         case $state:$popped in
@@ -310,6 +321,12 @@ function parser {
             *:-* )
                 state=option
                 case $popped in
+                    -C* )
+                        completable=1
+                        ;;
+                    -U* )
+                        usage=1
+                        ;;
                     -F* )
                         fallthrough=1
                         ;;
@@ -603,12 +620,16 @@ function parser {
     typeset combined=( "${(@)interspersed}" "${(@Oa)stack[1,$top]}" )
     if (( parse[complete] )); then
         printf 'parse=( %s )\n' ${(j: :)"${(@qq)${(@kv)parse}}"}
-    fi
-    if (( parse[complete] && ! fallthrough )); then
+        if (( completable )); then
+            args:user:error $funcstack[$depth] complete '' "${(@)combined}"
+        fi
         print return
     else
         if (( ${#combined} )); then
             printf 'set -- %s\n' ${(j: :)${(@qq)combined}}
+        elif (( usage )); then
+            print usage $funcstack[$depth]
+            print return
         else
             printf 'set --\n'
         fi

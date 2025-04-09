@@ -38,7 +38,13 @@ function include {
 # Invoke the next sub-command from the extracted commands. The prefix is the
 # underbar delimited path of commands visited so far.
 function delegate {
-    typeset func=$funcstack[2] next=${1:-}
+    typeset next=${1:-}
+    integer top=2
+    while [[ $funcstack[$top] != (execute:*|execute) ]]; do
+        ((top++))
+        (( top <= ${#funcstack} )) || abend 'must be called from an execute function'
+    done
+    typeset func=$funcstack[$top]
     if (( ! $# )); then
         (( parse[complete] )) && return
         abend 'fatal: %s expects a command argument' ${func//:/ }
