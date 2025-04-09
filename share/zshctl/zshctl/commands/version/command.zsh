@@ -1,4 +1,7 @@
-# ___ execute:version ___
+# ___ execute:version _ description ___
+# Display the current version of
+# .PG .BR __program__ .
+# ___ execute:version _ man ___
 # .SH NAME
 # .PG __program__\ version \- display version
 # .SH SYNOPSIS
@@ -9,25 +12,14 @@
 # .RB [ \-h | \-\-help ]
 # .YS
 # .SH DESCRIPTION
-# .PG .B __program__\ completion
-# generates completions for Zsh and Bash.
+# .PG .B __program__\ version
+# display the current version of
+# .PG .BR __program__ .
 # .SH OPTIONS
 # .TP
 # .BR \-h ,\  \-\-help
 # Help for
 # .PG .BR __program__\ version .
-# .SH COMMANDS
-# You can learn more about the each command by invoking the command with the
-# .B --help
-# option.
-# .TP
-# .B bash
-# .br
-# Generate shell compltions for Bash.
-# .TP
-# .B zsh
-# .br
-# Generate shell compltions for Zsh.
 # ___
 function execute:version {
     typeset o_output=terse
