@@ -43,7 +43,7 @@ function delegate {
         (( parse[complete] )) && return
         abend 'fatal: %s expects a command argument' ${func//:/ }
     fi
-    typeset delegate=$func:$next cmd argzero qualified
+    typeset delegate=$func:$next
     shift
     if [[ ${${COMMANDS[$delegate]}[1]} = '/' ]]; then
         source $COMMANDS[$delegate]
