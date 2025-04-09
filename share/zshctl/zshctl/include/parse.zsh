@@ -26,19 +26,57 @@ function resource {
 
 #
 function usage {
-    typeset usage=${1:-$funcstack[2]} cols="$(tput cols)"
+    setopt localoptions extendedglob
+    typeset usage=${1:-$funcstack[2]} man=${2:-0} cols="$(tput cols)"
     typeset release_date=$(date --date=@$zshctl[release_date] +'%B %-d, %Y')
     typeset capitalized=${usage//*:/$zshctl[program]:}
     capitalized=${${capitalized//:/-}:u}
-    typeset mandoc=() lines=() line
-    lines=( "${(@Af)"$(resource $usage $functions_source[$usage])"}" )
-    for line in "${(@)lines}"; do
-        if [[ $line = .PG\ * ]]; then
-            line=${line//zshctl/zidiom}
-            line=${line#.PG }
-        fi
-        mandoc+=( "$line" )
+    typeset mandoc=() lines=() split=() line cmd src
+    integer dirty=1
+    mandoc=( "${(@Af)"$(resource "$usage _ man" $functions_source[$usage])"}" )
+    while (( dirty )); do
+        dirty=0
+        lines=( "${(@)mandoc}" )
+        mandoc=()
+        for line in "${(@)lines}"; do
+            case $line in
+                .PG\ * )
+                    line=${line//__program__/$zshctl[program]}
+                    line=${line#.PG }
+                    mandoc+=( "$line" )
+                    ;;
+                .ZC\ * )
+                    line=${line#.ZC }
+                    case $line in
+                        commands )
+                            for cmd in "${(@o)${(@k)COMMANDS}}"; do
+                                if [[ $cmd = $usage:[^:]## ]]; then
+                                    if [[ $COMMANDS[$cmd] = ':' ]]; then
+                                        src=$functions_source[$cmd]
+                                    else
+                                        src=$COMMANDS[$cmd]
+                                    fi
+                                    src=$(resource "$cmd _ description" $src)
+                                    if [[ -n $src ]]; then
+                                        dirty=1
+                                        split=( "${(@ps:\n:)src}" )
+                                        mandoc+=( .TP ".B ${cmd##*:}" .br "${(@)split}" )
+                                    fi
+                                fi
+                            done
+                            ;;
+                    esac
+                    ;;
+                * )
+                    mandoc+=( "$line" )
+                    ;;
+            esac
+        done
     done
+    if (( man )); then
+        print -rl "${(@)mandoc}"
+        return
+    fi
     function {
         if (( cols > 120 )); then
             cols=120
@@ -80,9 +118,7 @@ function completion {
 
 function completions {
     typeset lines=() line
-    lines=( "${(@Af)$(
-        awk '/^(# )?___ '$parse[func]' ___/{flag=1;next}/^(# )?___/{flag=0}flag' "$src" | sed -E 's/^# ?//g'
-    )}" )
+    lines=( "${(@Af)$(usage $parse[func] 1)}" )
     typeset state=seek mandoc=( '.TH Ignore 1 "Manuals" "STOP" "Manuals"' )
     for line in "${(@Af)lines}"; do
         case $state:$line in
