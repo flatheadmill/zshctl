@@ -100,15 +100,28 @@ function usage {
 }
 
 function completion {
-    parse[complete]=0
-    eval "$(parser '' 2 -s m,message -b o,ordered -- "$@")"
-    parse[complete]=1
-    if (( o_ordered )); then
+    zparseopts -D -F -K -- \
+        {w,-waiting}=o_waiting \
+        {s,-suffix}:=o_suffix \
+        {o,-ordered}=o_ordered \
+        {m,-message}:=o_message || abend 'fatal: invalid arguments'
+    if (( ${#o_wating} && ! parse[waiting] )); then
+        parse[waiting]=1
+        print ':progress'
+    fi
+    if (( ${#o_ordered} )); then
         parse[flags]=$(( parse[flags] | 32 ))
         parse[flags]=$(( parse[flags] | 4 ))
     fi
-    if [[ -v o_message ]]; then
-        parse[message]=$o_message
+    if (( ${#o_suffix} == 2 )); then
+        parse[flags]=$(( parse[flags] | 2 ))
+        case $o_suffix[2] in
+            (/) parse[flags]=$(( parse[flags] | 64 ));;
+            (=) parse[flags]=$(( parse[flags] | 128 ));;
+        esac
+    fi
+    if [[ -n ${o_message[2]} ]]; then
+        parse[message]=$o_message[2]
     fi
     if (( $# )); then
         completion_match+=( ${1:-} )
