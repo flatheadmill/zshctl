@@ -29,7 +29,7 @@ function usage {
     setopt localoptions extendedglob
     typeset usage=${1:-$funcstack[2]} man=${2:-0} cols="$(tput cols)"
     typeset release_date=$(date --date=@$zshctl[release_date] +'%B %-d, %Y')
-    typeset capitalized=${usage//*:/$zshctl[program]:}
+    typeset capitalized=$zshctl[program]:${usage#*:}
     capitalized=${${capitalized//:/-}:u}
     typeset mandoc=() lines=() split=() line cmd src
     integer dirty=1
@@ -100,13 +100,15 @@ function usage {
 }
 
 function completion {
-    parse[fallthrough]=1
     parse[complete]=0
-    eval "$(parser '' 2 '' -b o,ordered -- "$@")"
+    eval "$(parser '' 2 -s m,message -b o,ordered -- "$@")"
     parse[complete]=1
     if (( o_ordered )); then
         parse[flags]=$(( parse[flags] | 32 ))
         parse[flags]=$(( parse[flags] | 4 ))
+    fi
+    if [[ -v o_message ]]; then
+        parse[message]=$o_message
     fi
     if (( $# )); then
         completion_match+=( ${1:-} )
@@ -247,8 +249,9 @@ function args:error {
     shift 3
     case $reason in
         complete )
-            if (( ${+functions[complete:$func]} )); then
-                printf 'complete:%s "$@"\n' $func
+            if (( ${+functions[complete:${func#execute:}]} )); then
+                parse[completed]=1
+                printf 'complete:%s %s\n' ${func#execute:} "${(qq)parse[incomplete]}"
             else
                 printf 'delegate %s\n' "${(j: :)${(qq)@}}"
             fi
@@ -286,7 +289,7 @@ function parser {
     # TODO Make a note of this.
     # zshctl <(print 'program')
 
-    [[ -v parse ]] || typeset -A parse=( complete 0 flags 0 fallthrough 0 )
+    [[ -v parse ]] || typeset -A parse=( complete 0 flags 0 )
     typeset err=_parser_print_error
     if (( parse[complete] )); then
         typeset err=_parser_stash_error
@@ -310,7 +313,7 @@ function parser {
     typeset -A option=( kind scalar defined 0 required 0 ) short options missing
     typeset split=() long=() declared=() stack=( "${(@Oa)@}" )
     typeset popped on_zeroed state=option typesets
-    integer top=${#stack} intersperse=0 fallthrough=0 usage=0 completable=0
+    integer top=${#stack} intersperse=0 usage=0 completable=0
     while (( top )); do
         popped=$stack[$top]
         case $state:$popped in
@@ -326,9 +329,6 @@ function parser {
                         ;;
                     -U* )
                         usage=1
-                        ;;
-                    -F* )
-                        fallthrough=1
                         ;;
                     -@* )
                         intersperse=1
@@ -382,6 +382,7 @@ function parser {
                 option[long]=$split[2]
                 options[$split[2]]=${(j: :)${(@qqkv)option}}
                 long+=( $split[2] )
+                # TODO `__complete` is gone, so what is this doing?
                 if (( ! $option[defined] && __complete[earnest] )); then
                     case $option[kind] in
                         counter | boolean | toggle )
@@ -416,19 +417,27 @@ function parser {
     if [[ $funcstack[$depth] != *:* && ${stack[$top]:-} = __complete ]]; then
         ((top--))
         parse[complete]=1
+        parse[incomplete]=$stack[1]
         (( ${#completion_match} )) && abend 'should be empty'
         $funcstack[$depth] "${(@Oa)stack[2,$top]}"
         # print -u 2 ${(j: :)"${(@qq)${(@kv)parse}}"}
-        if (( ! parse[fallthrough] )) then
+        if (( ! parse[completed] )) then
             completions
             (( parse[flags] = parse[flags] | 4 ))
         fi
         typeset hit
         for hit in ${(@M)completion_match:#${stack[1]}*}; do
             [[ $stack[1] = '' && $hit[1] = - ]] && continue
-            printf 'printf -- '\''%%s\\t%%s\\n'\'' %s %s\n' \
-                ${(qqq)hit} ${(qqq)completions[$hit]}
+            if (( ${+completions[$hit]} )); then
+                printf 'printf -- '\''%%s\\t%%s\\n'\'' %s %s\n' \
+                    ${(qqq)hit} ${(qqq)completions[$hit]}
+            else
+                printf 'printf -- '\''%%s\\n'\'' %s %s\n' ${(qqq)hit}
+            fi
         done
+        if [[ -n $parse[message] ]]; then
+            printf 'printf '\''_activeHelp_ %s\\n'\''\n' $parse[message]
+        fi
         printf 'print -- :%d\n' $parse[flags]
         print 'return'
         return
