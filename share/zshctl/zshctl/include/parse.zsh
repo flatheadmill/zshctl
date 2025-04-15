@@ -105,10 +105,14 @@ function completion {
         {s,-suffix}:=o_suffix \
         {f,-files}=o_files \
         {o,-ordered}=o_ordered \
+        {p,-prefixed}=o_prefixed \
         {m,-message}:=o_message || abend 'fatal: invalid arguments'
     if (( ${#o_wating} && ! parse[waiting] )); then
         parse[waiting]=1
         print ':progress'
+    fi
+    if (( ${#o_prefixed} )); then
+        parse[flags]=$(( parse[flags] | 512 ))
     fi
     if (( ${#o_ordered} )); then
         parse[flags]=$(( parse[flags] | 32 ))
@@ -129,6 +133,7 @@ function completion {
     fi
     if [[ -n ${o_message[2]} ]]; then
         parse[message]=$o_message[2]
+        parse[flags]=$(( parse[flags] | 4 ))
     fi
     if (( $# )); then
         completion_match+=( ${1:-} )
