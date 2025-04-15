@@ -103,6 +103,7 @@ function completion {
     zparseopts -D -F -K -- \
         {w,-waiting}=o_waiting \
         {s,-suffix}:=o_suffix \
+        {f,-files}=o_files \
         {o,-ordered}=o_ordered \
         {m,-message}:=o_message || abend 'fatal: invalid arguments'
     if (( ${#o_wating} && ! parse[waiting] )); then
@@ -118,7 +119,13 @@ function completion {
         case $o_suffix[2] in
             (/) parse[flags]=$(( parse[flags] | 64 ));;
             (=) parse[flags]=$(( parse[flags] | 128 ));;
+            (:) parse[flags]=$(( parse[flags] | 256 ));;
         esac
+        parse[flags]=$(( parse[flags] | 4 ))
+    fi
+    if (( ${#o_files} )); then
+        print -u 2 files
+        parse[flags]=$(( parse[flags] & (~4) ))
     fi
     if [[ -n ${o_message[2]} ]]; then
         parse[message]=$o_message[2]
@@ -263,8 +270,8 @@ function args:error {
     case $reason in
         complete )
             if (( ${+functions[complete:${func#execute:}]} )); then
-                parse[completed]=1
-                printf 'complete:%s %s\n' ${func#execute:} "${(qq)parse[incomplete]}"
+                printf 'parse[completed]=1\n'
+                printf 'complete:%s %s\n' ${func#execute:} "${(j: :)${(@qq)@}}"
             else
                 printf 'delegate %s\n' "${(j: :)${(qq)@}}"
             fi
@@ -395,8 +402,7 @@ function parser {
                 option[long]=$split[2]
                 options[$split[2]]=${(j: :)${(@qqkv)option}}
                 long+=( $split[2] )
-                # TODO `__complete` is gone, so what is this doing?
-                if (( ! $option[defined] && __complete[earnest] )); then
+                if (( ! $option[defined] && ! parse[complete] )); then
                     case $option[kind] in
                         counter | boolean | toggle )
                             printf -v typesets 'integer o_%s=0\n' ${option[long]//-/_}
