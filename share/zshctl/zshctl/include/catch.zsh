@@ -1,4 +1,3 @@
-
 function catch {
     source <({
         integer output input try tried code
@@ -15,7 +14,11 @@ function catch {
         exec {try}>&p
         exec {tried}<&p
         coproc :
-        "$@[3,-1]" 1>&${output} 2>&${try}
+        if (( $# > 2 )); then
+            "$@[3,-1]" 1>&${output} 2>&${try}
+        else
+            source <(cat)
+        fi
         code=$?
         exec {try}>&-
         exec {output}>&-
