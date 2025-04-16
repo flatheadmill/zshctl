@@ -656,7 +656,6 @@ function parser {
     typeset combined=( "${(@)interspersed}" "${(@Oa)stack[1,$top]}" )
     if (( parse[complete] )); then
         printf 'parse=( %s )\n' ${(j: :)"${(@qq)${(@kv)parse}}"}
-        print -u 2 -r -- "${(@kv)parse}"
         if (( completable )); then
             args:user:error $funcstack[$depth] complete '' "${(@)combined}"
         fi
