@@ -107,6 +107,7 @@ function completion {
         {o,-ordered}=o_ordered \
         {p,-prefixed}=o_prefixed \
         {m,-message}:=o_message || abend 'fatal: invalid arguments'
+    parse[flags]=$(( parse[flags] | 4 ))
     if (( ${#o_wating} && ! parse[waiting] )); then
         parse[waiting]=1
         print ':progress'
@@ -116,7 +117,6 @@ function completion {
     fi
     if (( ${#o_ordered} )); then
         parse[flags]=$(( parse[flags] | 32 ))
-        parse[flags]=$(( parse[flags] | 4 ))
     fi
     if (( ${#o_suffix} == 2 )); then
         parse[flags]=$(( parse[flags] | 2 ))
@@ -206,9 +206,11 @@ function completions {
                 state=
                 ;;
             *:OPTIONS | *:COMMANDS )
+                print -u 2 also hit $line
                 state=key
                 ;;
             key:?* )
+                print -u 2 super hit $line
                 # Trim whitespace.
                 key=${(MS)line##[[:graph:]]*[[:graph:]]}
                 # Strip all formatting.
@@ -446,6 +448,7 @@ function parser {
         $funcstack[$depth] "${(@Oa)stack[2,$top]}"
         # print -u 2 ${(j: :)"${(@qq)${(@kv)parse}}"}
         if (( ! parse[completed] )) then
+            print -u 2 hit
             completions
             (( parse[flags] = parse[flags] | 4 ))
         fi
@@ -653,6 +656,7 @@ function parser {
     typeset combined=( "${(@)interspersed}" "${(@Oa)stack[1,$top]}" )
     if (( parse[complete] )); then
         printf 'parse=( %s )\n' ${(j: :)"${(@qq)${(@kv)parse}}"}
+        print -u 2 -r -- "${(@kv)parse}"
         if (( completable )); then
             args:user:error $funcstack[$depth] complete '' "${(@)combined}"
         fi
