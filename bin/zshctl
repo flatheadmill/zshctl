@@ -124,7 +124,6 @@ function {
         [[ $func = execute:* ]] || continue
         COMMANDS[$func]=':'
     done
-    include heredoc
-    include parse
+    include heredoc parse
     execute "$@"
 } "$@"

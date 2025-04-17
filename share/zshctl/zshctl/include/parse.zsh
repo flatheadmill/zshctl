@@ -106,11 +106,16 @@ function completion {
         {f,-files}=o_files \
         {o,-ordered}=o_ordered \
         {p,-prefixed}=o_prefixed \
+        {S,-short-prefix}=o_short_prefixed \
         {m,-message}:=o_message || abend 'fatal: invalid arguments'
     parse[flags]=$(( parse[flags] | 4 ))
     if (( ${#o_wating} && ! parse[waiting] )); then
         parse[waiting]=1
         print ':progress'
+    fi
+    if (( ${#o_short_prefixed} )); then
+        parse[flags]=$(( parse[flags] | 2 ))
+        parse[flags]=$(( parse[flags] | 1024 ))
     fi
     if (( ${#o_prefixed} )); then
         parse[flags]=$(( parse[flags] | 512 ))
@@ -206,11 +211,9 @@ function completions {
                 state=
                 ;;
             *:OPTIONS | *:COMMANDS )
-                print -u 2 also hit $line
                 state=key
                 ;;
             key:?* )
-                print -u 2 super hit $line
                 # Trim whitespace.
                 key=${(MS)line##[[:graph:]]*[[:graph:]]}
                 # Strip all formatting.
@@ -263,9 +266,7 @@ function _parser_print_error {
 }
 
 function _parser_stash_error {
-    typeset func=${1:-} reason=${3:-}
-    __complete[reason]=$reason
-    printf '__complete=( %s )\n' ${(j: :)"${(@qq)${(@kv)__complete}}"}
+    print -u 2 DO NOT CALL ME ANYMORE
 }
 
 # What if we called this something other than error, something like helper,
@@ -316,11 +317,7 @@ function parser {
     # TODO Make a note of this.
     # zshctl <(print 'program')
 
-    [[ -v parse ]] || typeset -A parse=( complete 0 flags 0 )
-    typeset err=_parser_print_error
-    if (( parse[complete] )); then
-        typeset err=_parser_stash_error
-    fi
+    [[ -v parse ]] || typeset -A parse=( complete 0 flags 0 remainder '' )
     typeset -A completions=()
     typeset completion_match=()
     parse[func]=$funcstack[$depth]
@@ -434,7 +431,7 @@ function parser {
                 ;;
             * )
                 print -u 2 "unable to interpret $popped"
-                $err $error $funcstack[$depth] compile - 0
+                args:user:error $error $funcstack[$depth] compile - 0
                 exit 1
                 ;;
         esac
@@ -445,16 +442,18 @@ function parser {
         parse[complete]=1
         parse[incomplete]=$stack[1]
         (( ${#completion_match} )) && abend 'should be empty'
-        $funcstack[$depth] "${(@Oa)stack[2,$top]}"
+        $funcstack[$depth] "${(@Oa)stack[1,$top]}"
         # print -u 2 ${(j: :)"${(@qq)${(@kv)parse}}"}
         if (( ! parse[completed] )) then
-            print -u 2 hit
             completions
             (( parse[flags] = parse[flags] | 4 ))
         fi
         typeset hit
-        for hit in ${(@M)completion_match:#${stack[1]}*}; do
-            [[ $stack[1] = '' && $hit[1] = - ]] && continue
+        # TODO We could try grouping commands and options.
+        #for hit in ${(@M)completion_match:#${stack[1]}*}; do
+        for hit in ${completion_match}; do
+            [[ ${stack[1]} != -* && $hit = -* ]] && continue
+            #[[ $stack[1] = '' && $hit[1] = - ]] && continue
             if (( ${+completions[$hit]} )); then
                 printf 'printf -- '\''%%s\\t%%s\\n'\'' %s %s\n' \
                     ${(qqq)hit} ${(qqq)completions[$hit]}
@@ -485,7 +484,7 @@ function parser {
         last=$(( top == 1 ))
         case $state:$popped in
             switch:-- )
-                ((top--))
+                (( parse[complete] )) || ((top--))
                 break
                 ;;
             switch:--* )
@@ -506,11 +505,24 @@ function parser {
                 # Should we complain if the argument is ambiguous? Currently, we are
                 # just accepting the first match in alphabetical order.
                 index=$long[(Ie)$flag]
-                if (( ! index )); then
-                    $err $error $funcstack[$depth] unknown $flag $last
-                    return
-                fi
+                # Check if the flag is valid.
+                case $index:$parse[complete] in
+                    # Display an error if the argument is not recognized.
+                    0:0 )
+                        args:user:error $error $funcstack[$depth] unknown $flag $last
+                        return
+                        ;;
+                    # If we are completing and we do not match, we return to our
+                    # default completion logic which will use the man page to
+                    # match against available options.
+                    0:1 )
+                        printf 'parse=( %s )\n' ${(j: :)"${(@qq)${(@kv)parse}}"}
+                        print return
+                        return
+                        ;;
+                esac
                 option=( "${(@QA)${(z)options[$long[$index]]}}" )
+                option[matched]="--$flag"
                 missing[$option[long]]=0
                 # Go back over our poppped argument to determine if it is a negated
                 # boolean or an assignment.
@@ -547,6 +559,7 @@ function parser {
                 else
                     index=$long[(Ie)$short[$popped[2,2]]]
                     option=( "${(@QA)${(z)options[$long[$index]]}}" )
+                    option[matched]="-$popped[2,2]"
                     missing[$option[long]]=0
                     case $option[kind] in
                         boolean | counter )
@@ -656,8 +669,24 @@ function parser {
     typeset combined=( "${(@)interspersed}" "${(@Oa)stack[1,$top]}" )
     if (( parse[complete] )); then
         printf 'parse=( %s )\n' ${(j: :)"${(@qq)${(@kv)parse}}"}
+        if [[ $state = value && ${#combined} -eq 0 ]]; then
+            combined+=( '' )
+        fi
+        # TODO Come back and remove all the `true`.
         if (( completable )); then
-            args:user:error $funcstack[$depth] complete '' "${(@)combined}"
+            if [[ $combined = (-|--) ]]; then
+                true
+            else
+                if (( ${+functions[complete:${parse[func]#execute:}]} )); then
+                    printf 'parse[completed]=1\n'
+                    printf 'parse[matched]=%s\n' ${(qqq)option[matched]}
+                    printf 'complete:%s %s\n' ${parse[func]#execute:} "${(j: :)${(@qq)combined}}"
+                else
+                    printf 'delegate %s\n' "${(j: :)${(@qq)combined}}"
+                fi
+            fi
+        else
+            true
         fi
         print return
     else
