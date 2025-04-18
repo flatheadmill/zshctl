@@ -309,6 +309,16 @@ function args {
     parser args:user:error 3 "$@"
 }
 
+# Completion annoyances.
+# -f<value>
+# -f <value>
+# --flag=<value>
+# --flag <value>
+# --flag <key>
+# --flag <key> <value>
+# --flag <key>=<value>
+# Did I offer -f<key>=<value>?
+
 function parser {
     setopt localoptions extendedglob
     typeset error=$1 depth=$2
@@ -404,7 +414,7 @@ function parser {
                 fi
                 option[short]=$split[1]
                 option[long]=$split[2]
-                options[$split[2]]=${(j: :)${(@qqkv)option}}
+                options[$option[long]]=${(j: :)${(@qqkv)option}}
                 long+=( $split[2] )
                 if (( ! $option[defined] && ! parse[complete] )); then
                     case $option[kind] in
@@ -573,6 +583,7 @@ function parser {
                             if (( ${#popped} == 2 )); then
                                 ((top--))
                             else
+                                option[short_prefix]=1
                                 stack[$top]=${popped[3,-1]}
                             fi
                             ;;
