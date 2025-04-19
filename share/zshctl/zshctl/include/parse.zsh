@@ -100,6 +100,7 @@ function usage {
 }
 
 function completion {
+    print called completion >> $parse[debug]
     zparseopts -D -F -K -- \
         {w,-waiting}=o_waiting \
         {s,-suffix}:=o_suffix \
@@ -109,6 +110,7 @@ function completion {
         {S,-short-prefix}=o_short_prefixed \
         {m,-message}:=o_message || abend 'fatal: invalid arguments'
     parse[flags]=$(( parse[flags] | 4 ))
+    parse[completed]=1
     if (( ${#o_wating} && ! parse[waiting] )); then
         parse[waiting]=1
         print ':progress'
@@ -150,6 +152,7 @@ function completion {
 }
 
 function completions {
+    print completions $parse[func] >> $parse[debug]
     typeset lines=() line
     lines=( "${(@Af)$(usage $parse[func] 1)}" )
     typeset state=seek mandoc=( '.TH Ignore 1 "Manuals" "STOP" "Manuals"' )
@@ -207,6 +210,7 @@ function completions {
     typeset key split=() stripped quoted=()
     state=seek
     for line in "${(@)lines}"; do
+        print -- "$line" >> $parse[debug]
         case ${${:-$state:$line}//$~backspaced/} in
             *:STOP* )
                 state=
@@ -280,7 +284,6 @@ function args:error {
     case $reason in
         complete )
             if (( ${+functions[complete:${func#execute:}]} )); then
-                printf 'parse[completed]=1\n'
                 printf 'complete:%s %s\n' ${func#execute:} "${(j: :)${(@qq)@}}"
             else
                 printf 'delegate %s\n' "${(j: :)${(qq)@}}"
@@ -329,7 +332,7 @@ function parser {
     # TODO Make a note of this.
     # zshctl <(print 'program')
 
-    [[ -v parse ]] || typeset -A parse=( filenames 0 descriptions 0 complete 0 flags 0 remainder '' )
+    [[ -v parse ]] || typeset -A parse=( completed 0 filenames 0 descriptions 0 complete 0 flags 0 remainder '' )
     typeset -A completions=()
     typeset completion_match=()
     parse[func]=$funcstack[$depth]
@@ -473,51 +476,20 @@ function parser {
         ((top--))
         shell=$stack[$top]
         ((top--))
-        print -u 2 here $shell
         if [[ $shell = bash ]]; then
             parse[debug]=$stack[$top]
-            print hello >> $parse[debug]
-            heredoc >> $parse[debug] <<'            EOF'
-                entering into a world of bash completions
-            EOF
             ((top--))
-            printf '<%s>\n' $stack[$top] >> $parse[debug]
             line=$stack[$top]
             ((top--))
             point=$stack[$top]
-            print -u 2 "<$line> <${#line}> <$point>"
             ((top--))
-
-            # expriment
-
-            # We out to be able to quickly find the current word by parsing
-            # the command line cut at the cut point. We can then get the rest
-            # of the word by repeating until we get an additional word and
-            # then backing up. While are moving forward we look any one
-            # non-space character to tell us we were in the middle of a word.
-            if false; then
-            iterator=$point
+            #  We clip for Bash. It doesn't seem to do mid-word completion
+            #  anywhere. Not even `ls` can run with a file name that actually
+            #  exists. We can be just as brutal.
             words=( "${(z)${line[1,$point]}}" )
-            if (( point != ${#line} )); then
-                print hit >> $parse[debug]
-                i=$(( point + 1 ))
-                while (( $i <= ${#line} && ${#${(z)${line[1,$i]}}} == ${#words} )); do
-                    ((i++))
-                    words=( "${(z)${line[1,$i]}}" )
-                done
-            else
-                print miss >> $parse[debug]
-            fi
-            fi
-
-            # Too much. How about this. We clip for Bash. It doesn't seem to
-            # do mid-word completion anywhere. Not even `ls` can run with a
-            # file name that actually exists.
-            words=( "${(z)${line[1,$point]}}" )
-
-            # But, we do want to know if we are at the end of a complete word.
-            # We are going to add a character to the end and see if we get a
-            # new word.
+            # We want to know if we are at the end of a complete word. We are
+            # going to add a character to the end and see if we get a new
+            # word.
             if (( ${#words} != ${#${(z)${:-${line[1,$point]}x}}} )); then
                 parse[incomplete]=''
                 words=( "${(@)words[2,-1]}" )
@@ -525,30 +497,8 @@ function parser {
                 parse[incomplete]=$words[-1]
                 words=( "${(@)words[2,-2]}" )
             fi
-
-            print -l -- "${(@)words}" >> $parse[debug]
-
+            print -l -- "${(@)words}" "$parse[incomplete]" >> $parse[debug]
             print "<$line> <${line[1,$point]}> <${line[1,$i]}> <$point>" >> $parse[debug]
-            if false; then
-            print -u 2 here top is $top
-            for word in "${(z)line}"; do
-                print -u 2 loop "<$word> <$line>"
-                while true; do
-                    size=${#line}
-                    line=${line#[[:space:]]}
-                    (( ${#line} == size )) && break
-                    ((--point)) || break 2
-                done
-                size=${#line}
-                line=${line#$word}
-                (( size - ${#line} == ${#word} )) || print -u 2 'could not strip'
-                words+=( "$word" )
-                ((point-=${#word}))
-                print -u 2 "<$line>" "<$point>" "<${#words}>"
-                print -u 2 continue
-            done
-            print -u 2 here "<$point> <${#line}>"
-            fi
         else
             point=$stack[$top]
             ((top--))
@@ -559,11 +509,10 @@ function parser {
                 ((--top))
             done
         fi
-        print -u 2 -l "${(@)words}"
         parse[complete]=1
-        (( ${#completion_match} )) && abend 'should be empty'
+        print "parse[completed]<$parse[completed]>" >> $parse[debug]
         $funcstack[$depth] "${(@)words}"
-        print -u 2 here there
+        print "parse[completed]<$parse[completed]>" >> $parse[debug]
         # print -u 2 ${(j: :)"${(@qq)${(@kv)parse}}"}
         if (( ! parse[completed] )) then
             completions
@@ -577,7 +526,7 @@ function parser {
         # TODO We could try grouping commands and options.
         #for hit in ${(@M)completion_match:#${stack[1]}*}; do
         for hit in ${completion_match}; do
-            [[ ${stack[1]} != -* && $hit = -* ]] && continue
+            [[ ${parse[incomplete]} != -* && $hit = -* ]] && continue
             printf 'printf -- '\''result_completions+=( %%q )\\n'\'' %s\n' ${(qqq)hit}
             if (( ${+completions[$hit]} )); then
                 printf 'printf -- '\''result_settings[key]=%%q; result_descriptions[${result_settings[key]}]=%%q\\n'\'' %s %s\n' \
@@ -798,7 +747,6 @@ function parser {
                 true
             else
                 if (( ${+functions[complete:${parse[func]#execute:}]} )); then
-                    printf 'parse[completed]=1\n'
                     printf 'parse[matched]=%s\n' ${(qqq)option[matched]}
                     printf 'complete:%s %s\n' ${parse[func]#execute:} "${(j: :)${(@qq)combined}}"
                 else

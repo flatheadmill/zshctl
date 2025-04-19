@@ -23,6 +23,8 @@ __zshctl_get_completion_results() {
     # input with a timeout. We cancel the timer by writing to its standard
     # input. Note that this is always the way we do a coproc, managing it
     # through standard input instead of trying to sort out singal handling.
+    local putback=${COMP_LINE:$COMP_POINT:1}
+    __zshctl_debug "putback<$putback>"
     local spinner_PID code
     local -a spinner
     exec 3>&1
@@ -34,7 +36,7 @@ __zshctl_get_completion_results() {
                 local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
                 read -t 0.2 -r line
                 [[ -z $line ]] || return
-                printf '\e[?25l' 1>&3
+                printf '\e[?25l' 1>&3 # hide cursor
                 local i=0
                 while [[ -z $line ]]; do
                     i=$(( (i + $charwidth ) % ${#spin} ))
@@ -42,19 +44,18 @@ __zshctl_get_completion_results() {
                     echo -en "\033[1D" 1>&3
                     read -t 0.1 -r line
                 done
-                echo -en " \033[1D" 1>&3
-                printf '\e[?25h' 1>&3
+                echo -en "${putback:- }\033[1D" 1>&3
+                printf '\e[?25h' 1>&3 # normal cursor
             }
         }
     } 2>/dev/null
     # Calling ${COMP_WORD[0]} instead of directly zshctl allows to handle aliases.
     out=$(${COMP_WORDS[0]} __complete bash "${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}" \
-        "$COMP_LINE" "$COMP_POINT" 2>${ZSHCTL_COMP_DEBUG_FILE:-/dev/null})
+        "$COMP_LINE" "$COMP_POINT" 2>>${ZSHCTL_COMP_DEBUG_FILE:-/dev/null})
     code=$?
     echo close >&"${spinner[1]}"
     wait $spinner_PID
     exec 3>&-
-
 
     if (( code )); then
         __zshctl_debug "Completion failed: $code"
@@ -327,7 +328,7 @@ __start_zshctl()
 
     COMPREPLY=()
 
-    __zshctl_debug "========= before bash_compltion =========="
+    __zshctl_debug "========= zshctl completion =========="
     local w
     for w in "${COMP_WORDS[@]}"; do
         __zshctl_debug "COMP_WORD: $w"
@@ -336,58 +337,73 @@ __start_zshctl()
     # We start off with `COMP_WORDS` and `COMP_CWORD`. The words in
     # `COMP_WORDS` are split on a colleciton of characters specified in
     # `COMP_WORDBREAKS` creating tokens that do not map to shell words at all.
-    # `_init_completion` attempts to put everything back together again. It
-    # matches the tokens with `COMP_LINE` and tries reassemble any tokens
-    # split by the caracters given to `-n`. We give it all the characters.
-
+    # It's really a collection of tokens.
+    #
+    # Eventually you'll see it's because the completion mechanism can't
+    # account for prefixes. If you are completing `--protocol=`, your
+    # `COMPREPLY` must be filled with `--protocol=http`, `--protocol=https`,
+    # `--protocol=ftp`, etc. You can only replace a specific "WORD" so
+    # `COMP_WORDBREAKS` tends to include `=`.
+    #
+    # Tends to include because it's a global. You cannot make changes that are
+    # local to a specific completion. The source for the `git` completion will
+    # add the colon to `COMP_WORDBREAKS` if it is not already there.
+    #
+    # `bash_completion` attempts to put everything back together again with
+    # its `_init_completion` function. It matches the tokens with `COMP_LINE`
+    # and tries reassemble any tokens split by the caracters given to `-n`.
+    #
+    # These "words" come from Bash itself, which struggles because in shell,
+    # you don't parse for words until you've resolved all expansions. It's not
+    # doing what it normally does, evaulating the expansions and
+    # substitutions. Bash appears to do an okay job with process expansion
+    # `$(echo 1)`, but it does not recognize process substitution `<(echo 1)`.
+    # It breaks that up into too many words.
+    #
+    # `bash_completion` also attempts to remove redirections such as
+    # `2>/dev/null`, so when it gets the broken process substituion, it sees
+    # it as redirections and deletes the "word" with the leading `<(` and
+    # makes its `words` array of "words" worse off than `COMP_WORDS`. Only if
+    # the process substitution is nestled next to an `=` as in `--file=<(echo
+    # 1)` does the process substitution survive.
+    #
     # Note that Bash doesn't handle redirections well itself and the
-    # `COMP_WORDS` list is going to stop if you have a common redirection such
-    # as `1>&2`. Bash is not evaluating this line as it would if it were a
-    # command. If it were a command it would resolve expansions and
-    # substitutions and then parse the words.
-
+    # `COMP_WORDS` list is going to stop at the `&` if you have a common
+    # redirection such as `1>&2`. Bash is not evaluating this line as it would
+    # if it were a command. If it were a command it would resolve expansions
+    # and substitutions and then parse the words.
+    #
     # The Cobra code on which this is based would call the Cobra enabled
-    # program using `eval` and thereby resolve all the substitutions. They
-    # join the `words` array created by `bash_completion`, but this array
-    # contains "words" that are still split on characters in
-    # `$COMP_WORDBREAKS`, so the words passed to the program apt to be
-    # differnt from the words passed to the program when the command line is
-    # run.
-
-    # We've resovled to do our best with Bash and give up early. If we can't
-    # make sense of what we find in Zsh we give up.
-
-    # We're also inclined skip `_init_compltion` altogether, since the only
-    # thing that this Cobra code uses is file completion, we may be able to
-    # duplicate that in our Zshctl code.
-
+    # program using `eval` and thereby resolve all the expansions and any
+    # surviving substitutions. They join the `words` array created by
+    # `bash_completion`, but this array contains "words" that are still split
+    # on characters in `$COMP_WORDBREAKS`, so the words passed to the program
+    # apt to be different from the words passed to the program when the
+    # command line is run.
+    #
+    # Note that Zsh does not have these problems. It recognizes process
+    # expansion and substitution as a word of the future and makes it part of
+    # a single word. The words you recive will have expansion and substitution
+    # quoted and they will be split on space. Zsh has the ability to filter
+    # completions with prefixes and append suffixes before display, so it can
+    # work with full words.
+    #
+    # What's more, this robust word parsing is avialable to the user with the
+    # `z` modifier, as in `${(z)line}`.
+    #
+    # So obviously, we just pass `COMP_LINE` and `COMP_POINT` into our
+    # `zshctl` invocation and let `zshctl` parse the line with Zsh.
+    #
+    # We need to know about `COMP_WORDBREAKS`, we make assumptions about its
+    # value, but we do not parse it.
     __zshctl_debug 'COMP_LINE<%s> COMP_POINT<%s> <%s>' \
         "$COMP_LINE" "$COMP_POINT" "${COMP_LINE:$COMP_POINT:3}"
-
-    # `_init_completion` is also going to attempt to remove redirections. It
-    # accepts a list of characters that should be used
-
-    #_init_completion -n $COMP_WORDBREAKS=: || return
-
-    #__zshctl_debug
-    #__zshctl_debug "========= starting completion logic =========="
-    #__zshctl_debug "cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}, cword is $cword"
-
-    # The user could have moved the cursor backwards on the command-line.
-    # We need to trigger completion from the $cword location, so we need
-    # to truncate the command-line ($words) up to the $cword location.
-    #words=("${words[@]:0:$cword+1}")
-    #__zshctl_debug "Truncated words[*]: ${words[*]},"
 
     local out directive
     __zshctl_get_completion_results
     #__zshctl_process_completion_results
 }
 
-if [[ $(type -t compopt) = "builtin" ]]; then
-    complete -o default -F __start_zshctl zshctl
-else
-    complete -o default -o nospace -F __start_zshctl zshctl
-fi
+complete -o default -F __start_zshctl zshctl
 
-# ex: ts=4 sw=4 et filetype=sh
+# ex: ts=4 sw=4 et
