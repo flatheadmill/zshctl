@@ -520,7 +520,7 @@ function parser {
             parse[files]=none
         fi
         typeset hit key value
-        for hit in suffix filenames incomplete files descriptions message; do
+        for hit in prefix suffix filenames incomplete files descriptions message; do
             printf 'printf '\''result_settings[%%s]=%%q\n'\'' %s %s\n' ${(qqq)hit} ${(qqq)parse[$hit]}
         done
         # TODO We could try grouping commands and options.

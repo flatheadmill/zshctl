@@ -5,7 +5,7 @@ __zshctl_debug()
     local message
     if [[ -n ${ZSHCTL_COMP_DEBUG_FILE-} ]]; then
         printf -v message "$@"
-        echo "$message" >> "${BASH_COMP_DEBUG_FILE}"
+        echo "$message" >> "${ZSHCTL_COMP_DEBUG_FILE}"
     fi
 }
 
@@ -61,12 +61,13 @@ __zshctl_get_completion_results() {
         __zshctl_debug "Completion failed: $code"
         return
     fi
-
-    typeset -A result_settings
-    typeset -A result_descriptions
+    typeset -A result_settings result_descriptions
     typeset -a result_completions
     eval $out
 
+    if [[ -n ${result_settings[prefix]} ]]; then
+        result_completions=( "${result_completions[@]/#/${result_settings[prefix]}}" )
+    fi
     if [[ -n ${result_settings[suffix]} ]]; then
         result_settings[nospace]=1
         result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
