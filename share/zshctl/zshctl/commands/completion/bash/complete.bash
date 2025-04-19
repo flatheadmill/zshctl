@@ -2,8 +2,10 @@
 
 __zshctl_debug()
 {
+    local message
     if [[ -n ${BASH_COMP_DEBUG_FILE-} ]]; then
-        echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
+        printf -v message "$@"
+        echo "$message" >> "${BASH_COMP_DEBUG_FILE}"
     fi
 }
 
@@ -18,39 +20,23 @@ __zshctl_init_completion()
 # This function calls the zshctl program to obtain the completion
 # results and the directive.  It fills the 'out' and 'directive' vars.
 __zshctl_get_completion_results() {
+    # Makes any changes made by `set` local to the current function.
     local -
+    # Turn off job monitoring so we can use `coproc` without chattering.
     set +m
+
     local requestComp lastParam lastChar args
 
-    # Prepare the command to request completions for the program.
-    # Calling ${words[0]} instead of directly zshctl allows to handle aliases
-    args=("${words[@]:1}")
-    requestComp="${words[0]} __complete ${args[*]}"
+    # Calling ${COMP_WORD[0]} instead of directly zshctl allows to handle aliases
+    local program=${COMP_WORDS[0]}
+    __acrectl_debug ${COMP_WORDS[0]}
 
-    local w
-    for w in "${words[@]}"; do
-        __zshctl_debug "word: $w"
-    done
-
-    lastParam=${words[$((${#words[@]}-1))]}
-    lastChar=${lastParam:$((${#lastParam}-1)):1}
-    __zshctl_debug "lastParam ${lastParam}, lastChar ${lastChar}"
-
-    if [[ -z ${cur} && ${lastChar} != = ]]; then
-        # If the last parameter is complete (there is a space following it)
-        # We add an extra empty parameter so we can indicate this to the go method.
-        __zshctl_debug "Adding extra empty parameter"
-        requestComp="${requestComp} ''"
-    fi
-
-    # When completing a flag with an = (e.g., zshctl -n=<TAB>)
-    # bash focuses on the part after the =, so we need to remove
-    # the flag part from $cur
-    if [[ ${cur} == -*=* ]]; then
-        cur="${cur#*=}"
-    fi
-
-    __zshctl_debug "Calling <${requestComp}>"
+    # Start a spinner with a delay. Spinner animates by waiting on standard
+    # input with a timeout. We cancel the timer by writing to its standard
+    # input. Note that this is always the way we do a coproc, managing it
+    # through standard input instead of trying to sort out singal handling.
+    local spinner_PID
+    local -a spinner
     exec 3>&1
     {
         {
@@ -73,11 +59,13 @@ __zshctl_get_completion_results() {
             }
         }
     } 2>/dev/null
+    __zshctl_debug "Calling %q __complete bash %q %q" "$program" "$COMP_LINE" "$COMP_POINT"
     # Use eval to handle any environment variables and such
-    out=$(eval "${requestComp}" 2>/dev/null)
+    #out=$($program __complete bash "$COMP_LINE" "$COMP_POINT")
     echo close >&"${spinner[1]}"
     wait $spinner_PID
     exec 3>&-
+    return 1
 
     # Extract the directive integer at the very end of the output following a colon (:)
     directive=${out##*:}
@@ -384,27 +372,27 @@ __start_zshctl()
     # thing that this Cobra code uses is file completion, we may be able to
     # duplicate that in our Zshctl code.
 
-    __zshctl_debug "COMP_LINE<$COMP_LINE> COMP_POINT<$COMP_POINT> <${COMP_LINE:$COMP_POINT:3}>"
+    __zshctl_debug 'COMP_LINE<%s> COMP_POINT<%s> <%s>' \
+        "$COMP_LINE" "$COMP_POINT" "${COMP_LINE:$COMP_POINT:3}"
 
     # `_init_completion` is also going to attempt to remove redirections. It
     # accepts a list of characters that should be used
 
+    #_init_completion -n $COMP_WORDBREAKS=: || return
 
-    _init_completion -n $COMP_WORDBREAKS=: || return
-
-    __zshctl_debug
-    __zshctl_debug "========= starting completion logic =========="
-    __zshctl_debug "cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}, cword is $cword"
+    #__zshctl_debug
+    #__zshctl_debug "========= starting completion logic =========="
+    #__zshctl_debug "cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}, cword is $cword"
 
     # The user could have moved the cursor backwards on the command-line.
     # We need to trigger completion from the $cword location, so we need
     # to truncate the command-line ($words) up to the $cword location.
-    words=("${words[@]:0:$cword+1}")
-    __zshctl_debug "Truncated words[*]: ${words[*]},"
+    #words=("${words[@]:0:$cword+1}")
+    #__zshctl_debug "Truncated words[*]: ${words[*]},"
 
     local out directive
     __zshctl_get_completion_results
-    __zshctl_process_completion_results
+    #__zshctl_process_completion_results
 }
 
 if [[ $(type -t compopt) = "builtin" ]]; then

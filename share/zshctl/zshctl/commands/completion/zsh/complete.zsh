@@ -1,95 +1,28 @@
 #compdef zshctl
 compdef _zshctl zshctl
 
-function cursorBack() {
-  echo -en "\033[$1D"
-  # Mac compatible, but goes back to first column always. See comments
-  #echo -en "\r"
-}
-
 # zsh completion for zshctl                                  -*- shell-script -*-
 
 __zshctl_debug()
 {
-    local file="$BASH_COMP_DEBUG_FILE"
+    local file="$BASH_COMP_DEBUG_FILE" message
     if [[ -n ${file} ]]; then
-        echo "$*" >> "${file}"
+        printf -v message "$@"
+        print -r "$message" >> "$BASH_COMP_DEBUG_FILE"
     fi
-}
-
-function __zshctl_spinner {
-    unsetopt localoptions MONITOR
-    trap 'loop=0; print trapped >> ~/foo.txt' TERM
-    local spin='⣾⣽⣻⢿⡿⣟⣯⣷'
-    tput civis
-    sleep .2
-    integer i=0 loop=1
-    print ${#spin} >> ~/foo.txt
-    while (( loop )); do
-        i=$(( (i + 1) % ${#spin} ))
-        printf $spin[$(( i + 1 ))]'\b'
-        sleep .1
-    done
-    tput cnorm
 }
 
 _zshctl()
 {
     unsetopt localoptions MONITOR
-    local shellCompDirectiveError=1
-    local shellCompDirectiveNoSpace=2
-    local shellCompDirectiveNoFileComp=4
-    local shellCompDirectiveFilterFileExt=8
-    local shellCompDirectiveFilterDirs=16
-    local shellCompDirectiveKeepOrder=32
-    local shellCompDirectiveSlash=64
-    local shellCompDirectiveEquals=128
-    local shellCompDirectiveColon=256
-    local shellCompDirectivePrefix=512
-    local shellCompDirectiveShortPrefix=1024
 
-    local lastParam lastChar flagPrefix requestComp out directive comp lastComp noSpace keepOrder
-    local line
+    local out line
     local -a completions
 
     __zshctl_debug "\n========= starting completion logic =========="
     __zshctl_debug "CURRENT: ${CURRENT}, words[*]: ${words[*]}"
 
-    typeset w
-    for  w in "${(@)words}"; do
-        printf -v w '%q' $w
-        __zshctl_debug "word: $w"
-    done
-
-    # The user could have moved the cursor backwards on the command-line.
-    # We need to trigger completion from the $CURRENT location, so we need
-    # to truncate the command-line ($words) up to the $CURRENT location.
-    # (We cannot use $CURSOR as its value does not work when a command is an alias.)
-    words=("${=words[1,CURRENT]}")
-    __zshctl_debug "Truncated words[*]: ${words[*]},"
-
-    lastParam=${words[-1]}
-    lastChar=${lastParam[-1]}
-    __zshctl_debug "lastParam: ${lastParam}, lastChar: ${lastChar}"
-
-    # For zsh, when completing a flag with an = (e.g., zshctl -n=<TAB>)
-    # completions must be prefixed with the flag
-    setopt local_options BASH_REMATCH
-    if [[ "${lastParam}" =~ '-.*=' ]]; then
-        # We are dealing with a flag with an =
-        flagPrefix="-P ${BASH_REMATCH}"
-    fi
-
-    # Prepare the command to obtain completions
-    typeset putback=${${BUFFER#$LBUFFER}[1]:- }
-    requestComp="${words[1]} __complete ${words[2,-1]}"
-    if [ "${lastChar}" = "" ]; then
-        # If the last parameter is complete (there is a space following it)
-        # We add an extra empty parameter so we can indicate this to the go completion code.
-        __zshctl_debug "Adding extra empty parameter"
-        requestComp="${requestComp} \"\""
-    fi
-
+    integer code
     exec 3>&1
     coproc {
         coproc :
@@ -107,118 +40,51 @@ _zshctl()
         printf '%s\b' $putback 1>&3
         printf '\e[?25h' 1>&3
     }
-    __zshctl_debug "About to call: eval <${requestComp}>"
+    __zshctl_debug "ALL WORDS: ${(j: :)${(@qq)words}}"
+    __zshctl_debug "About to call: ${(qq)words[1]} __complete zsh $CURRENT ${(j: :)${(@qq)${(@)words}}}"
     typeset spin=$!
     __zshctl_debug $spin
-    out=$(eval ${requestComp} 2>/dev/null)
+    out=$("${words[1]}" __complete zsh $CURRENT "${(@)words}" 2>/dev/null)
+    code=$?
     print -p close
     wait $spin
     exec 3>&-
-    zle -R
 
-    # Use eval to handle any environment variables and such
-    __zshctl_debug "completion output: ${out}"
-
-    # Extract the directive integer following a : from the last line
-    local lastLine
-    while IFS='\n' read -r line; do
-        lastLine=${line}
-    done < <(printf "%s\n" "${out[@]}")
-    __zshctl_debug "last line: ${lastLine}"
-
-    if [ "${lastLine[1]}" = : ]; then
-        directive=${lastLine[2,-1]}
-        # Remove the directive including the : and the newline
-        local suffix
-        (( suffix=${#lastLine}+2))
-        out=${out[1,-$suffix]}
-    else
-        # There is no directive specified.  Leave $out as is.
-        __zshctl_debug "No directive found.  Setting do default"
-        directive=0
-    fi
-
-    __zshctl_debug "directive: ${directive}"
-    __zshctl_debug "completions: ${out}"
-    __zshctl_debug "flagPrefix: ${flagPrefix}"
-
-    if [ $((directive & shellCompDirectiveError)) -ne 0 ]; then
+    if (( code )); then
         __zshctl_debug "Completion received error. Ignoring completions."
         return
     fi
 
-    local activeHelpMarker="_activeHelp_ "
-    local endIndex=${#activeHelpMarker}
-    local startIndex=$((${#activeHelpMarker}+1))
-    local hasActiveHelp=0
-    while IFS='\n' read -r comp; do
-        # Check if this is an activeHelp statement (i.e., prefixed with $activeHelpMarker)
-        if [ "${comp[1,$endIndex]}" = "$activeHelpMarker" ];then
-            __zshctl_debug "ActiveHelp found: $comp"
-            comp="${comp[$startIndex,-1]}"
-            if [ -n "$comp" ]; then
-                _message -r "${comp}"
-                __zshctl_debug "ActiveHelp will need delimiter"
-                hasActiveHelp=1
-            fi
+    # Use eval to handle any environment variables and such
+    __zshctl_debug "completion output: ${out}"
 
-            continue
-        fi
+    typeset result_completions=()
+    typeset -A result_settings result_descriptions
+    eval "$out"
 
-        if [ -n "$comp" ]; then
-            # If requested, completions are returned with a description.
-            # The description is preceded by a TAB character.
-            # For zsh's _describe, we need to use a : instead of a TAB.
-            # We first need to escape any : as part of the completion itself.
-            comp=${comp//:/\\:}
-
-            local tab="$(printf '\t')"
-            comp=${comp//$tab/:}
-
-            __zshctl_debug "Adding completion: ${comp}"
-            completions+=${comp}
-            lastComp=$comp
-        fi
-    done < <(printf "%s\n" "${out[@]}")
-
-    # Add a delimiter after the activeHelp statements, but only if:
-    # - there are completions following the activeHelp statements, or
-    # - file completion will be performed (so there will be choices after the activeHelp)
-    if [ $hasActiveHelp -eq 1 ]; then
-        if [ ${#completions} -ne 0 ] || [ $((directive & shellCompDirectiveNoFileComp)) -eq 0 ]; then
-            __zshctl_debug "Adding activeHelp delimiter"
-            compadd -x "--"
-            hasActiveHelp=0
-        fi
+    if [[ -n $result_settings[message] ]]; then
+        _message -r "${result_settings[message]}"
+        return
     fi
 
-    if [ $((directive & shellCompDirectiveSlash)) -ne 0 ]; then
-        __zshctl_debug "Activating slash."
-        noSpace="-q -S '/'"
-    elif [ $((directive & shellCompDirectiveEquals)) -ne 0 ]; then
-        __zshctl_debug "Activating equals."
-        noSpace="-q -S '='"
-    elif [ $((directive & shellCompDirectiveColon)) -ne 0 ]; then
-        __zshctl_debug "Activating colon."
-        noSpace="-q -S ':'"
-    elif [ $((directive & shellCompDirectiveNoSpace)) -ne 0 ]; then
-        __zshctl_debug "Activating nospace."
-        noSpace="-S ''"
+    typeset comp_args=()
+    if [[ -n $result_settings[suffix] ]]; then
+        comp_args+=( -q -S "$result_settings[suffix]" )
+    elif (( $result_settings[nospace] )); then
+        comp_args+=( -S '' )
     fi
 
-    if [ $((directive & shellCompDirectivePrefix)) -ne 0 ]; then
-        # We are dealing with a flag with an =
-        flagPrefix="-P ${lastParam%%=*}="
-    elif [ $((directive & shellCompDirectiveShortPrefix)) -ne 0 ]; then
-        flagPrefix="-P ${lastParam[1,2]}"
+    if [[ -n $result_settings[prefix] ]]; then
+        comp_args+=( -P "$result_settings[prefix]" )
     fi
 
+    typeset args_args=()
     if [ $((directive & shellCompDirectiveKeepOrder)) -ne 0 ]; then
         __zshctl_debug "Activating keep order."
-        keepOrder="-V"
+        args_args+=( -V )
     fi
 
-    if [ $((directive & shellCompDirectiveFilterFileExt)) -ne 0 ]; then
+    if false && [ $((directive & shellCompDirectiveFilterFileExt)) -ne 0 ]; then
         # File extension filtering
         local filteringCmd
         filteringCmd='_files'
@@ -233,7 +99,7 @@ _zshctl()
 
         __zshctl_debug "File filtering command: $filteringCmd"
         _arguments '*:filename:'"$filteringCmd"
-    elif [ $((directive & shellCompDirectiveFilterDirs)) -ne 0 ]; then
+    elif false && [ $((directive & shellCompDirectiveFilterDirs)) -ne 0 ]; then
         # File completion for directories only
         local subdir
         subdir="${completions[1]}"
@@ -252,14 +118,22 @@ _zshctl()
         fi
         return $result
     else
+        if (( $result_settings[descriptions] )); then
+            for completion in "{(@)result_completions}"; do
+                completions+=( "$completion:$result_descriptions[$completion]" )
+            done
+        else
+            completions=( "${(@)result_completions}" )
+        fi
         __zshctl_debug "Calling _describe"
         #__zshctl_debug eval _describe $keepOrder "completions" completions $flagPrefix $noSpace
-        if eval _describe $keepOrder "completions" completions $flagPrefix $noSpace; then
+        if eval _describe "${(@)args_args}" "completions" completions "${(@)comp_args}"; then
             __zshctl_debug "_describe found some completions"
 
             # Return the success of having called _describe
             return 0
         else
+                return 1
             __zshctl_debug "_describe did not find completions."
             __zshctl_debug "Checking if we should do file completion."
             if [ $((directive & shellCompDirectiveNoFileComp)) -ne 0 ]; then

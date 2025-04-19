@@ -447,34 +447,73 @@ function parser {
         esac
     done
 
+    typeset shell words=() line
+    integer point=0 size cword=0
     if [[ $funcstack[$depth] != *:* && ${stack[$top]:-} = __complete ]]; then
         ((top--))
+        shell=$stack[$top]
+        ((top--))
+        print -u 2 here $shell
+        if [[ $shell = bash ]]; then
+            printf '<%s>\n' $stack[$top] 1>&2
+            line=$stack[$top]
+            ((top--))
+            point=$stack[$top]
+            print -u 2 "<$line> <${#line}> <$point>"
+            ((top--))
+            print -u 2 here top is $top
+            for word in "${(z)line}"; do
+                print -u 2 loop "<$word> <$line>"
+                while true; do
+                    size=${#line}
+                    line=${line#[[:space:]]}
+                    (( ${#line} == size )) && break
+                    ((--point)) || break 2
+                done
+                size=${#line}
+                line=${line#$word}
+                (( size - ${#line} == ${#word} )) || print -u 2 'could not strip'
+                words+=( "$word" )
+                ((point-=${#word}))
+                print -u 2 "<$line>" "<$point>" "<${#words}>"
+                print -u 2 continue
+            done
+            print -u 2 here "<$point> <${#line}>"
+        else
+            point=$stack[$top]
+            ((top--))
+            ((top--))
+            ((point--))
+            while (( point-- )); do
+                words+=( "$stack[$top]" )
+                ((--top))
+            done
+        fi
+        print -u 2 -l "${(@)words}"
         parse[complete]=1
-        parse[incomplete]=$stack[1]
         (( ${#completion_match} )) && abend 'should be empty'
-        $funcstack[$depth] "${(@Oa)stack[1,$top]}"
+        $funcstack[$depth] "${(@)words}"
+        print -u 2 here there
         # print -u 2 ${(j: :)"${(@qq)${(@kv)parse}}"}
         if (( ! parse[completed] )) then
             completions
             (( parse[flags] = parse[flags] | 4 ))
+            parse[files]=none
         fi
-        typeset hit
+        typeset hit key value
+        for hit in files descriptions message; do
+            printf 'printf '\''result_settings[%%s]=%%q\n'\'' %s %s\n' ${(qqq)hit} ${(qqq)parse[$hit]}
+        done
         # TODO We could try grouping commands and options.
         #for hit in ${(@M)completion_match:#${stack[1]}*}; do
         for hit in ${completion_match}; do
             [[ ${stack[1]} != -* && $hit = -* ]] && continue
-            #[[ $stack[1] = '' && $hit[1] = - ]] && continue
+            printf 'printf -- '\''result_completions+=( %%q )\\n'\'' %s\n' ${(qqq)hit}
             if (( ${+completions[$hit]} )); then
-                printf 'printf -- '\''%%s\\t%%s\\n'\'' %s %s\n' \
+                printf 'printf -- '\''result_settings[key]=%%q; result_descriptions[${result_settings[key]}]=%%q\\n'\'' %s %s\n' \
                     ${(qqq)hit} ${(qqq)completions[$hit]}
-            else
-                printf 'printf -- '\''%%s\\n'\'' %s %s\n' ${(qqq)hit}
             fi
         done
-        if [[ -n $parse[message] ]]; then
-            printf 'printf '\''_activeHelp_ %s\\n'\''\n' $parse[message]
-        fi
-        printf 'print -- :%d\n' $parse[flags]
         print 'return'
         return
     fi

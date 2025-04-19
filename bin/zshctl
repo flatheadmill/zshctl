@@ -45,7 +45,9 @@ function delegate {
         (( top <= ${#funcstack} )) || abend 'must be called from an execute function'
     done
     typeset func=$funcstack[$top]
-    if (( ! $# )); then
+    # TODO More here, basically, if the top most argument doesn't match when
+    # completing, then complete, otherwise we have an error and cannot answer.
+    if (( ! $# )) || [[ -z ${1:-} ]]; then
         (( parse[complete] )) && return
         abend 'fatal: %s expects a command argument' ${func//:/ }
     fi
