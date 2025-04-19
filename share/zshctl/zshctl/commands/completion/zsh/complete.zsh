@@ -3,52 +3,61 @@ compdef _zshctl zshctl
 
 # zsh completion for zshctl                                  -*- shell-script -*-
 
-__zshctl_debug()
-{
-    local file="$BASH_COMP_DEBUG_FILE" message
+function __zshctl_debug {
+    local file="$ZSHCTL_COMP_DEBUG_FILE" message
     if [[ -n ${file} ]]; then
         printf -v message "$@"
-        print -r "$message" >> "$BASH_COMP_DEBUG_FILE"
+        print -r "$message" >> "$ZSHCTL_COMP_DEBUG_FILE"
     fi
 }
 
-_zshctl()
-{
+function _zshctl {
     unsetopt localoptions MONITOR
 
-    local out line
-    local -a completions
+    typeset out line completions=() executable=()
 
-    __zshctl_debug "\n========= starting completion logic =========="
-    __zshctl_debug "CURRENT: ${CURRENT}, words[*]: ${words[*]}"
+    # TODO What else do we get to play with.
+    __zshctl_debug '========= starting completion logic =========='
+    __zshctl_debug 'CURRENT: %d, words: %s' $CURRENT ${(j: :)${(@qq)words}}
 
-    integer code
-    exec 3>&1
-    coproc {
-        coproc :
-        local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
-        read -t 0.2 -r line
-        [[ -z $line ]] || return
-        printf '\e[?25l' 1>&3
-        integer i=0
-        while [[ -z $line ]]; do
-            i=$(( (i + 1) % ${#spin} ))
-            printf $spin[$(( i + 1 ))] 1>&3
-            echo -en "\033[1D" 1>&3
-            read -t 0.1 -r line
-        done
-        printf '%s\b' $putback 1>&3
-        printf '\e[?25h' 1>&3
-    }
-    __zshctl_debug "ALL WORDS: ${(j: :)${(@qq)words}}"
-    __zshctl_debug "About to call: ${(qq)words[1]} __complete zsh $CURRENT ${(j: :)${(@qq)${(@)words}}}"
-    typeset spin=$!
-    __zshctl_debug $spin
-    out=$("${words[1]}" __complete zsh $CURRENT "${(@)words}" 2>/dev/null)
-    code=$?
-    print -p close
-    wait $spin
-    exec 3>&-
+    executable=(
+        "${words[1]}" __complete zsh ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
+            $CURRENT "${(@)words}"
+    )
+    __zshctl_debug 'About to call: %s' "${(j: :)${(@qq)${(@)executable}}}"
+
+    if [[ ! -v _autocomplete__func_opts ]]; then
+        typeset putback=${${BUFFER#$LBUFFER}[1]:- }
+        integer code spinner
+        exec 3>&1
+        coproc {
+            coproc :
+            typeset spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
+            read -t 0.2 -r line
+            [[ -z $line ]] || return
+            printf '\e[?25l' 1>&3
+            integer i=0
+            while [[ -z $line ]]; do
+                i=$(( (i + 1) % ${#spin} ))
+                printf $spin[$(( i + 1 ))] 1>&3
+                echo -en "\033[1D" 1>&3
+                read -t 0.1 -r line
+            done
+            printf '%s\b' ${putback:-} 1>&3
+            printf '\e[?25h' 1>&3
+        }
+        spinner=$!
+        __zshctl_debug 'Spinner PID: %d' $spinner
+        out=$( "${(@)executable}" )
+        code=$?
+        print -p close
+        wait $spin
+        exec 3>&-
+    else
+        __zshctl_debug "autocomplete detected"
+        out=$( "${(@)executable}" )
+        code=$?
+    fi
 
     if (( code )); then
         __zshctl_debug "Completion received error. Ignoring completions."
@@ -119,15 +128,17 @@ _zshctl()
         return $result
     else
         if (( $result_settings[descriptions] )); then
-            for completion in "{(@)result_completions}"; do
+            for completion in "${(@)result_completions}"; do
                 completions+=( "$completion:$result_descriptions[$completion]" )
             done
         else
             completions=( "${(@)result_completions}" )
         fi
-        __zshctl_debug "Calling _describe"
-        #__zshctl_debug eval _describe $keepOrder "completions" completions $flagPrefix $noSpace
-        if eval _describe "${(@)args_args}" "completions" completions "${(@)comp_args}"; then
+        executable=(
+            _describe "${(@)args_args}" completions completions "${(@)comp_args}"
+        )
+        __zshctl_debug 'Calling _describe: %s' "${(j: :)${(@qq)executable}}"
+        if "${(@)executable}"; then
             __zshctl_debug "_describe found some completions"
 
             # Return the success of having called _describe
@@ -157,6 +168,6 @@ _zshctl()
 }
 
 # don't run the completion function when being source-ed or eval-ed
-if [ "$funcstack[1]" = "_zshctl" ]; then
+if [[ "$funcstack[1]" = "_zshctl" ]]; then
     _zshctl
 fi

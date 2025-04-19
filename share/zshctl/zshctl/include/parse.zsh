@@ -100,7 +100,6 @@ function usage {
 }
 
 function completion {
-    print called completion >> $parse[debug]
     zparseopts -D -F -K -- \
         {w,-waiting}=o_waiting \
         {s,-suffix}:=o_suffix \
@@ -152,7 +151,6 @@ function completion {
 }
 
 function completions {
-    print completions $parse[func] >> $parse[debug]
     typeset lines=() line
     lines=( "${(@Af)$(usage $parse[func] 1)}" )
     typeset state=seek mandoc=( '.TH Ignore 1 "Manuals" "STOP" "Manuals"' )
@@ -210,7 +208,6 @@ function completions {
     typeset key split=() stripped quoted=()
     state=seek
     for line in "${(@)lines}"; do
-        print -- "$line" >> $parse[debug]
         case ${${:-$state:$line}//$~backspaced/} in
             *:STOP* )
                 state=
@@ -497,18 +494,21 @@ function parser {
                 parse[incomplete]=$words[-1]
                 words=( "${(@)words[2,-2]}" )
             fi
-            print -l -- "${(@)words}" "$parse[incomplete]" >> $parse[debug]
             print "<$line> <${line[1,$point]}> <${line[1,$i]}> <$point>" >> $parse[debug]
         else
+            parse[debug]=$stack[$top]
+            ((top--))
             point=$stack[$top]
             ((top--))
             ((top--))
-            ((point--))
+            ((point-=2))
             while (( point-- )); do
                 words+=( "$stack[$top]" )
                 ((--top))
             done
+            parse[incomplete]=$stack[$top]
         fi
+        print -l -- "${(@)words}" "$parse[incomplete]" >> $parse[debug]
         parse[complete]=1
         print "parse[completed]<$parse[completed]>" >> $parse[debug]
         $funcstack[$depth] "${(@)words}"
