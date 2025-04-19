@@ -143,6 +143,7 @@ function completion {
     if (( $# )); then
         completion_match+=( ${1:-} )
         if (( $# == 2 )); then
+            parse[descriptions]=1
             completions+=( ${1:-} ${2:-} )
         fi
     fi
@@ -252,6 +253,7 @@ function completions {
                     split=( $key )
                 fi
                 for key in "${(@)split}"; do
+                    parse[descriptions]=1
                     completions+=( $key $line )
                     completion_match+=( $key )
                 done
@@ -327,7 +329,7 @@ function parser {
     # TODO Make a note of this.
     # zshctl <(print 'program')
 
-    [[ -v parse ]] || typeset -A parse=( complete 0 flags 0 remainder '' )
+    [[ -v parse ]] || typeset -A parse=( filenames 0 descriptions 0 complete 0 flags 0 remainder '' )
     typeset -A completions=()
     typeset completion_match=()
     parse[func]=$funcstack[$depth]
@@ -351,10 +353,15 @@ function parser {
     while (( top )); do
         popped=$stack[$top]
         case $state:$popped in
+            # Definitions finished.
             *:-- )
                 ((top--))
                 break
                 ;;
+            # Short flags to the argument parser itself. Captial letters
+            # represent global options.Lower case letters are options that
+            # apply the subsequent field defintions or a single next
+            # defintiion depending on option.
             *:-* )
                 state=option
                 case $popped in
@@ -383,7 +390,7 @@ function parser {
                         option[kind]=counter
                         ;;
                     -d* )
-                        option[defined]=1
+                        option[defined]=1 # resets after a single defintion.
                         ;;
                     -i* )
                         option[kind]=number
@@ -407,6 +414,7 @@ function parser {
                     ((top--))
                 fi
                 ;;
+            # Optional short option followed by a long option.
             option:[a-zA-Z0-9]#,[a-zA-Z][a-zA-Z-]#[a-z] )
                 split=( "${(@s:,:)popped}" )
                 if [[ -n $split[1] ]]; then
@@ -439,28 +447,89 @@ function parser {
                 option=( kind $option[kind] defined 0 required 0 )
                 ((top--))
                 ;;
+            # Error in parsing.
             * )
                 print -u 2 "unable to interpret $popped"
-                args:user:error $error $funcstack[$depth] compile - 0
+                args:user:error $funcstack[$depth] compile - 0
                 exit 1
                 ;;
         esac
     done
 
-    typeset shell words=() line
-    integer point=0 size cword=0
+    # When we complete, we descend the command path within this invocation of
+    # args and print commands to our standard out that print configuration for
+    # evaluation onstandard out. This is different from normal operation where
+    # we print options to be evaluated standard out. The user then descends
+    # the tree using `delegate`.
+
+    # Our completion scripts are shims that delegate the completion logic to
+    # this function. For Bash, especially, we want to take advantage of Zsh's
+    # superior tokenization of shell words. Better than the the words that
+    # Bash provides to a completion function.
+
+    typeset shell words=() line maybe=()
+    integer point=0 size cword=0 i
     if [[ $funcstack[$depth] != *:* && ${stack[$top]:-} = __complete ]]; then
         ((top--))
         shell=$stack[$top]
         ((top--))
         print -u 2 here $shell
         if [[ $shell = bash ]]; then
-            printf '<%s>\n' $stack[$top] 1>&2
+            parse[debug]=$stack[$top]
+            print hello >> $parse[debug]
+            heredoc >> $parse[debug] <<'            EOF'
+                entering into a world of bash completions
+            EOF
+            ((top--))
+            printf '<%s>\n' $stack[$top] >> $parse[debug]
             line=$stack[$top]
             ((top--))
             point=$stack[$top]
             print -u 2 "<$line> <${#line}> <$point>"
             ((top--))
+
+            # expriment
+
+            # We out to be able to quickly find the current word by parsing
+            # the command line cut at the cut point. We can then get the rest
+            # of the word by repeating until we get an additional word and
+            # then backing up. While are moving forward we look any one
+            # non-space character to tell us we were in the middle of a word.
+            if false; then
+            iterator=$point
+            words=( "${(z)${line[1,$point]}}" )
+            if (( point != ${#line} )); then
+                print hit >> $parse[debug]
+                i=$(( point + 1 ))
+                while (( $i <= ${#line} && ${#${(z)${line[1,$i]}}} == ${#words} )); do
+                    ((i++))
+                    words=( "${(z)${line[1,$i]}}" )
+                done
+            else
+                print miss >> $parse[debug]
+            fi
+            fi
+
+            # Too much. How about this. We clip for Bash. It doesn't seem to
+            # do mid-word completion anywhere. Not even `ls` can run with a
+            # file name that actually exists.
+            words=( "${(z)${line[1,$point]}}" )
+
+            # But, we do want to know if we are at the end of a complete word.
+            # We are going to add a character to the end and see if we get a
+            # new word.
+            if (( ${#words} != ${#${(z)${:-${line[1,$point]}x}}} )); then
+                parse[incomplete]=''
+                words=( "${(@)words[2,-1]}" )
+            else
+                parse[incomplete]=$words[-1]
+                words=( "${(@)words[2,-2]}" )
+            fi
+
+            print -l -- "${(@)words}" >> $parse[debug]
+
+            print "<$line> <${line[1,$point]}> <${line[1,$i]}> <$point>" >> $parse[debug]
+            if false; then
             print -u 2 here top is $top
             for word in "${(z)line}"; do
                 print -u 2 loop "<$word> <$line>"
@@ -479,6 +548,7 @@ function parser {
                 print -u 2 continue
             done
             print -u 2 here "<$point> <${#line}>"
+            fi
         else
             point=$stack[$top]
             ((top--))
@@ -501,7 +571,7 @@ function parser {
             parse[files]=none
         fi
         typeset hit key value
-        for hit in files descriptions message; do
+        for hit in suffix filenames incomplete files descriptions message; do
             printf 'printf '\''result_settings[%%s]=%%q\n'\'' %s %s\n' ${(qqq)hit} ${(qqq)parse[$hit]}
         done
         # TODO We could try grouping commands and options.

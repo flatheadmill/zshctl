@@ -3,18 +3,10 @@
 __zshctl_debug()
 {
     local message
-    if [[ -n ${BASH_COMP_DEBUG_FILE-} ]]; then
+    if [[ -n ${ZSHCTL_COMP_DEBUG_FILE-} ]]; then
         printf -v message "$@"
         echo "$message" >> "${BASH_COMP_DEBUG_FILE}"
     fi
-}
-
-# Macs have bash3 for which the bash-completion package doesn't include
-# _init_completion. This is a minimal version of that function.
-__zshctl_init_completion()
-{
-    COMPREPLY=()
-    _get_comp_words_by_ref "$@" cur prev words cword
 }
 
 # This function calls the zshctl program to obtain the completion
@@ -27,15 +19,11 @@ __zshctl_get_completion_results() {
 
     local requestComp lastParam lastChar args
 
-    # Calling ${COMP_WORD[0]} instead of directly zshctl allows to handle aliases
-    local program=${COMP_WORDS[0]}
-    __acrectl_debug ${COMP_WORDS[0]}
-
     # Start a spinner with a delay. Spinner animates by waiting on standard
     # input with a timeout. We cancel the timer by writing to its standard
     # input. Note that this is always the way we do a coproc, managing it
     # through standard input instead of trying to sort out singal handling.
-    local spinner_PID
+    local spinner_PID code
     local -a spinner
     exec 3>&1
     {
@@ -59,27 +47,39 @@ __zshctl_get_completion_results() {
             }
         }
     } 2>/dev/null
-    __zshctl_debug "Calling %q __complete bash %q %q" "$program" "$COMP_LINE" "$COMP_POINT"
-    # Use eval to handle any environment variables and such
-    #out=$($program __complete bash "$COMP_LINE" "$COMP_POINT")
+    # Calling ${COMP_WORD[0]} instead of directly zshctl allows to handle aliases.
+    out=$(${COMP_WORDS[0]} __complete bash "${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}" \
+        "$COMP_LINE" "$COMP_POINT" 2>${ZSHCTL_COMP_DEBUG_FILE:-/dev/null})
+    code=$?
     echo close >&"${spinner[1]}"
     wait $spinner_PID
     exec 3>&-
-    return 1
 
-    # Extract the directive integer at the very end of the output following a colon (:)
-    directive=${out##*:}
-    # Remove the directive
-    out=${out%:*}
-    if [[ ${directive} == "${out}" ]]; then
-        # There is not directive specified
-        directive=0
+
+    if (( code )); then
+        __zshctl_debug "Completion failed: $code"
+        return
     fi
+
+    typeset -A result_settings
+    typeset -A result_descriptions
+    typeset -a result_completions
+    eval $out
+
+    if [[ -n ${result_settings[suffix]} ]]; then
+        result_settings[nospace]=1
+        result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
+    fi
+    if (( ${result_settings[nospace]} )); then
+        compopt -o nospace
+    fi
+    if (( ${result_settings[filenames]} )); then
+        compopt -o filenames
+    fi
+
     __zshctl_debug "The completion directive is: ${directive}"
     __zshctl_debug "The completions are: ${out}"
-}
 
-__zshctl_process_completion_results() {
     local shellCompDirectiveError=1
     local shellCompDirectiveNoSpace=2
     local shellCompDirectiveNoFileComp=4
@@ -136,7 +136,8 @@ __zshctl_process_completion_results() {
     # Separate activeHelp from normal completions
     local completions=()
     local activeHelp=()
-    __zshctl_extract_activeHelp
+
+    local directive=0
 
     if (((directive & shellCompDirectiveFilterFileExt) != 0)); then
         # File extension filtering
@@ -167,6 +168,12 @@ __zshctl_process_completion_results() {
         __zshctl_handle_completion_types
     fi
 
+    __zshctl_debug 'made it'
+    return
+    compopt -o filenames
+    COMPREPLY=( baz/snert/ baz/super/ )
+    return
+
     __zshctl_handle_special_char "$cur" :
     __zshctl_handle_special_char "$cur" =
 
@@ -186,26 +193,6 @@ __zshctl_process_completion_results() {
             printf "%s" "${COMP_LINE[@]}"
         fi
     fi
-}
-
-# Separate activeHelp lines from real completions.
-# Fills the $activeHelp and $completions arrays.
-__zshctl_extract_activeHelp() {
-    local activeHelpMarker="_activeHelp_ "
-    local endIndex=${#activeHelpMarker}
-
-    while IFS='' read -r comp; do
-        if [[ ${comp:0:endIndex} == $activeHelpMarker ]]; then
-            comp=${comp:endIndex}
-            __zshctl_debug "ActiveHelp found: $comp"
-            if [[ -n $comp ]]; then
-                activeHelp+=("$comp")
-            fi
-        else
-            # Not an activeHelp line but a normal completion
-            completions+=("$comp")
-        fi
-    done <<<"${out}"
 }
 
 __zshctl_handle_completion_types() {
@@ -240,26 +227,28 @@ __zshctl_handle_standard_completion_case() {
     local tab=$'\t' comp
 
     # Short circuit to optimize if we don't have descriptions
-    if [[ "${completions[*]}" != *$tab* ]]; then
-        IFS=$'\n' read -ra COMPREPLY -d '' < <(compgen -W "${completions[*]}" -- "$cur")
+    if [[ "${result_settings[descriptions]}" -ne 1 ]]; then
+        __zshctl_debug "trying the cheap reply"
+        IFS=$'\n' read -ra COMPREPLY -d '' < <(compgen -W "${result_completions[*]}" -- "${result_settings[incomplete]}")
         return 0
     fi
     __zshctl_debug "cur <$cur>"
+    __zshctl_debug "COLUMNS<$COLUMNS>"
 
     local longest=0
     local compline
-    # Look for the longest completion so that we can format things nicely
-    while IFS='' read -r compline; do
-        [[ -z $compline ]] && continue
-        # Strip any description before checking the length
-        comp=${compline%%$tab*}
-        # Only consider the completions that match
-        [[ $comp == "$cur"* ]] || continue
-        COMPREPLY+=("$compline")
-        if ((${#comp}>longest)); then
+    __zshctl_debug "result_completions<${#result_completions}> incomplete<${result_settings[incomplete]}>"
+    for comp in "${result_completions[@]}"; do
+        __zshctl_debug "comp<${comp}>"
+        [[ "$comp" = "${result_settings[incomplete]}"* ]] || continue
+        compline="${comp}$tab${result_descriptions[$comp]}"
+        COMPREPLY+=( "$compline" )
+        if (( ${#comp} > longest )); then
             longest=${#comp}
         fi
-    done < <(printf "%s\n" "${completions[@]}")
+    done
+
+    __zshctl_debug "COMPREPLY<${#COMPREPLY}>"
 
     # If there is a single completion left, remove the description text
     if ((${#COMPREPLY[*]} == 1)); then
