@@ -9,10 +9,10 @@ COPY --from=fetched /var/zshctl.github.io/ /html/
 FROM alpine AS compiled
 
 ARG NEXT_VERSION
-RUN apk update && apk add zsh git gpg gpg-agent
+RUN apk update && apk add zsh git gpg gpg-agent openssl
 COPY ./ /zshctl/
 WORKDIR /work
-RUN --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/pkgctl/bin/pkgctl compile
+RUN --mount=type=secret,id=rsa --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/pkgctl/bin/pkgctl compile
 RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
 FROM alpine AS brew
