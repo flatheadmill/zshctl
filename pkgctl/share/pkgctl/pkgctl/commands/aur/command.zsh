@@ -63,7 +63,6 @@ function execute:aur {
     mv $conf[program]-$version-1-any.pkg.tar.* /html/aur
     repo-add --sign /html/aur/$conf[program].db.tar.gz /html/aur/$conf[program]-$version-1-any.pkg.tar.zst ||
         abend '`repo-add --sign` failed.'
-    gpg --armor --export 'Package Signing' > /html/aur/gpg
 }
 
 # vim: ft=zsh:

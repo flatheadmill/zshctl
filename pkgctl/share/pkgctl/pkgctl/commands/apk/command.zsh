@@ -80,7 +80,6 @@ function execute:apk {
     apk index --no-warnings -vU -o APKINDEX.tar.gz *.apk
     popd
     abuild-sign -k ~/.abuild/$conf[apk.key.name].rsa /html/apk/x86_64/APKINDEX.tar.gz
-    openssl rsa -in /run/secrets/rsa -pubout -out /html/apk/$conf[apk.key.name].rsa.pub
 }
 
 # vim: ft=zsh:

@@ -24,7 +24,7 @@ if ! type git >/dev/null 2>&1; then
     emerge dev-vcs/git
 fi
 
-/usr/bin/wget -O /usr/share/openpgp-keys/zshctl.asc -q https://zshctl.sh/gpg
+/usr/bin/wget -O /usr/share/openpgp-keys/zshctl.asc -q https://zshctl.sh/keys/gpg
 
 mkdir -p /etc/portage/repos.conf
 

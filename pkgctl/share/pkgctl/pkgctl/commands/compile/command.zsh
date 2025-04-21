@@ -17,7 +17,9 @@ function execute:compile {
     # Create a tarball containing only `zshctl`.
     tar -C $conf[program] -czvf /work/$conf[program]-$version.tar.gz bin/zshctl share
     # Export the public key of the GPG signing key.
+    mkdir -p /work/html/keys
     gpg --import /run/secrets/gpg
     gpg --list-secret-keys --keyid-format=long
-    gpg --armor --export 'Package Signing' > gpg
+    openssl rsa -in /run/secrets/rsa -pubout -out /work/html/keys/$conf[apk.key.name].rsa.pub
+    gpg --armor --export 'Package Signing' > /work/html/keys/gpg
 }

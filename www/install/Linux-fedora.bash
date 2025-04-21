@@ -21,7 +21,7 @@ metadata_expire=1d
 repo_gpgcheck=0
 type=rpm
 gpgcheck=1
-gpgkey=https://zshctl.sh/yum/gpg
+gpgkey=https://zshctl.sh/keys/gpg
 skip_if_unavailable=False
 EOF
 

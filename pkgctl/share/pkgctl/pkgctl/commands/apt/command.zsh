@@ -78,7 +78,6 @@ function execute:apt {
         abend 'unable to clearsign'
 
     mkdir -p /html/apt/doc
-    gpg --armor --export 'Package Signing' > /html/apt/doc/apt-key.gpg
 }
 
 # vim: ft=zsh:

@@ -14,7 +14,7 @@ cat <<EOF >> /etc/apk/repositories
 https://zshctl.sh/apk
 EOF
 
-wget -qO /etc/apk/keys/alan@prettyrobots.com-67eee297.rsa.pub https://zshctl.sh/alan@prettyrobots.com-67eee297.rsa.pub
+wget -qO /etc/apk/keys/alan@prettyrobots.com-67eee297.rsa.pub https://zshctl.sh/keys/alan@prettyrobots.com-67eee297.rsa.pub
 
 apk --no-progress update
 apk --no-progress add zshctl

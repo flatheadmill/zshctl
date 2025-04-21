@@ -21,7 +21,7 @@ cat <<EOF >> /etc/pacman.conf
 Server = https://zshctl.sh/aur
 EOF
 
-curl -s https://zshctl.sh/yum/gpg | pacman-key --add -
+curl -s https://zshctl.sh/keys/gpg | pacman-key --add -
 pacman-key --lsign-key 8262C8D6D0959C6F
 
 pacman -Sy

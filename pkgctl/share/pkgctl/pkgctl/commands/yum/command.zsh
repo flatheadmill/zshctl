@@ -90,8 +90,6 @@ function execute:yum {
         abend 'install falled.'
     mkdir -p /html/yum/repo
     cp /root/rpmbuild/RPMS/noarch/$conf[program]-$version-1.noarch.rpm /html/yum/repo
-    gpg --armor --export 'Package Signing' > /html/yum/gpg
-    gpg --armor --export 'Package Signing' > /html/gpg
     createrepo /html/yum/repo || abend '`createrepo` failed.'
     gpg --detach-sign --armor /html/yum/repo/repodata/repomd.xml ||
         abend '`gpg --detach-sign` failed.'

@@ -67,7 +67,7 @@ RUN pacman-key --init && \
     useradd -u 1983 -d /home/build -s /bin/false build && usermod -L build && \
     mkdir -p /work /html /home/build && chown build:build /work /html /home/build
 COPY --chown=1983 --from=compiled /work/ /work/compiled/
-RUN pacman-key --add /work/compiled/gpg && pacman-key --lsign-key 8262C8D6D0959C6F
+RUN pacman-key --add /work/compiled/html/keys/gpg && pacman-key --lsign-key 8262C8D6D0959C6F
 COPY --chown=1983 --from=previous /html/ /work/previous/
 COPY ./ /zshctl/
 WORKDIR /work
@@ -95,6 +95,7 @@ COPY --from=apk --chown=0:0 /html/ /html/
 COPY --from=yum /html/ /html/
 COPY --from=aur --chown=0:0 /html/ /html/
 COPY --from=gentoo /html/ /html/
+COPY --from=compiled /work/html/ /html/
 COPY ./www/ /html/
 
 RUN du -sh /html/

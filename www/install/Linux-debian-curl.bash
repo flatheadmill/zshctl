@@ -17,7 +17,7 @@ if ! type gpg > /dev/null 2>&1; then
     apt-get install -y gnupg2
 fi
 
-curl -sL https://zshctl.sh/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/zshctl.sh.gpg add -
+curl -sL https://zshctl.sh/keys/gpg | apt-key --keyring /usr/share/keyrings/zshctl.sh.gpg add -
 echo "deb [arch=all signed-by=/usr/share/keyrings/zshctl.sh.gpg] https://zshctl.sh/apt stable main" > /etc/apt/sources.list.d/zshctl.list
 apt-get update
 apt-get install -y zshctl
