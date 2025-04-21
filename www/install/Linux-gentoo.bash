@@ -43,4 +43,5 @@ emaint --repo zshctl sync
 
 ACCEPT_LICENSE="MIT" emerge app-misc/zshctl
 
+type zshctl
 /usr/bin/zshctl version

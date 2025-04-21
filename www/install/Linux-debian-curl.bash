@@ -22,4 +22,5 @@ echo "deb [arch=all signed-by=/usr/share/keyrings/zshctl.sh.gpg] https://zshctl.
 apt-get update
 apt-get install -y zshctl
 
+type zshctl
 /usr/bin/zshctl version

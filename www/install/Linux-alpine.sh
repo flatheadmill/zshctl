@@ -19,4 +19,5 @@ wget -qO /etc/apk/keys/alan@prettyrobots.com-67eee297.rsa.pub https://zshctl.sh/
 apk --no-progress update
 apk --no-progress add zshctl
 
+type zshctl
 /usr/bin/zshctl version

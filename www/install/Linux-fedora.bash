@@ -27,4 +27,5 @@ EOF
 
 dnf install -y zshctl
 
+type zshctl
 /usr/bin/zshctl version

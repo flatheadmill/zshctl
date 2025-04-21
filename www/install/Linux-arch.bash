@@ -27,4 +27,5 @@ pacman-key --lsign-key 8262C8D6D0959C6F
 pacman -Sy
 pacman --noconfirm -S zshctl
 
+type zshctl
 /usr/bin/zshctl version
