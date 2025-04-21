@@ -25,7 +25,8 @@ function ebuild_conf {
 
         src_install() {
             dobin bin/$conf[program]
-            cp -r share/$conf[program] \${ED}/share/$conf[program]
+            insinto /usr/share
+            doins -r share/$conf[program]
         }
     EOF
 }

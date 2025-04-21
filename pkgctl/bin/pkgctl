@@ -2,8 +2,8 @@
 
 typeset -xgA conf=(
     program zshctl
-    url.home https//github.com/flatheadmill/zshctl
-    url.repo https//zshctl.sh
+    url.home https://github.com/flatheadmill/zshctl
+    url.repo https://zshctl.sh
     description 'ZSH CLI application framework.'
     license "MIT"
 
@@ -18,7 +18,7 @@ typeset -xgA conf=(
     aur.dependencies 'zsh groff'
 
     apt.dependencies 'zsh, less, groff-base'
-    yum.dependencies 'zsh, less, groff-base'
+    yum.dependencies 'zsh, less, groff-base, gawk'
 )
 
 # vim: ft=zsh:

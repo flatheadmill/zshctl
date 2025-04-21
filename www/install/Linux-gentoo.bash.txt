@@ -1,0 +1,11 @@
+
+                           Welcome to `zshctl`.
+
+The `zshctl` Gentoo installer will install `zshctl` on Gentoo Linux using the
+system package installer `emerge`. It must run as `root`. You can run this
+installer directly yourself with the following command.
+
+  sudo bash -c "$(wget -qO - https://zshctl.sh/install/Linux-gentoo.bash)"
+
+We can run the installer for you, but first we're going to dump the contents of
+the installer to your console for you to review.

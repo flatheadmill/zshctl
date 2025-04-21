@@ -1,0 +1,11 @@
+
+                           Welcome to `zshctl`.
+
+The `zshctl` Debian installer will install `zshctl` on Debian Linux using the
+system package installer APT. It must run as `root`. You can run this installer
+directly yourself with the following command.
+
+  sudo bash -c "$(curl -sL - https://zshctl.sh/install/Linux-debian.bash)"
+
+We can run the installer for you, but first we're going to dump the contents of
+the installer to your console for you to review.

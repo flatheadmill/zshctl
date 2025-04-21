@@ -1,0 +1,11 @@
+
+                           Welcome to `zshctl`.
+
+The `zshctl` Fedora installer will install `zshctl` on Fedora Linux using the
+system package installer `dnf`. It must run as `root`. You can run this
+installer directly yourself with the following command.
+
+  sudo bash -c "$(curl -L https://zshctl.sh/install/Linux-fedora.bash)"
+
+We can run the installer for you, but first we're going to dump the contents of
+the installer to your console for you to review.

@@ -95,8 +95,10 @@ COPY --from=apk --chown=0:0 /html/ /html/
 COPY --from=yum /html/ /html/
 COPY --from=aur --chown=0:0 /html/ /html/
 COPY --from=gentoo /html/ /html/
+COPY ./www/ /html/
 
 RUN du -sh /html/
+RUN find /html/
 
 FROM alpine
 

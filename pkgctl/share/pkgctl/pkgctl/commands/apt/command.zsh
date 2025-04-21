@@ -16,14 +16,14 @@ function do_hash {
 function generate_release {
     # TODO Example Repository?
     heredoc -f "$(date -Ru)" << '    EOF'
-        Origin: Example Repository
-        Label: Example
+        Origin: Zshctl Repository
+        Label: Zshctl
         Suite: stable
         Codename: stable
         Version: 1.0
         Architectures: all
         Components: main
-        Description: An example software repository
+        Description: ZSH CLI application framework.
         Date: %s
     EOF
     do_hash "MD5Sum" "md5sum"
@@ -48,7 +48,9 @@ function execute:apt {
         Depends: $conf[apt.dependencies]
     EOF
     mkdir -p deb/$stem/usr/bin
-    install -m 755 compiled/$conf[program] deb/$stem/usr/bin/$conf[program]
+    mkdir -p deb/$stem/usr/share
+    install -m 755 compiled/$conf[program]/bin/$conf[program] deb/$stem/usr/bin/$conf[program] || exit 1
+    cp -r compiled/$conf[program]/share/$conf[program] deb/$stem/usr/share/$conf[program] || exit 1
     dpkg-deb --build --root-owner-group deb/$stem
     # get current repository
     mkdir /html

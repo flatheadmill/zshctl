@@ -37,7 +37,7 @@ function execute:apk {
     pkgrel=0
     pkgdesc=${(qqq)conf[description]}
     url=$conf[url.home]
-    arch="noarch"
+    arch="x86_64"
     license=$conf[license]
     depends=${(qqq)conf[apk.dependencies]}
     depends_dev=""
@@ -69,10 +69,10 @@ function execute:apk {
     EOF
     abuild checksum || abend '`abuild checksum` failed'
     abuild -r || abend '`abuild -r` failed'
-    mkdir -p /html/apk/x86_64
     # TODO Can I make this a no-arch package?
+    mkdir -p /html/apk/x86_64
     if [[ ! -e previous/zero ]]; then
-        cp previous/apk/x86_64/*.apk html/apk/x86_64
+        cp previous/apk/x86_64/*.apk /html/apk/x86_64
     fi
     find /home/build/packages
     cp /home/build/packages/compiled/x86_64/$conf[program]-$version-r0.apk /html/apk/x86_64
@@ -80,7 +80,7 @@ function execute:apk {
     apk index --no-warnings -vU -o APKINDEX.tar.gz *.apk
     popd
     abuild-sign -k ~/.abuild/$conf[apk.key.name].rsa /html/apk/x86_64/APKINDEX.tar.gz
-    openssl rsa -in /run/secrets/rsa -pubout -out /html/$conf[apk.key.name].rsa.pub
+    openssl rsa -in /run/secrets/rsa -pubout -out /html/apk/$conf[apk.key.name].rsa.pub
 }
 
 # vim: ft=zsh:

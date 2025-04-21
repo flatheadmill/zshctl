@@ -58,7 +58,6 @@ function execute:brew {
           end
         end
     EOF
-    exit
     git -C brew add .
     typeset mesage
     printf -v message 'Release `%s`.' $conf[program]-$version

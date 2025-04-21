@@ -15,7 +15,7 @@ function execute:compile {
     # Check version.
     $conf[program]/bin/$conf[program] version
     # Create a tarball containing only `zshctl`.
-    tar -C /$conf[program] -czvf /work/$conf[program]-$version.tar.gz bin/zshctl share
+    tar -C $conf[program] -czvf /work/$conf[program]-$version.tar.gz bin/zshctl share
     # Export the public key of the GPG signing key.
     gpg --import /run/secrets/gpg
     gpg --list-secret-keys --keyid-format=long

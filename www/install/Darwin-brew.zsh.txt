@@ -1,0 +1,19 @@
+
+                           Welcome to `zshctl`.
+
+The `zshctl` OS X installer will install `zshctl` on OS X using Homebrew.
+
+Homebrew is necessary for automatic, yet prompted and confirmed, installation of
+the programs that `zshctl` needs to run. `zshctl` will use Homebrew install
+the programs it needs as needed. If you never use a particular `zshctl`
+command, then you will not install its dependencies.
+
+If Homebrew is not installed, the `zshctl` OS X installer will run the Homebrew
+installer.
+
+You can run the `zshctl` OS X installer yourself with the following command.
+
+  zsh -c "$(curl -L https://zshctl.sh/install/Darwin-brew.zsh)"
+
+We can run the installer for you, but first we're going to dump the contents of
+the installer to your console for you to review.
