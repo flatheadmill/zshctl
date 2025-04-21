@@ -63,7 +63,7 @@ FROM archlinux AS aur
 RUN pacman-key --init && \
     pacman-key --populate archlinux && \
     pacman --noconfirm -Sy archlinux-keyring && \
-    pacman --noconfirm -S base-devel zsh wget jo jq && \
+    pacman --noconfirm -S base-devel zsh wget less && \
     useradd -u 1983 -d /home/build -s /bin/false build && usermod -L build && \
     mkdir -p /work /html /home/build && chown build:build /work /html /home/build
 COPY --chown=1983 --from=compiled /work/ /work/compiled/

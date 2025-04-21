@@ -15,7 +15,7 @@ typeset -xgA conf=(
     apk.key.name alan@prettyrobots.com-67eee297
     apk.dependencies 'zsh less groff'
 
-    aur.dependencies 'zsh groff'
+    aur.dependencies 'zsh groff less'
 
     apt.dependencies 'zsh, less, groff-base'
     yum.dependencies 'zsh, less, groff-base, gawk'
