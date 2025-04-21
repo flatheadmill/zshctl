@@ -9,7 +9,8 @@ COPY --from=fetched /var/zshctl.github.io/ /html/
 FROM alpine AS compiled
 
 ARG NEXT_VERSION
-RUN apk update && apk add zsh git gpg gpg-agent openssl
+RUN apk update
+RUN apk add zsh git gpg gpg-agent openssl
 COPY ./ /zshctl/
 WORKDIR /work
 RUN --mount=type=secret,id=rsa --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/pkgctl/bin/pkgctl compile
@@ -17,7 +18,8 @@ RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
 FROM alpine AS brew
 
-RUN apk update && apk add zsh wget git ruby
+RUN apk update
+RUN apk add zsh wget git ruby
 COPY --from=previous /html/ /work/previous/
 COPY --from=compiled /work/ /work/compiled/
 COPY ./ /zshctl/
@@ -26,7 +28,8 @@ RUN /zshctl/pkgctl/bin/pkgctl brew
 
 FROM ubuntu:noble AS apt
 
-RUN apt-get update && apt-get install -y make dpkg-dev git wget zsh
+RUN apt-get update
+RUN apt-get install -y make dpkg-dev git wget zsh
 COPY --from=previous /html/ /work/previous/
 COPY --from=compiled /work/ /work/compiled/
 COPY ./ /zshctl/
@@ -36,7 +39,12 @@ RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
 FROM alpine AS apk
 
-RUN apk --no-progress update && apk --no-progress upgrade && apk --no-progress add sudo alpine-sdk zsh && adduser -u 1983 -D -h /home/build -s /bin/false build && addgroup build abuild && mkdir /work /html && chown build:build /work /html
+RUN apk --no-progress update
+RUN apk --no-progress upgrade
+RUN apk --no-progress add sudo alpine-sdk zsh
+RUN adduser -u 1983 -D -h /home/build -s /bin/false build
+RUN addgroup build abuild
+RUN mkdir /work /html && chown build:build /work /html
 COPY --chown=1983:1983 --from=compiled /work/ /work/compiled/
 COPY --chown=1983:1983 --from=previous /html/ /work/previous/
 COPY --chown=1983:1983 ./ /zshctl/
@@ -60,14 +68,16 @@ RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
 FROM archlinux AS aur
 
-RUN pacman-key --init && \
-    pacman-key --populate archlinux && \
-    pacman --noconfirm -Sy archlinux-keyring && \
-    pacman --noconfirm -S base-devel zsh wget less && \
-    useradd -u 1983 -d /home/build -s /bin/false build && usermod -L build && \
-    mkdir -p /work /html /home/build && chown build:build /work /html /home/build
+RUN pacman-key --init
+RUN pacman-key --populate archlinux
+RUN pacman --noconfirm -Sy archlinux-keyring
+RUN pacman --noconfirm -S base-devel zsh wget less
+RUN useradd -u 1983 -d /home/build -s /bin/false build && usermod -L build
+RUN mkdir -p /work /html /home/build
+RUN chown build:build /work /html /home/build
 COPY --chown=1983 --from=compiled /work/ /work/compiled/
-RUN pacman-key --add /work/compiled/html/keys/gpg && pacman-key --lsign-key 8262C8D6D0959C6F
+RUN pacman-key --add /work/compiled/html/keys/gpg
+RUN pacman-key --lsign-key 8262C8D6D0959C6F
 COPY --chown=1983 --from=previous /html/ /work/previous/
 COPY ./ /zshctl/
 WORKDIR /work
@@ -75,11 +85,10 @@ USER build
 RUN --mount=type=secret,id=gpg,uid=1983 --mount=type=tmpfs,dst=/gpg /zshctl/pkgctl/bin/pkgctl aur
 RUN zsh -c '[[ ! -d /gpg ]]'
 
-FROM gentoo/portage:latest AS portage
-
 FROM gentoo/stage3:latest AS gentoo
 
-RUN emaint --all sync && FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox" emerge app-eselect/eselect-repository emerge dev-vcs/git zsh
+RUN PORTAGE_QUIET=1 emaint --all sync >/dev/null
+RUN FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox" emerge --quiet app-eselect/eselect-repository emerge dev-vcs/git zsh
 COPY --from=compiled /work/ /work/compiled/
 COPY --from=previous /html/ /work/previous/
 COPY ./ /zshctl/

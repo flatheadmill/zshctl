@@ -21,7 +21,7 @@ if cat /proc/1/cgroup | grep -q '^[0-9][0-9]*:[^:][^:]*:/docker/'; then
 fi
 
 if ! type git >/dev/null 2>&1; then
-    emerge dev-vcs/git
+    emerge --quiet dev-vcs/git
 fi
 
 /usr/bin/wget -O /usr/share/openpgp-keys/zshctl.asc -q https://zshctl.sh/keys/gpg
@@ -41,7 +41,9 @@ EOF
 
 emaint --repo zshctl sync
 
-ACCEPT_LICENSE="MIT" emerge app-misc/zshctl
+#echo "app-misc/zshctl ~amd64" >> /etc/portage/package.accept_keywords/zshctl
+
+ACCEPT_LICENSE="MIT" emerge --quiet app-misc/zshctl
 
 type zshctl
 /usr/bin/zshctl version

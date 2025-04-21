@@ -16,7 +16,7 @@ function ebuild_conf {
 
         LICENSE=${(qqq)conf[license]}
         SLOT="0"
-        KEYWORDS="~amd64"
+        KEYWORDS="amd64"
 
         DEPEND=""
         RDEPEND="\${DEPEND} app-shells/zsh dev-vcs/git sys-apps/groff sys-apps/less"
