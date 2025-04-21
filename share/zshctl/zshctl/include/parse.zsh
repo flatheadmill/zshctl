@@ -1,3 +1,5 @@
+zmodload zsh/terminfo
+
 # https://github.com/jarro2783/cxxopts/issues/120#issuecomment-437709167
 function resource {
     typeset name=${1:-} file=${2:-${ZSHCTL_ARGZERO:A}}
@@ -27,7 +29,7 @@ function resource {
 #
 function usage {
     setopt localoptions extendedglob
-    typeset usage=${1:-$funcstack[2]} man=${2:-0} cols="$(tput cols)"
+    typeset usage=${1:-$funcstack[2]} man=${2:-0} cols="$(echoti cols)"
     typeset release_date=$(date --date=@$zshctl[release_date] +'%B %-d, %Y')
     typeset capitalized=$zshctl[program]:${usage#*:}
     capitalized=${${capitalized//:/-}:u}
