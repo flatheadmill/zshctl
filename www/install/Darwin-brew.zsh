@@ -29,4 +29,5 @@ fi
 brew tap zshctl/zshctl https://zshctl.sh/brew.git
 brew install zshctl
 
+type zshctl
 "$(brew --prefix)/bin/zshctl" version
