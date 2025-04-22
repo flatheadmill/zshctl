@@ -103,8 +103,17 @@ __zshctl_get_completion_results() {
     # part of the completed path. `foo/bar` and `foo/baz` will display `bar`
     # and `baz` if the user is completing `foo/`.
     if (( ${result_settings[filenames]} )); then
-        compopt -o filenames
+        compopt -o filenames -o noquote
     fi
+    # ^ Problem with this is that it cannot be used for actual filenames
+    # because we defeat quoting, which we would not want to do for actual
+    # filenames because of spaces in file names. This is for when we're doing
+    # something silly with our commnad line completions, when we've created a
+    # little language like `vault/item/field=project/service-account`. We
+    # really ought to do as `ytt` does and insist on a flag for everything,
+    # but `ytt` does have funky file marks, so even there they take liberties.
+    #
+    # TODO Come back and make `noquote` a separate option.
 
     # Outgoing, but we have to get to files.
     local shellCompDirectiveError=1
