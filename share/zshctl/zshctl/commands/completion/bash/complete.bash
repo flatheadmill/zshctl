@@ -61,9 +61,14 @@ __zshctl_get_completion_results() {
         bash "${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}"
         "$COMP_LINE"
         "$COMP_POINT"
+        "$COMP_WORDBREAKS"
+        "$COMP_TYPE"
+        "$COMP_KEY"
+        "$COMP_CWORD"
+        "${COMP_WORDS[@]}"
     )
     __zshctl_debug 'About to call: %s' "$(IFS=, ; echo "${execute[@]@Q}")"
-    out=$( "${execute[@]}" )
+    out=$( "${execute[@]}" 2>/dev/null )
     code=$?
 
     # Stop the spinner and wait for it to finish. If we do not wait we might
@@ -79,22 +84,24 @@ __zshctl_get_completion_results() {
         return
     fi
 
+    __zshctl_debug "$out"
+
     # Evaluate the output from our program.
     typeset -A result_settings result_descriptions
     typeset -a result_completions
     eval $out
 
     # For Bash completions all we can do is append the prefix.
-    if [[ -n ${result_settings[prefix]} ]]; then
-        result_completions=( "${result_completions[@]/#/${result_settings[prefix]}}" )
-    fi
+    #if [[ -n ${result_settings[prefix]} && ${result_settings[prefix]} != *= ]]; then
+    #    result_completions=( "${result_completions[@]/#/${result_settings[prefix]}}" )
+    #fi
     # For Bash completions all we can do is append the suffix. When we have
     # a suffix it means we want to keep building a word, that is it is `=` or
     # `/` and we are building an assignment or a path, so no space.
-    if [[ -n ${result_settings[suffix]} ]]; then
-        result_settings[nospace]=1
-        result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
-    fi
+    #if [[ -n ${result_settings[suffix]} ]]; then
+    #    result_settings[nospace]=1
+    #    result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
+    #fi
     # We will probably not set no space independent of a suffix.
     if (( ${result_settings[nospace]} )); then
         compopt -o nospace
@@ -114,6 +121,8 @@ __zshctl_get_completion_results() {
     # but `ytt` does have funky file marks, so even there they take liberties.
     #
     # TODO Come back and make `noquote` a separate option.
+
+    __zshctl_debug "$(IFS=$'\n'; echo "${result_completions[@]}")"
 
     # Outgoing, but we have to get to files.
     local shellCompDirectiveError=1
@@ -208,7 +217,7 @@ __zshctl_get_completion_results() {
 
     # TODO Help message.
 
-    compopt -o filenames
+    compopt -o filenames -o noquote
     COMPREPLY=( baz/snert/ baz/super/ )
     return
 
@@ -268,6 +277,7 @@ __zshctl_handle_standard_completion_case() {
     if [[ "${result_settings[descriptions]}" -ne 1 ]]; then
         __zshctl_debug "trying the cheap reply"
         IFS=$'\n' read -ra COMPREPLY -d '' < <(compgen -W "${result_completions[*]}" -- "${result_settings[incomplete]}")
+        __zshctl_debug "$(IFS=$'\n'; echo "${COMPREPLY[@]}")"
         return 0
     fi
     __zshctl_debug "cur <$cur>"

@@ -469,7 +469,7 @@ function parser {
     # superior tokenization of shell words. Better than the the words that
     # Bash provides to a completion function.
 
-    typeset shell words=() line maybe=()
+    typeset shell words=() line maybe=() bwords=()
     integer point=0 size cword=0 i
     if [[ $funcstack[$depth] != *:* && ${stack[$top]:-} = __complete ]]; then
         ((top--))
@@ -482,6 +482,16 @@ function parser {
             ((top--))
             point=$stack[$top]
             ((top--))
+            ((top--)) # COMP_WORDBREAKS
+            ((top--)) # COMP_TYPE
+            ((top--)) # COMP_KEY (ASCII last keystroke?)
+            cword=$stack[$top]
+            ((cword++)) # Bash is zero indexed.
+            ((top--))
+            bwords=( "${(@Oa)${(@)stack[$top, -1]}}" )
+            bwords=( "${(A@Oa)${(@)stack[1, $top]}}" )
+            print -l -- "CWORD: $cword" >> $parse[debug]
+            print -l -- "${(@)bwords}" >> $parse[debug]
             #  We clip for Bash. It doesn't seem to do mid-word completion
             #  anywhere. Not even `ls` can run with a file name that actually
             #  exists. We can be just as brutal.
@@ -513,6 +523,7 @@ function parser {
         print -l -- "${(@)words}" "$parse[incomplete]" >> $parse[debug]
         parse[complete]=1
         print "parse[completed]<$parse[completed]>" >> $parse[debug]
+        print $funcstack[$depth] "${(@)words}" >> $parse[debug]
         $funcstack[$depth] "${(@)words}"
         print "parse[completed]<$parse[completed]>" >> $parse[debug]
         # print -u 2 ${(j: :)"${(@qq)${(@kv)parse}}"}
@@ -521,8 +532,32 @@ function parser {
             (( parse[flags] = parse[flags] | 4 ))
             parse[files]=none
         fi
+        if [[ $shell = bash ]]; then
+            # Bash creates "words" by splitting on all sorts of characters
+            # that do not delineate shell words. If we are at an equals or our
+            # previous character was an equals, we do not need the asignee
+            # part of the prefix.
+            print -u 2 ">> <$parse[delimiter]> $bwords[$cword]"
+            if [[
+                -n $parse[delimiter] &&
+                (
+                    $bwords[$cword] = $parse[delimiter] ||
+                    $bwords[$(( cword - 1 ))] = $parse[delimiter]
+                )
+            ]]; then
+                parse[prefix]=${parse[prefix]#*$parse[delimiter]}
+                parse[incomplete]=${parse[incomplete]#*$parse[delimiter]}
+                completion_match=( "${(@)completion_match#*$parse[delimiter]}" )
+            fi
+            if [[ -n $parse[suffix] ]]; then
+                parse[nospace]=1
+            fi
+            completion_match=( "${(@)completion_match/#/$parse[prefix]}" )
+            completion_match=( "${(@)^completion_match}$parse[suffix]" )
+            completion_match=( "${(@M)completion_match:#$parse[incomplete]*}" )
+        fi
         typeset hit key value
-        for hit in prefix suffix filenames incomplete files descriptions message; do
+        for hit in nospace prefix suffix filenames incomplete files descriptions message; do
             printf 'printf '\''result_settings[%%s]=%%q\n'\'' %s %s\n' ${(qqq)hit} ${(qqq)parse[$hit]}
         done
         # TODO We could try grouping commands and options.
@@ -750,6 +785,7 @@ function parser {
             else
                 if (( ${+functions[complete:${parse[func]#execute:}]} )); then
                     printf 'parse[matched]=%s\n' ${(qqq)option[matched]}
+                    print ${functions_source[complete:op:put]} >> $parse[debug]
                     printf 'complete:%s %s\n' ${parse[func]#execute:} "${(j: :)${(@qq)combined}}"
                 else
                     printf 'delegate %s\n' "${(j: :)${(@qq)combined}}"
