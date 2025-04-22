@@ -23,18 +23,22 @@ __zshctl_get_completion_results() {
     # input with a timeout. We cancel the timer by writing to its standard
     # input. Note that this is always the way we do a coproc, managing it
     # through standard input instead of trying to sort out singal handling.
+    # Bonus is that we don't have to wait for a timer to expire and come back
+    # around to break a loop, we awake immediately if sleeping on a read.
+
+    # Get the character that we'll put back when the spinner stops spinning.
     local putback=${COMP_LINE:$COMP_POINT:1}
-    __zshctl_debug "putback<$putback>"
+    # Variables for the spinner and the invocation of our program.
     local spinner_PID code
-    local -a spinner
+    local -a spinner execute
     exec 3>&1
     {
         {
             coproc spinner {
-                local LC_CTYPE=C
-                local charwidth=3
+                local LC_CTYPE=C    # important
+                local charwidth=3   # also, important
                 local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
-                read -t 0.2 -r line
+                read -t 0.2 -r line # if we have a line we never start spinning
                 [[ -z $line ]] || return
                 printf '\e[?25l' 1>&3 # hide cursor
                 local i=0
@@ -42,46 +46,67 @@ __zshctl_get_completion_results() {
                     i=$(( (i + $charwidth ) % ${#spin} ))
                     printf "%s" ${spin:$i:$charwidth} 1>&3
                     echo -en "\033[1D" 1>&3
-                    read -t 0.1 -r line
+                    read -t 0.1 -r line # snooze
                 done
-                echo -en "${putback:- }\033[1D" 1>&3
+                echo -en "${putback:- }\033[1D" 1>&3 # putback
                 printf '\e[?25h' 1>&3 # normal cursor
             }
         }
     } 2>/dev/null
+
     # Calling ${COMP_WORD[0]} instead of directly zshctl allows to handle aliases.
-    out=$(${COMP_WORDS[0]} __complete bash "${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}" \
-        "$COMP_LINE" "$COMP_POINT" 2>>${ZSHCTL_COMP_DEBUG_FILE:-/dev/null})
+    execute=(
+        ${COMP_WORDS[0]}
+        __complete
+        bash "${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}"
+        "$COMP_LINE"
+        "$COMP_POINT"
+    )
+    __zshctl_debug 'About to call: %s' "$(IFS=, ; echo "${execute[@]@Q}")"
+    out=$( "${execute[@]}" )
     code=$?
+
+    # Stop the spinner and wait for it to finish. If we do not wait we might
+    # exit this function and get job control spew on the terminal because our
+    # local settings to hush the spew will be reset when we return.
     echo close >&"${spinner[1]}"
     wait $spinner_PID
     exec 3>&-
 
+    # Oh, well.
     if (( code )); then
         __zshctl_debug "Completion failed: $code"
         return
     fi
+
+    # Evaluate the output from our program.
     typeset -A result_settings result_descriptions
     typeset -a result_completions
     eval $out
 
+    # For Bash completions all we can do is append the prefix.
     if [[ -n ${result_settings[prefix]} ]]; then
         result_completions=( "${result_completions[@]/#/${result_settings[prefix]}}" )
     fi
+    # For Bash completions all we can do is append the suffix. When we have
+    # a suffix it means we want to keep building a word, that is it is `=` or
+    # `/` and we are building an assignment or a path, so no space.
     if [[ -n ${result_settings[suffix]} ]]; then
         result_settings[nospace]=1
         result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
     fi
+    # We will probably not set no space independent of a suffix.
     if (( ${result_settings[nospace]} )); then
         compopt -o nospace
     fi
+    # We are completing a path and setting this will display only the last
+    # part of the completed path. `foo/bar` and `foo/baz` will display `bar`
+    # and `baz` if the user is completing `foo/`.
     if (( ${result_settings[filenames]} )); then
         compopt -o filenames
     fi
 
-    __zshctl_debug "The completion directive is: ${directive}"
-    __zshctl_debug "The completions are: ${out}"
-
+    # Outgoing, but we have to get to files.
     local shellCompDirectiveError=1
     local shellCompDirectiveNoSpace=2
     local shellCompDirectiveNoFileComp=4
@@ -170,8 +195,10 @@ __zshctl_get_completion_results() {
         __zshctl_handle_completion_types
     fi
 
-    __zshctl_debug 'made it'
     return
+
+    # TODO Help message.
+
     compopt -o filenames
     COMPREPLY=( baz/snert/ baz/super/ )
     return
