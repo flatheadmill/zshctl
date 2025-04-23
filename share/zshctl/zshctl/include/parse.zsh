@@ -783,10 +783,10 @@ function parser {
             if [[ $combined = (-|--) ]]; then
                 true
             else
-                if (( ${+functions[complete:${parse[func]#execute:}]} )); then
+                if (( ${+functions[complete${parse[func]#execute}]} )); then
                     printf 'parse[matched]=%s\n' ${(qqq)option[matched]}
                     print ${functions_source[complete:op:put]} >> $parse[debug]
-                    printf 'complete:%s %s\n' ${parse[func]#execute:} "${(j: :)${(@qq)combined}}"
+                    printf 'complete%s %s\n' ${parse[func]#execute} "${(j: :)${(@qq)combined}}"
                 else
                     printf 'delegate %s\n' "${(j: :)${(@qq)combined}}"
                 fi
