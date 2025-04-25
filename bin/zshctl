@@ -106,7 +106,7 @@ function {
         fi
     do; :; done
     if (( zshctl[commandable] && zshctl[localized] )); then
-        command_path+=( ~/.local/share/${zshctl[argzero]:t} )
+        command_path+=( ~/.local/share/${zshctl[program]} )
     fi
     # The value for uncompiled functions is the path to the source, so we use
     # ":" functions because it is not a popular file name.
