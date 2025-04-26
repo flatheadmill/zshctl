@@ -75,10 +75,6 @@ function tekton::close {
     fi
 }
 
-function block {
-    banner "$@"
-}
-
 typeset -xgA o_block
 
 # The banner starts a block and creates a subshell that we can use to indent the
