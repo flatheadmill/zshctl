@@ -82,6 +82,9 @@ typeset -xgA o_block
 
 #
 function banner {
+    typeset o_indent=( '' 4 )
+    zparseopts -D -F -K -- \
+        {i,--indent}:=o_indent
     o_block[pids]=''
     o_block[stop]=0
     integer fd out
@@ -134,7 +137,7 @@ function banner {
             print -- >&$out
         fi
         # Tee into the word count, indent, and print to parent's standard out.
-        tee >(>&p) | sed -ue 's/^\(..*\)$/    \1/' >&$out
+        tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:o_indent:: :)}"'\1/' >&$out
         # Close the >&p and <&p of our word count `coproc`.
         coproc :
         # If we had any output at all, print a new line.
