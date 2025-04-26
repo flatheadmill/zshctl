@@ -100,16 +100,18 @@ function banner {
     # line, we may as well look for another.
     #
     # `while` is slow so someday we can replace with this an `awk` program.
-    coproc awk '
-    /^reset$/ { split("", arr) }
-    /^$/ || /^ / { arr[length(arr) + 1] = $0 }
-    /^end$/ {
-        for (i = 1; i <= length(arr); i++) {
-            print arr[i]
+    {
+        coproc awk -Winteractive '
+        /^reset$/ { split("", arr) }
+        /^$/ || /^ / { arr[length(arr) + 1] = $0 }
+        /^end$/ {
+            for (i = 1; i <= length(arr); i++) {
+                print arr[i]
+            }
+            exit 0
         }
-        exit 0
-    }
-    '
+        '
+    } 2>/dev/null # awk: unknown option -Winteractive ignored
     # Keep both the input and output.
     exec {fd}>&p; o_block[try]=$fd
     exec {fd}<&p; o_block[tried]=$fd
