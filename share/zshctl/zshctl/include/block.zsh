@@ -137,7 +137,7 @@ function banner {
             print -- >&$out
         fi
         # Tee into the word count, indent, and print to parent's standard out.
-        tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:o_indent:: :)}"'\1/' >&$out
+        tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:o_indent[2]:: :)}"'\1/' >&$out
         # Close the >&p and <&p of our word count `coproc`.
         coproc :
         # If we had any output at all, print a new line.
