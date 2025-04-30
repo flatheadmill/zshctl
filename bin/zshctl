@@ -59,7 +59,8 @@ function delegate {
             abend 'unable to source `%s`.' $delegate
         COMMANDS[$delegate]=':'
     fi
-    (( ${+functions_source[$delegate]} )) || abend 'fatal: no such command `%s`.' ${delegate//:/ }
+    (( ${+functions_source[$delegate]} )) ||
+        abend 'fatal: no such command `%s`.' ${delegate//:/ }
     $delegate "$@"
 }
 
