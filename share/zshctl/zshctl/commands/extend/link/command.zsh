@@ -19,5 +19,5 @@ function execute:extend:link {
     source $found[1]
     print ${zshctl[argzero]:A:h:h}
     mkdir -p ~/.local/share/$zshctl[program]
-    ln -s ${found[1]:h} ~/.local/share/$zshctl[program]/$extend[link_as]
+    ln -s ${found[1]:A:h} ~/.local/share/$zshctl[program]/${extend[link_as]}
 }
