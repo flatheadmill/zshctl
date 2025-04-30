@@ -256,6 +256,9 @@ function completions {
                     split=( $key )
                 fi
                 for key in "${(@)split}"; do
+                    if [[ $key = *=* ]]; then
+                        key=${key%=*}
+                    fi
                     parse[descriptions]=1
                     completions+=( $key $line )
                     completion_match+=( $key )
