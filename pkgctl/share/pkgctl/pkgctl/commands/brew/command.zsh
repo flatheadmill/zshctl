@@ -37,19 +37,19 @@ function execute:brew {
     for key value in "${(@kv)conf}"; do
         ruby[$key]=$(ruby -e 'puts ARGV[0].dump()' "$value")
     done
-    mkdir -p brew/formula
-    heredoc -q <<'    EOF' | tee brew/formula/$conf[program].rb
+    mkdir -p brew/Formula
+    heredoc -q <<'    EOF' | tee brew/Formula/$conf[program].rb
         require "formula"
 
         class ${(C)conf[program]} < Formula
           desc $ruby[description]
           homepage $ruby[url.home]
           url $ruby[url.download]
-          sha256 "SHA256SUM"
+          sha256 "$sha256sum"
 
           def install
-            bin.install $ruby[url.program]
-            share.install $ruby[url.program]
+            bin.install "bin/" + $ruby[program]
+            share.install "share/" + $ruby[program]
           end
 
           # Homebrew requires tests.
