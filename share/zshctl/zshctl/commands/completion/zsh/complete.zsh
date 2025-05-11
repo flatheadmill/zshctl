@@ -28,7 +28,7 @@ function _zshctl {
 
     if [[ ! -v _autocomplete__func_opts ]]; then
         typeset putback=${${BUFFER#$LBUFFER}[1]:- }
-        integer code spinner
+        integer code spinner=0
         exec 3>&1
         coproc {
             coproc :
@@ -47,11 +47,13 @@ function _zshctl {
             printf '\e[?25h' 1>&3
         }
         spinner=$!
+        trap '(( spinner )) && print -p close' EXIT INT TERM
         __zshctl_debug 'Spinner PID: %d' $spinner
         out=$( "${(@)executable}" )
         code=$?
-        print -p close
-        wait $spin
+        print -p close 2>/dev/null # Pipe may be broken.
+        wait $spinner
+        spinner=0
         exec 3>&-
     else
         __zshctl_debug "autocomplete detected"

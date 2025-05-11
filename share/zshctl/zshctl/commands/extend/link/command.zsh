@@ -1,3 +1,28 @@
+# ___ execute:extend:link _ description ___
+# Install an
+# .PG .B __program__
+# extension.
+# ___ execute:extend:link _ man ___
+# .SH NAME
+# .PB __program__\ extend \link \- install a
+# .PG __program__
+# extension.
+# .SH SYNOPSIS
+# .PG .SY __program__\ extend\ link
+# .I path
+# .PG .SY __program__\ extend\ link
+# .RB [ \-h | \-\-help ]
+# .YS
+# .SH DESCRIPTION
+# Installs a
+# .PG __program__
+# extension.
+# .SH OPTIONS
+# .TP
+# .BR \-h ,\  \-\-help
+# Help for
+# .BR zshctl\ completions .
+# ___
 function execute:extend:link {
     eval "$(args -U -bx h,help -- "$@")"
     typeset subdirectory=.

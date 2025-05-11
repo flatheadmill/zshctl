@@ -1,37 +1,29 @@
-# ___ execute:completion ___
+# ___ execute:completion _ description ___
+# Install
+# .PG .B __program__
+# shell completions for Zsh or Bash.
+# ___ execute:completion _ man ___
 # .SH NAME
-# zshctl\ completion \- generate shell completions
+# .PG __program__\ completion \- generate shell completions
 # .SH SYNOPSIS
-# .SY zshctl\ completion
+# .PG .SY __program__\ completion
 # .I command
 # .RI [ arguments ]
-# .SY zshctl\ completion
+# .PG .SY __program__\ completion
 # .RB [ \-h | \-\-help ]
 # .YS
 # .SH DESCRIPTION
-# .B zshctl\ completions
-# generates completions for Zsh and Bash.
+# Generates completions for Zsh and Bash.
 # .SH OPTIONS
 # .TP
 # .BR \-h ,\  \-\-help
 # Help for
-# .BR zshctl\ completions .
+# .PG .BR zshctl\ completions .
 # .SH COMMANDS
-# The following command can be invoked to perform 1Password operations. You can
-# learn more about the each command by invoking the command with the
-# .B --help
-# option.
-# .TP
-# .B zsh
-# .br
-# Generate shell compltions for Bash.
-# .TP
-# .B zsh
-# .br
-# Generate shell compltions for Zsh.
+# .ZC commands
 # ___
 function execute:completion {
-    eval "$(args -F -bx h,help -- "$@")"
+    eval "$(args -UC -bx h,help -- "$@")"
     (( $# || parse[complete] )) || usage
     delegate "$@"
 }
