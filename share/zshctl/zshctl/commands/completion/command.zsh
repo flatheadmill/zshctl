@@ -18,7 +18,7 @@
 # .TP
 # .BR \-h ,\  \-\-help
 # Help for
-# .PG .BR zshctl\ completions .
+# .PG .BR __program__\ completions .
 # .SH COMMANDS
 # .ZC commands
 # ___

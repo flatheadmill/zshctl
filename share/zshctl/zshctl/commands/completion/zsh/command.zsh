@@ -1,8 +1,8 @@
 # ___ execute:completion:zsh _ description ___
-# Generate Bash completions for
+# Generate Zsh completions for
 # .PG .BR __program__ .
 # ___ execute:completion:zsh _ man ___
-# .PG __program__\ completion \- generate Bash shell completions
+# .PG __program__\ completion \- generate Zsh shell completions
 # .SH SYNOPSIS
 # .PG .SY __program__\ completion\ zsh
 # .PG .SY __program__\ completion\ zsh
@@ -15,7 +15,7 @@
 # .TP
 # .BR \-h ,\  \-\-help
 # Help for
-# .PG .BR zshctl\ completions .
+# .PG .BR __program__\ completions\ zsh .
 # ___
 function execute:completion:zsh {
     eval "$(args -bx h,help -- "$@")"

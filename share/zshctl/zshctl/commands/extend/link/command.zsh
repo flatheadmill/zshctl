@@ -1,7 +1,5 @@
 # ___ execute:extend:link _ description ___
-# Install an
-# .PG .B __program__
-# extension.
+# Install an extension.
 # ___ execute:extend:link _ man ___
 # .SH NAME
 # .PB __program__\ extend \link \- install a
@@ -9,7 +7,7 @@
 # extension.
 # .SH SYNOPSIS
 # .PG .SY __program__\ extend\ link
-# .I path
+# .I extension-path
 # .PG .SY __program__\ extend\ link
 # .RB [ \-h | \-\-help ]
 # .YS
@@ -21,7 +19,7 @@
 # .TP
 # .BR \-h ,\  \-\-help
 # Help for
-# .BR zshctl\ completions .
+# .BR zshctl\ extend\ link .
 # ___
 function execute:extend:link {
     eval "$(args -U -bx h,help -- "$@")"

@@ -15,7 +15,7 @@
 # .TP
 # .BR \-h ,\  \-\-help
 # Help for
-# .PG .BR zshctl\ completions .
+# .PG .BR __program__\ completions\ bash .
 # ___
 function execute:completion:bash {
     eval "$(args -bx h,help -- "$@")"

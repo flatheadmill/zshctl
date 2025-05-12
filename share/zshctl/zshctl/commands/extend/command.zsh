@@ -4,14 +4,15 @@
 # with additional commands.
 # ___ execute:extend _ man ___
 # .SH NAME
-# .PB __program__\ extend \- extend
-# .PG __program__
+# .PG __program__\ extend \-
+# extend
+# .PG .B __program__
 # with additional commands
 # .SH SYNOPSIS
-# .PG .SY __program__\ completion
+# .PG .SY __program__\ extend
 # .I command
 # .RI [ arguments ]
-# .PG .SY __program__\ completion
+# .PG .SY __program__\ extend
 # .RB [ \-h | \-\-help ]
 # .YS
 # .SH DESCRIPTION
@@ -22,7 +23,7 @@
 # .TP
 # .BR \-h ,\  \-\-help
 # Help for
-# .BR zshctl\ completions .
+# .PG .BR __program__\ extend .
 # .SH COMMANDS
 # The following command can be invoked to extend
 # .PG __program__ with additional commands.

@@ -1,4 +1,6 @@
 zmodload zsh/datetime
+
+# TODO Make the format options a bullet list under it's entry in OPTIONS.
 # ___ execute:version _ description ___
 # Display the current version of
 # .PG .BR __program__ .
@@ -7,8 +9,7 @@ zmodload zsh/datetime
 # .PG __program__\ version \- display version
 # .SH SYNOPSIS
 # .PG .SY __program__\ version
-# .I command
-# .RI [ arguments ]
+# .RB [ \-f | \-\-format = \fIterse\fR | \fIverbose\fR | \fIshell\fR | \fIjson\fR ]
 # .PG .SY __program__\ version
 # .RB [ \-h | \-\-help ]
 # .YS
