@@ -1,4 +1,5 @@
 zmodload zsh/terminfo
+zmodload zsh/datetime
 
 # https://github.com/jarro2783/cxxopts/issues/120#issuecomment-437709167
 function resource {
@@ -30,7 +31,7 @@ function resource {
 function usage {
     setopt localoptions extendedglob
     typeset usage=${1:-$funcstack[2]} man=${2:-0} cols="$(echoti cols)"
-    typeset release_date=$(date --date=@$zshctl[release_date] +'%B %-d, %Y')
+    typeset release_date=$(strftime '%B %-d, %Y' $zshctl[release_date])
     typeset capitalized=$zshctl[program]:${usage#*:}
     capitalized=${${capitalized//:/-}:u}
     typeset mandoc=() lines=() split=() line cmd src
@@ -85,7 +86,7 @@ function usage {
         else
             cols=$(( cols - 7 ))
         fi
-        if (( $zshctl[osx] )); then
+        if [[ $(uname) = Darwin ]]; then
             mandoc -O width=${cols}  -T utf8 $1
         else
             GROFF_NO_SGR=1 groff -rLL=${cols}n -rLT=${cols}n -Wall -mtty-char -Tutf8 -man -c "$1"
@@ -182,8 +183,20 @@ function completions {
         esac
     done
     mandoc+=( '' )
+    if false; then
+        if [[ $(uname) = Darwin ]]; then
+            mandoc -O width=999  -c -T utf8 <(printf '%s' "${(pj:\n:)mandoc}") > ~/.mandoced
+        else
+            GROFF_NO_SGR=1 groff -rLL=999n -rLT=999n -Wall -mtty-char -Tutf8 -man -c <(printf '%s' "${(pj:\n:)mandoc}")
+        fi
+    fi
+    # for `mandoc` we have to replace non-breaking spaces with regular spaces
     lines=( "${(@Af)"$(
-        GROFF_NO_SGR=1 groff -rLL=999n -rLT=999n -Wall -mtty-char -Tutf8 -man -c <(printf '%s' "${(pj:\n:)mandoc}")
+        if [[ $(uname) = Darwin ]]; then
+            mandoc -O width=999  -T utf8 <(printf '%s' "${(pj:\n:)mandoc}") | sed $'s/\xC2\xA0/ /g'
+        else
+            GROFF_NO_SGR=1 groff -rLL=999n -rLT=999n -Wall -mtty-char -Tutf8 -man -c <(printf '%s' "${(pj:\n:)mandoc}")
+        fi
     )"}" )
     # Underscroe followed by backspace.
     typeset italicized='_'$'\b'
