@@ -70,7 +70,8 @@ FROM archlinux AS aur
 
 RUN pacman-key --init
 RUN pacman-key --populate archlinux
-RUN pacman --noconfirm -Sy archlinux-keyring
+RUN pacman --noconfirm -Syu
+RUN pacman --noconfirm -S archlinux-keyring
 RUN pacman --noconfirm -S base-devel zsh wget less
 RUN useradd -u 1983 -d /home/build -s /bin/false build && usermod -L build
 RUN mkdir -p /work /html /home/build
