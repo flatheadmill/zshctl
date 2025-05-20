@@ -1,0 +1,11 @@
+
+                           Welcome to `zshctl`.
+
+Unfortunately, we cannot determine your hardware platform and operating system
+distribution so we're not going to be able to give you a proper installation at
+this time.
+
+You can clone https://github.com/flatheadmill/zshctl to your system, set the
+execute bit and put it in your path.
+
+We'll work on supporting you mavericks, but not today.

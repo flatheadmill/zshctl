@@ -1,0 +1,24 @@
+#!/zshctl/bin/zshctl
+
+typeset -xgA conf=(
+    program zshctl
+    url.home https://github.com/flatheadmill/zshctl
+    url.repo https://zshctl.sh
+    description 'ZSH CLI application framework.'
+    license "MIT"
+
+    user.email alan@prettyrobots.com
+    user.name 'Alan Gutierrez'
+
+    brew.class.name 'Zshctl'
+
+    apk.key.name alan@prettyrobots.com-67eee297
+    apk.dependencies 'zsh less groff'
+
+    aur.dependencies 'zsh groff less'
+
+    apt.dependencies 'zsh, less, groff-base'
+    yum.dependencies 'zsh, less, groff-base, gawk'
+)
+
+# vim: ft=zsh:

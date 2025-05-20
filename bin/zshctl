@@ -1,0 +1,132 @@
+#!/usr/bin/env zsh
+
+zmodload zsh/parameter
+zmodload zsh/datetime
+
+typeset -xgA zshctl
+
+zshctl[man_title]='Zshctl Manuals'
+zshctl[shebangable]=1
+zshctl[commandable]=1
+zshctl[localized]=1
+zshctl[main]=zshctl
+
+function include {
+    while (( $# )); do
+        case "${INCLUDES[$1]}" in
+            /* )
+                source $INCLUDES[$1]
+                INCLUDES[$1]=':'
+                ;;
+            : )
+                ;;
+            * )
+                abend 'unable to include %s' "${(qqq)1}"
+        esac
+        shift
+    done
+}
+
+# Extract a string resource from this source file. String resources are within
+# comments. They begin with a resource name surrounded by three underbars. We're
+# rather particular about white space, there should be only one space separating
+# the comment the underbars and the resource name. Furthermore, the comment must
+# begin on the first column. The string resource is terminated by a line that
+# has a comment followed by three underbars, so either the next string resource
+# or a sole three underbar terminator.
+
+# Invoke the next sub-command from the extracted commands. The prefix is the
+# underbar delimited path of commands visited so far.
+function delegate {
+    typeset next=${1:-}
+    integer top=2
+    while [[ $funcstack[$top] != (execute:*|execute) ]]; do
+        ((top++))
+        (( top <= ${#funcstack} )) || abend 'must be called from an execute function'
+    done
+    typeset func=$funcstack[$top]
+    # TODO More here, basically, if the top most argument doesn't match when
+    # completing, then complete, otherwise we have an error and cannot answer.
+    if (( ! $# )) || [[ -z ${1:-} ]]; then
+        (( parse[complete] )) && return
+        abend 'fatal: %s expects a command argument' ${func//:/ }
+    fi
+    typeset delegate=$func:$next
+    shift
+    if [[ ${${COMMANDS[$delegate]}[1]} = '/' ]]; then
+        source $COMMANDS[$delegate]
+        (( ${+functions_source[$delegate]} )) ||
+            abend 'unable to source `%s`.' $delegate
+        COMMANDS[$delegate]=':'
+    fi
+    (( ${+functions_source[$delegate]} )) ||
+        abend 'fatal: no such command `%s`.' ${delegate//:/ }
+    $delegate "$@"
+}
+
+# ___ execute ___
+# ___
+function execute {
+    eval "$(args -F -bx h,help -- "$@")"
+    delegate "$@"
+}
+
+function {
+    typeset -A INCLUDES=() COMMANDS=()
+    typeset command_path=() match=()
+    typeset shebang dir base func src
+    zshctl[argzero]=$ZSH_ARGZERO
+    while
+        if (( $zshctl[commandable] )); then
+            command_path+=( "${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}" )
+        fi
+        zshctl[program]=${zshctl[argzero]:t}
+        shebang=$1
+        if (( $# && zshctl[shebangable] )) && [[
+            ( $shebang =~ ^\. || $shebang =~ / ) &&
+            -f $shebang &&
+            (
+                (
+                    "$(head -c 14 $shebang)" = '#!/usr/bin/env' &&
+                    "$(head -n 1 $shebang)" =~ ^#!/usr/bin/env\ +([^ ]+)\ *$ &&
+                    $match[1] = ${zshctl[argzero]:t}
+                ) ||
+                (
+                    "$(head -n 1 $shebang)" =~ ^#!(/[^ ]+)\ *$ &&
+                    $match[1] = $zshctl[argzero]
+                )
+            )
+        ]]; then
+            zshctl[argzero]=$1
+            shift
+            zshctl[shebangable]=0
+            source ${zshctl[argzero]:A}
+            true
+        else
+            false
+        fi
+    do; :; done
+    if (( zshctl[commandable] && zshctl[localized] )); then
+        command_path+=( ~/.local/share/${zshctl[program]} )
+    fi
+    # The value for uncompiled functions is the path to the source, so we use
+    # ":" functions because it is not a popular file name.
+    for dir in "${(@)command_path}"; do
+        for src in "$dir"/*/commands/**/command.zsh(N); do
+            func=${${src#$base/*/commands/}%/command.zsh}
+            COMMANDS[execute:${func//\//:}]=$src
+        done
+        for src in "$dir"/*/include/*.zsh(N); do
+            INCLUDES[${src:t:r}]=$src
+        done
+        for src in $dir/release.zsh(N); do
+            source $src
+        done
+    done
+    for func in "${(@k)functions_source}"; do
+        [[ $func = execute:* ]] || continue
+        COMMANDS[$func]=':'
+    done
+    include heredoc parse
+    execute "$@"
+} "$@"
