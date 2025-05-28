@@ -6,11 +6,13 @@ function execute:yum {
     version=$(zsh compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'
     mkdir -p /html
-    if [[ -d previous/yum ]]; then
-        mv previous/yum /html/yum
-    else
-        mkdir /html/yum
-    fi
+    find previous/yum
+    #exit 1
+    #if [[ -d previous/yum ]]; then
+    #    mv previous/yum /html/yum
+    #else
+    #    mkdir /html/yum
+    #fi
     gpg --import /run/secrets/gpg
     gpg --list-secret-keys --keyid-format=long
     rpmdev-setuptree
@@ -88,9 +90,14 @@ function execute:yum {
         abend '`rpm -i` failed.'
     [[ "$(=$conf[program] version)" = $version ]] ||
         abend 'install falled.'
-    mkdir -p /html/yum/repo
+    if [[ -e /work/previous/zero ]]; then
+        mkdir -p /html/yum/repo
+    else
+        mv /work/previous/yum /html/yum
+    fi
     cp /root/rpmbuild/RPMS/noarch/$conf[program]-$version-1.noarch.rpm /html/yum/repo
     createrepo /html/yum/repo || abend '`createrepo` failed.'
+    rm /html/yum/repo/repodata/repomd.xml.asc
     gpg --detach-sign --armor /html/yum/repo/repodata/repomd.xml ||
         abend '`gpg --detach-sign` failed.'
 }

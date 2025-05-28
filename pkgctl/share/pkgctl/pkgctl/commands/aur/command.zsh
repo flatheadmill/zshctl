@@ -59,7 +59,12 @@ function execute:aur {
     cat PKGBUILD
     cp compiled/$conf[program]-$version.tar.gz $conf[program].tar.gz
     makepkg --sign || abend '`makepkg` failed.'
-    mkdir -p /html/aur
+    if [[ -e /work/previous/zero ]]; then
+        mkdir -p /html/aur
+    else
+        mkdir -p /html
+        mv previous/aur /html/aur
+    fi
     mv $conf[program]-$version-1-any.pkg.tar.* /html/aur
     repo-add --sign /html/aur/$conf[program].db.tar.gz /html/aur/$conf[program]-$version-1-any.pkg.tar.zst ||
         abend '`repo-add --sign` failed.'

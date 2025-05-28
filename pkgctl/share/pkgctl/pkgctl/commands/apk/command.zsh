@@ -71,8 +71,8 @@ function execute:apk {
     abuild -r || abend '`abuild -r` failed'
     # TODO Can I make this a no-arch package?
     mkdir -p /html/apk/x86_64
-    if [[ ! -e previous/zero ]]; then
-        cp previous/apk/x86_64/*.apk /html/apk/x86_64
+    if [[ ! -e /work/previous/zero ]]; then
+        cp /work/previous/apk/x86_64/*.apk /html/apk/x86_64
     fi
     find /home/build/packages
     cp /home/build/packages/compiled/x86_64/$conf[program]-$version-r0.apk /html/apk/x86_64
@@ -80,6 +80,8 @@ function execute:apk {
     apk index --no-warnings -vU -o APKINDEX.tar.gz *.apk
     popd
     abuild-sign -k ~/.abuild/$conf[apk.key.name].rsa /html/apk/x86_64/APKINDEX.tar.gz
+    tar xzvf /html/apk/x86_64/APKINDEX.tar.gz
+    cat APKINDEX
 }
 
 # vim: ft=zsh:

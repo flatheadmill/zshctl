@@ -17,7 +17,9 @@ function execute:brew {
         git clone brew.git brew
         mkdir -p /html/downloads
     else
-        mv /work/previous/downloads html/downloads
+        mkdir -p /html
+        mv /work/previous/downloads /html/downloads
+        git clone /work/previous/brew.git
     fi
     # Create a tarball containing the program.
     mv compiled/$conf[program]-$version.tar.gz /html/downloads/

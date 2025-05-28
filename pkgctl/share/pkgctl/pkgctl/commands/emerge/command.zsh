@@ -83,7 +83,7 @@ function execute:emerge {
     typeset message
     printf -v message 'Release `%s` %s.' $conf[program] $version
     git -C ebuild commit -S -m $message
-    git -C ebuild log -p -n 2
+    git -C ebuild log -n 3
     mkdir -p /html
     git -C /html clone --bare /work/ebuild
     git -C /html/ebuild.git update-server-info
