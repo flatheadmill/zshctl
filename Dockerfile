@@ -109,7 +109,7 @@ COPY --from=compiled /work/html/ /html/
 COPY ./www/ /html/
 
 RUN du -sh /html/
-RUN find /html/ | sorta
+RUN find /html/ | sort
 
 FROM alpine
 
