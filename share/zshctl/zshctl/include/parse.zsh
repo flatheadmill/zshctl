@@ -366,7 +366,7 @@ function parser {
     # arguments will be assigned.
     typeset -A option=( kind scalar defined 0 required 0 ) short options missing
     typeset split=() long=() declared=() stack=( "${(@Oa)@}" )
-    typeset popped on_zeroed state=option typesets
+    typeset popped on_zeroed state=option typesets=() tset
     integer top=${#stack} intersperse=0 usage=0 completable=0
     while (( top )); do
         popped=$stack[$top]
@@ -445,19 +445,20 @@ function parser {
                 if (( ! $option[defined] && ! parse[complete] )); then
                     case $option[kind] in
                         counter | boolean | toggle )
-                            printf -v typesets 'integer o_%s=0\n' ${option[long]//-/_}
+                            printf -v tset 'integer o_%s=0' ${option[long]//-/_}
                             ;;
                         array )
-                            printf -v typesets 'typeset o_%s=()\n' ${option[long]//-/_}
+                            printf -v tset 'typeset o_%s=()' ${option[long]//-/_}
                             ;;
                         map )
-                            printf -v typesets 'typeset -A o_%s=()\n' ${option[long]//-/_}
+                            printf -v tset 'typeset -A o_%s=()' ${option[long]//-/_}
                             ;;
                         * )
-                            printf -v typesets 'typeset o_%s\n' ${option[long]//-/_}
-                            printf -v typesets 'unset o_%s\n' ${option[long]//-/_}
+                            printf -v tset 'typeset o_%s' ${option[long]//-/_}
+                            printf -v tset 'unset o_%s' ${option[long]//-/_}
                             ;;
                     esac
+                    typesets+=( $tset )
                 fi
                 if (( $option[required] )); then
                     missing[$option[long]]=1
@@ -591,7 +592,7 @@ function parser {
     fi
 
     if [[ -n $typesets ]]; then
-        printf $typesets
+        printf '%s\n' ${(pj:\n:)typesets}
     fi
 
     long=( ${(@o)long} ) # TODO What does this do?
