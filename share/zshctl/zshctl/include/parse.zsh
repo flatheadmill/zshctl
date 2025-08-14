@@ -730,6 +730,9 @@ function parser {
                     scalar )
                         printf 'o_%s=%s\n' ${option[long]//-/_} ${(qq)popped}
                         ;;
+                    number )
+                        printf 'o_%s=%s\n' ${option[long]//-/_} ${(qq)popped}
+                        ;;
                     boolean )
                         printf 'o_%s=%d\n' ${option[long]//-/_} $popped
                         ;;
