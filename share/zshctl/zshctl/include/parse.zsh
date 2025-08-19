@@ -365,6 +365,7 @@ function parser {
     # Initial loop to grab the definition and to define the variables to which
     # arguments will be assigned.
     typeset -A option=( kind scalar defined 0 required 0 ) short options missing
+    typeset -A negated=()  # Tracks which --no-* flags are actual negations
     typeset split=() long=() declared=() stack=( "${(@Oa)@}" )
     typeset popped on_zeroed state=option typesets=() tset
     integer top=${#stack} intersperse=0 usage=0 completable=0
@@ -442,6 +443,10 @@ function parser {
                 option[long]=$split[2]
                 options[$option[long]]=${(j: :)${(@qqkv)option}}
                 long+=( $split[2] )
+                # Track negatable flags for --no-* pattern recognition
+                if (( $option[negatable] )); then
+                    negated[no-$option[long]]=1
+                fi
                 if (( ! $option[defined] && ! parse[complete] )); then
                     case $option[kind] in
                         counter | boolean | toggle )
@@ -612,10 +617,6 @@ function parser {
             switch:--* )
                 # First determine the flag name so we can look up the options definition.
                 case $popped in
-                    (#b)--no-([^=]##) )
-                        flag=$match[1]
-                        ((top--))
-                        ;;
                     (#b)--([^=]##)=(*) )
                         flag=$match[1]
                         stack[$top]=$match[2]
@@ -624,6 +625,12 @@ function parser {
                         flag=$match[1]
                         ((top--))
                 esac
+                # Check if this is a known negation (--no-* pattern defined with -!)
+                if (( negated[$flag] )); then
+                    # It's a negation! Strip the "no-" prefix
+                    flag=${flag#no-}
+                    truth=0
+                fi
                 # Should we complain if the argument is ambiguous? Currently, we are
                 # just accepting the first match in alphabetical order.
                 index=$long[(Ie)$flag]
@@ -644,17 +651,10 @@ function parser {
                         ;;
                 esac
                 option=( "${(@QA)${(z)options[$long[$index]]}}" )
-                option[matched]="--$flag"
+                option[matched]="--$popped"
                 missing[$option[long]]=0
-                # Go back over our poppped argument to determine if it is a negated
-                # boolean or an assignment.
+                # Check if assignment syntax was used on non-assignable types
                 case $popped in
-                    (#b)--no-([^=]##) )
-                        if (( ! $option[negatable] )); then
-                            printf '%s %s unknown %s %s\n' $error $funcstack[$depth] --$match[1] $last
-                        fi
-                        truth=0
-                        ;;
                     (#b)--([^=]##)=* )
                         case $option[kind] in
                             boolean | counter )
