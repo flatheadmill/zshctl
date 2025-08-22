@@ -352,6 +352,8 @@ function parser {
     typeset completion_match=()
     parse[func]=$funcstack[$depth]
 
+    # TODO Unused, do we validate in this way? Probably, or assigning to
+    # `integer` gets lost.
     typeset is_number='
         (){
             case ${1#[-+]} in
@@ -365,8 +367,7 @@ function parser {
     # Initial loop to grab the definition and to define the variables to which
     # arguments will be assigned.
     typeset -A option=( kind scalar defined 0 required 0 ) short options missing
-    typeset -A negated=()  # Tracks which --no-* flags are actual negations
-    typeset split=() long=() declared=() stack=( "${(@Oa)@}" )
+    typeset split=() declared=() stack=( "${(@Oa)@}" )
     typeset popped on_zeroed state=option typesets=() tset
     integer top=${#stack} intersperse=0 usage=0 completable=0
     while (( top )); do
@@ -395,6 +396,10 @@ function parser {
                         ;;
                     -!* )
                         option[negatable]=1
+                        if (( ${#popped} > 2 )); then
+                            popped="-${popped[3,-1]}"
+                            option[short_negation]=${popped[2,2]}
+                        fi
                         ;;
                     -a* )
                         option[kind]=array
@@ -441,32 +446,38 @@ function parser {
                 fi
                 option[short]=$split[1]
                 option[long]=$split[2]
+                option[var]=$split[2]
                 options[$option[long]]=${(j: :)${(@qqkv)option}}
-                long+=( $split[2] )
-                # Track negatable flags for --no-* pattern recognition
-                if (( $option[negatable] )); then
-                    negated[no-$option[long]]=1
-                fi
                 if (( ! $option[defined] && ! parse[complete] )); then
                     case $option[kind] in
                         counter | boolean | toggle )
-                            printf -v tset 'integer o_%s=0' ${option[long]//-/_}
+                            printf -v tset 'integer o_%s=0' ${option[var]//-/_}
                             ;;
                         array )
-                            printf -v tset 'typeset o_%s=()' ${option[long]//-/_}
+                            printf -v tset 'typeset o_%s=()' ${option[var]//-/_}
                             ;;
                         map )
-                            printf -v tset 'typeset -A o_%s=()' ${option[long]//-/_}
+                            printf -v tset 'typeset -A o_%s=()' ${option[var]//-/_}
                             ;;
                         * )
-                            printf -v tset 'typeset o_%s' ${option[long]//-/_}
-                            printf -v tset 'unset o_%s' ${option[long]//-/_}
+                            printf -v tset 'typeset o_%s' ${option[var]//-/_}
+                            printf -v tset 'unset o_%s' ${option[var]//-/_}
                             ;;
                     esac
                     typesets+=( $tset )
                 fi
                 if (( $option[required] )); then
                     missing[$option[long]]=1
+                fi
+                if (( $option[negatable] )); then
+                    if (( ${+option[short_negation]} )); then
+                        short[$option[short_negation]]=no-$split[2]
+                    fi
+                    option[negate]=1
+                    option[short]=$option[short_negation]
+                    option[long]=no-$split[2]
+                    option[var]=$split[2]
+                    options[$option[long]]=${(j: :)${(@qqkv)option}}
                 fi
                 option=( kind $option[kind] defined 0 required 0 )
                 ((top--))
@@ -600,12 +611,11 @@ function parser {
         printf '%s\n' ${(pj:\n:)typesets}
     fi
 
-    long=( ${(@o)long} ) # TODO What does this do?
     state=switch
 
     parse[flag]=''
     integer last
-    typeset index key interspersed=() flag truth=1
+    typeset extant key interspersed=() flag truth=1
     while (( top )); do
         popped=$stack[$top]
         last=$(( top == 1 ))
@@ -625,17 +635,11 @@ function parser {
                         flag=$match[1]
                         ((top--))
                 esac
-                # Check if this is a known negation (--no-* pattern defined with -!)
-                if (( negated[$flag] )); then
-                    # It's a negation! Strip the "no-" prefix
-                    flag=${flag#no-}
-                    truth=0
-                fi
                 # Should we complain if the argument is ambiguous? Currently, we are
                 # just accepting the first match in alphabetical order.
-                index=$long[(Ie)$flag]
+                extant=${+options[$flag]} # 0 if missing, 1 if extant.
                 # Check if the flag is valid.
-                case $index:$parse[complete] in
+                case $extant:$parse[complete] in
                     # Display an error if the argument is not recognized.
                     0:0 )
                         args:user:error $error $funcstack[$depth] unknown $flag $last
@@ -650,7 +654,7 @@ function parser {
                         return
                         ;;
                 esac
-                option=( "${(@QA)${(z)options[$long[$index]]}}" )
+                option=( "${(@QA)${(z)options[$flag]}}" )
                 option[matched]="--$popped"
                 missing[$option[long]]=0
                 # Check if assignment syntax was used on non-assignable types
@@ -667,20 +671,11 @@ function parser {
                 ;;
             switch:-?* )
                 flag=${popped[2,2]}
-                if [[ $flag = '!' ]]; then
-                    truth=0
-                    if (( ${#popped} == 2 )); then
-                        printf '%s %s unknown %s %s\n' $error $funcstack[$depth] $popped[1,2] $last
-                        return
-                    fi
-                    stack[$top]=-${popped[3,-1]}
-                    continue
-                elif (( ! ${+short[${popped[2,2]}]} )); then
+                if (( ! ${+short[${popped[2,2]}]} )); then
                     printf '%s %s unknown %s %s\n' $error $funcstack[$depth] $popped[1,2] $last
                     return
                 else
-                    index=$long[(Ie)$short[$popped[2,2]]]
-                    option=( "${(@QA)${(z)options[$long[$index]]}}" )
+                    option=( "${(@QA)${(z)options[$short[$popped[2,2]]]}}" )
                     option[matched]="-$popped[2,2]"
                     missing[$option[long]]=0
                     case $option[kind] in
@@ -722,25 +717,25 @@ function parser {
             value:* )
                 case $option[kind] in
                     array )
-                        printf 'o_%s+=( %s )\n' ${option[long]//-/_} ${(qq)popped}
+                        printf 'o_%s+=( %s )\n' ${option[var]//-/_} ${(qq)popped}
                         ;;
                     map )
-                        printf '(){ typeset key=%s; o_%s[$key]=%s; }\n' ${(qq)key} ${option[long]//-/_} ${(qq)popped}
+                        printf '(){ typeset key=%s; o_%s[$key]=%s; }\n' ${(qq)key} ${option[var]//-/_} ${(qq)popped}
                         ;;
                     scalar )
-                        printf 'o_%s=%s\n' ${option[long]//-/_} ${(qq)popped}
+                        printf 'o_%s=%s\n' ${option[var]//-/_} ${(qq)popped}
                         ;;
                     number )
-                        printf 'o_%s=%s\n' ${option[long]//-/_} ${(qq)popped}
+                        printf 'o_%s=%s\n' ${option[var]//-/_} ${(qq)popped}
                         ;;
                     boolean )
-                        printf 'o_%s=%d\n' ${option[long]//-/_} $popped
+                        printf 'o_%s=%d\n' ${option[var]//-/_} $popped
                         ;;
                     counter )
-                        printf '((++o_%s))\n' ${option[long]//-/_}
+                        printf '((++o_%s))\n' ${option[var]//-/_}
                         ;;
                     toggle )
-                        printf 'o_%s=$(( ! o_%s ))\n' ${option[long]//-/_} ${option[long]//-/_}
+                        printf 'o_%s=$(( ! o_%s ))\n' ${option[var]//-/_} ${option[var]//-/_}
                         ;;
                 esac
                 stack[$top]=0
@@ -766,7 +761,7 @@ function parser {
         case $option[kind] in
             boolean | counter | toggle )
                 ((top++))
-                stack[$top]=$(( truth ))
+                stack[$top]=$(( ! ${option[negate]:-0} ))
                 state=value
                 ;;
             map )
