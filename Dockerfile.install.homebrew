@@ -1,0 +1,39 @@
+ARG ZSHCTL_PREVIOUS_VERSION
+
+FROM harbor.acreops.org/zshctl/homebrew:v${ZSHCTL_PREVIOUS_VERSION} AS previous
+
+ARG ZSHCTL_PREVIOUS_VERSION
+ARG ZSHCTL_VERSION
+
+RUN sh -c 'echo update ${ZSHCTL_PREVIOUS_VERSION} to ${ZSHCTL_VERSION}'
+USER root
+RUN apt-get update
+RUN apt-get -y upgrade
+USER homebrewer
+RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH brew update
+RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH brew upgrade zshctl
+RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH bash -c 'echo zshctl ${ZSHCTL_VERSION} = $(zshctl version)'
+USER root
+RUN touch /monkey
+
+FROM ubuntu:noble
+
+ARG ZSHCTL_VERSION
+
+RUN apt-get update
+RUN apt-get -y upgrade
+RUN apt-get -y install sudo curl git zsh build-essential
+RUN useradd homebrewer
+RUN mkdir -p /home/homebrewer && chown homebrewer:homebrewer /home/homebrewer
+RUN cat /etc/sudoers
+RUN echo 'homebrewer ALL=(ALL:ALL) NOPASSWD: ALL' | tee /etc/sudoers.d/sudoers
+USER homebrewer
+RUN /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+WORKDIR /work
+COPY www/install/Darwin-brew.zsh /work
+RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH zsh Darwin-brew.zsh
+RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH bash -c 'echo zshctl ${ZSHCTL_VERSION} $(zshctl version)'
+
+#COPY --from=previous /monkey /monkey

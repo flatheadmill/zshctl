@@ -72,7 +72,7 @@ function execute:apk {
     # TODO Can I make this a no-arch package?
     mkdir -p /html/apk/x86_64
     if [[ ! -e previous/zero ]]; then
-        cp previous/apk/x86_64/*.apk /html/apk/x86_64
+        cp /work/previous/apk/x86_64/*.apk /html/apk/x86_64
     fi
     find /home/build/packages
     cp /home/build/packages/compiled/x86_64/$conf[program]-$version-r0.apk /html/apk/x86_64

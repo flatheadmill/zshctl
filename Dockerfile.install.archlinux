@@ -1,0 +1,30 @@
+ARG ZSHCTL_PREVIOUS_VERSION
+
+FROM harbor.acreops.org/zshctl/archlinux:v${ZSHCTL_PREVIOUS_VERSION} AS previous
+
+ARG ZSHCTL_PREVIOUS_VERSION
+ARG ZSHCTL_VERSION
+
+RUN sh -c 'echo update ${ZSHCTL_PREVIOUS_VERSION} to ${ZSHCTL_VERSION}'
+RUN pacman --noconfirm -Syu
+RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+RUN bash -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
+
+RUN touch /monkey
+
+FROM archlinux
+
+ARG ZSHCTL_VERSION
+
+RUN echo ${ZSHCTL_VERSION}
+RUN pacman-key --init
+RUN pacman-key --populate archlinux
+RUN pacman --noconfirm -Syu
+RUN pacman --noconfirm -S archlinux-keyring
+WORKDIR /work
+COPY www/install/Linux-archlinux.bash /work
+RUN bash Linux-archlinux.bash
+RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+RUN bash -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
+
+COPY --from=previous /monkey /monkey

@@ -4,7 +4,7 @@ FROM ghcr.io/flatheadmill/zshctl:v${PREVIOUS_VERSION} AS fetched
 
 FROM fetched AS previous
 
-COPY --from=fetched /var/zshctl.github.io/ /html/
+COPY --from=fetched /usr/share/nginx/html/  /html/
 
 FROM alpine AS compiled
 
@@ -26,7 +26,7 @@ COPY ./ /zshctl/
 WORKDIR /work
 RUN /zshctl/pkgctl/bin/pkgctl brew
 
-FROM ubuntu:noble AS apt
+FROM ubuntu:24.04 AS apt
 
 RUN apt-get update
 RUN apt-get install -y make dpkg-dev git wget zsh
@@ -114,3 +114,4 @@ RUN find /html/
 FROM alpine
 
 COPY --from=index /html/ /var/zshctl.github.io/
+RUN find /var/zshctl.github.io | sort

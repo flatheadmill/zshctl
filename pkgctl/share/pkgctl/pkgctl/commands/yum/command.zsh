@@ -3,7 +3,7 @@
 function execute:yum {
     export GPG_TTY=$(tty)
     typeset version
-    version=$(zsh compiled/$conf[program]/bin/$conf[program] version) ||
+    version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'
     mkdir -p /html
     if [[ -d previous/yum ]]; then
@@ -66,10 +66,10 @@ function execute:yum {
     cat $conf[program].spec
     rpmbuild -ba $conf[program].spec || abend '`rpmbuild` failed.'
     touch passphrase
-    heredoc <<'    EOF' > ~/.rpmmacros
+    heredoc -q <<'    EOF' > ~/.rpmmacros
     %_signature gpg
     %_gpg_path /root/.gnupg
-    %_gpg_name Package Signing
+    %_gpg_name $conf[gpg.key.name]
     %_gpgbin /usr/bin/gpg2
     %__gpg_sign_cmd %{__gpg} gpg --force-v3-sigs --batch --verbose --no-armor --passphrase-file /work/passphrase --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} --digest-algo sha256 %{__plaintext_filename}'
     EOF
@@ -77,7 +77,7 @@ function execute:yum {
     # sign
     rpm --addsign /root/rpmbuild/RPMS/noarch/$conf[program]-$version-1.noarch.rpm ||
         abend '`rpm --addsign` failed.'
-    gpg --export --armor 'Package Signing' > public.key
+    gpg --export --armor $conf[gpg.key.name] > public.key
     rpm --import public.key
     rpm -q gpg-pubkey --qf '%{name}-%{version}-%{release} --> %{summary}\n'
     # verify
@@ -91,7 +91,8 @@ function execute:yum {
     mkdir -p /html/yum/repo
     cp /root/rpmbuild/RPMS/noarch/$conf[program]-$version-1.noarch.rpm /html/yum/repo
     createrepo /html/yum/repo || abend '`createrepo` failed.'
-    gpg --detach-sign --armor /html/yum/repo/repodata/repomd.xml ||
+    rm -f /html/yum/repo/repodata/repomd.xml.asc
+    gpg --batch=true --detach-sign --armor /html/yum/repo/repodata/repomd.xml ||
         abend '`gpg --detach-sign` failed.'
 }
 
