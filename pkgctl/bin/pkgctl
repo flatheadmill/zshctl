@@ -10,6 +10,9 @@ typeset -xgA conf=(
     user.email alan@prettyrobots.com
     user.name 'Alan Gutierrez'
 
+    gpg.key.name 'Package Signing'
+    gpg.key.fingerprint '8262C8D6D0959C6F'
+
     brew.class.name 'Zshctl'
 
     apk.key.name alan@prettyrobots.com-67eee297

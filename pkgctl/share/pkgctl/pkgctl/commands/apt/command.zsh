@@ -33,7 +33,7 @@ function generate_release {
 
 function execute:apt {
     typeset version
-    version=$(zsh compiled/$conf[program]/bin/$conf[program] version) ||
+    version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'
     typeset stem=$conf[program]_${version}_all
     mkdir -p deb/$stem/DEBIAN

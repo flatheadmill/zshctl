@@ -60,8 +60,11 @@ function execute:aur {
     cp compiled/$conf[program]-$version.tar.gz $conf[program].tar.gz
     makepkg --sign || abend '`makepkg` failed.'
     mkdir -p /html/aur
+    if [[ -d /work/previous/aur ]]; then
+        cp /work/previous/aur/*.pkg.tar.* /html/aur/
+    fi
     mv $conf[program]-$version-1-any.pkg.tar.* /html/aur
-    repo-add --sign /html/aur/$conf[program].db.tar.gz /html/aur/$conf[program]-$version-1-any.pkg.tar.zst ||
+    repo-add --sign /html/aur/$conf[program].db.tar.gz /html/aur/*.pkg.tar.zst ||
         abend '`repo-add --sign` failed.'
 }
 
