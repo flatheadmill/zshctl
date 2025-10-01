@@ -13,6 +13,12 @@ function resource {
     ' $file
 }
 
+function _zshctl_pushf {
+    typeset string
+    printf -v string "$@"
+    evaluate+=( "$string" )
+}
+
 # Extracts a string using `resource` and runs it through `groff` on Linux or
 # `mandoc` on OS X to create a man page when the user requests help.
 #
@@ -347,6 +353,7 @@ function parser {
     # TODO Make a note of this.
     # zshctl <(print 'program')
 
+    [[ -v _zshctl ]] || typeset -A _zshctl=( mode offhand )
     [[ -v parse ]] || typeset -A parse=( completed 0 filenames 0 descriptions 0 complete 0 flags 0 remainder '' )
     typeset -A completions=()
     typeset completion_match=()
@@ -369,7 +376,7 @@ function parser {
     typeset -A option=( kind scalar defined 0 required 0 ) short options missing
     typeset split=() declared=() stack=( "${(@Oa)@}" )
     typeset popped on_zeroed state=option typesets=() tset
-    integer top=${#stack} intersperse=0 usage=0 completable=0
+    integer top=${#stack} intersperse=0 usage=0 completable=0 delegated=0
     while (( top )); do
         popped=$stack[$top]
         case $state:$popped in
@@ -385,6 +392,9 @@ function parser {
             *:-* )
                 state=option
                 case $popped in
+                    -D* )
+                        delegated=1
+                        ;;
                     -C* )
                         completable=1
                         ;;
@@ -655,7 +665,7 @@ function parser {
                         ;;
                 esac
                 option=( "${(@QA)${(z)options[$flag]}}" )
-                option[matched]="--$popped"
+                option[matched]=$popped
                 missing[$option[long]]=0
                 # Check if assignment syntax was used on non-assignable types
                 case $popped in
@@ -819,5 +829,23 @@ function parser {
         else
             printf 'set --\n'
         fi
+        # If we are invoked from command descent, we must call the actual
+        # execution function. In order to use `args` to parse internal
+        # function arguments, we also have to reset `_zshctl`.
+        case $_zshctl[mode] in
+        (execute)
+            printf '_zshctl=()\n'
+            printf '%s "$@"\n' $_zshctl[func]
+            ;;
+        (completion)
+            print -u 2 hit hit
+            integer top=2
+            while [[ $funcstack[$top] != (:args:*|:args) ]]; do
+                ((top++))
+                (( top <= ${#funcstack} )) || abend 'must be called from an execute function'
+            done
+            print -u 2 "${(qqq)option[matched]}"
+            printf '_zshctl_descend_completion %s "$@"\n' $funcstack[$top]
+        esac
     fi
 }

@@ -22,8 +22,11 @@
 # .SH COMMANDS
 # .ZC commands
 # ___
-function execute:completion {
-    eval "$(args -UC -bx h,help -- "$@")"
+function :execute:completion {
     (( $# || parse[complete] )) || usage
     delegate "$@"
+}
+
+function :args:completion {
+    eval "$(args -UC -bx h,help -- "$@")"
 }

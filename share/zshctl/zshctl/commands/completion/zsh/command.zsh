@@ -17,8 +17,11 @@
 # Help for
 # .PG .BR __program__\ completions\ zsh .
 # ___
-function execute:completion:zsh {
+function :args:completion:zsh {
     eval "$(args -bx h,help -- "$@")"
+}
+
+function :execute:completion:zsh {
     sed -e 's/zshctl/'$zshctl[program]'/g' \
-        "${functions_source[execute:completion:zsh]:A:h}/complete.zsh"
+        "${functions_source[:execute:completion:zsh]:A:h}/complete.zsh"
 }

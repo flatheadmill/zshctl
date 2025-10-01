@@ -1,10 +1,10 @@
 zmodload zsh/datetime
 
 # TODO Make the format options a bullet list under it's entry in OPTIONS.
-# ___ execute:version _ description ___
+# ___ :execute:version _ description ___
 # Display the current version of
 # .PG .BR __program__ .
-# ___ execute:version _ man ___
+# ___ :execute:version _ man ___
 # .SH NAME
 # .PG __program__\ version \- display version
 # .SH SYNOPSIS
@@ -33,9 +33,7 @@ zmodload zsh/datetime
 # Help for
 # .PG .BR __program__\ version .
 # ___
-function execute:version {
-    typeset o_format=terse
-    eval "$(args -C -d f,format -bx h,help -- "$@")"
+function :execute:version {
     case $o_format in
         terse )
             print $zshctl[version]
@@ -52,7 +50,12 @@ function execute:version {
     esac
 }
 
-function complete:version {
+function :args:version {
+    typeset o_format=terse
+    eval "$(args -C -d f,format -bx h,help -- "$@")"
+}
+
+function :complete:version {
     case $parse[state]:$parse[matched] in
     (value:(-f|--format))
         completion terse 'display version number only'
