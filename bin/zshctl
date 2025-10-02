@@ -88,6 +88,43 @@ function :execute {
     delegate "$@"
 }
 
+# ___ :execute _ man ___
+# .SH NAME
+# zshctl \- a structure for Zsh programs
+# .SH SYNOPSIS
+# .SY zshctl
+# .I resource
+# .RI [ resource\.\.\.\& ]
+# .I command
+# .RI [ options ]
+# .RI [ arguments ]
+# .SY zshctl
+# .I resource
+# .RI [ resource\.\.\.\& ]
+# .IR command
+# .RB [ \-h | \-\-help ]
+# .SY acrectl
+# .I resource
+# .RI [ resource\.\.\.\& ]
+# .RB [ \-h | \-\-help ]
+# .SY acrectl
+# .RB [ \-h | \-\-help ]
+# .SH DESCRIPTION
+# a structure for the creation of Zsh programs.
+#
+# .BR zshctl
+# is provides underlying structure for Zsh programs with an argument parser, a
+# system for nested commands, a system for includes, and some libraries.
+# .SH OPTIONS
+# .TP
+# .BR \-h ,\  \-\-help
+# Help for
+# .BR acrectl .
+# .SH COMMANDS
+# The commands can be invoked to manage AcreOps resources. You can learn more
+# about the each resource with the .BR --help option.
+# .ZC commands
+# ___
 function :args {
     eval "$(args -UD -bx h,help -- "$@")"
 }
@@ -145,7 +182,7 @@ function _zshctl_descend_completion {
         complete=${sofar//#:args/:complete}
         $complete "$@"
         if (( ! $zshctl[args:completed] )); then
-            completions
+            completions $sofar
             (( zshctl[args:flags] = zshctl[args:flags] | 4 ))
             zshctl[args:files]=none
         fi

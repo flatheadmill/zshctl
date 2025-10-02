@@ -1,8 +1,8 @@
-# ___ execute:completion _ description ___
+# ___ :execute:completion _ description ___
 # Install
 # .PG .B __program__
 # shell completions for Zsh or Bash.
-# ___ execute:completion _ man ___
+# ___ :execute:completion _ man ___
 # .SH NAME
 # .PG __program__\ completion \- generate shell completions
 # .SH SYNOPSIS

@@ -161,8 +161,10 @@ function completion {
 }
 
 function completions {
+    typeset func=${1:-}
+    shift
     typeset lines=() line
-    lines=( "${(@Af)$(usage $parse[func] 1)}" )
+    lines=( "${(@Af)$(usage $func 1)}" )
     typeset state=seek mandoc=( '.TH Ignore 1 "Manuals" "STOP" "Manuals"' )
     for line in "${(@Af)lines}"; do
         case $state:$line in
@@ -279,7 +281,7 @@ function completions {
                     if [[ $key = *=* ]]; then
                         key=${key%=*}
                     fi
-                    parse[descriptions]=1
+                    zshctl[args:descriptions]=1
                     completions+=( $key $line )
                     completion_match+=( $key )
                 done
@@ -824,9 +826,6 @@ function parser {
     else
         if (( ${#combined} )); then
             printf 'set -- %s\n' ${(j: :)${(@qq)combined}}
-        elif (( usage )); then
-            print usage $funcstack[$depth]
-            print return
         else
             printf 'set --\n'
         fi
@@ -835,8 +834,12 @@ function parser {
         # function arguments, we also have to reset `_zshctl`.
         case $zshctl[args:mode] in
         (execute)
-            printf 'zshctl[args:mode]=inline\n'
-            printf '%s "$@"\n' $zshctl[args:func]
+            if (( usage )); then
+                printf 'usage %s\n' $funcstack[$depth]
+            else
+                printf 'zshctl[args:mode]=inline\n'
+                printf '%s "$@"\n' $zshctl[args:func]
+            fi
             ;;
         (completion)
             integer top=2
