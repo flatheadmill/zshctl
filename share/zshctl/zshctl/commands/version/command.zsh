@@ -36,18 +36,18 @@ zmodload zsh/datetime
 # ___
 function :execute:version {
     case $o_format in
-        terse )
-            print $zshctl[version]
-            ;;
-        verbose )
-            print "Version: $zshctl[version]\nRelease Date: $(strftime "%Y-%m-%dT%H:%M:%S:%z" $zshctl[release_date])"
-            ;;
-        shell )
-            print "${(qq)zshctl[version]} ${(qq)zshctl[release_date]}"
-            ;;
-        json )
-            printf '{"version":"%s","release_date":"%s"}\n' $zshctl[version] $zshctl[release_date]
-            ;;
+    (terse)
+        print $zshctl[version]
+        ;;
+    (verbose)
+        print "Version: $zshctl[version]\nRelease Date: $(strftime "%Y-%m-%dT%H:%M:%S:%z" $zshctl[release_date])"
+        ;;
+    (shell)
+        print "${(qq)zshctl[version]} ${(qq)zshctl[release_date]}"
+        ;;
+    (json)
+        printf '{"version":"%s","release_date":"%s"}\n' $zshctl[version] $zshctl[release_date]
+        ;;
     esac
 }
 

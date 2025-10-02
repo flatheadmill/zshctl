@@ -160,9 +160,9 @@ function completion {
     if [[ -v o_suffix ]]; then
         zshctl[args:flags]=$(( zshctl[args:flags] | 2 ))
         case $o_suffix[2] in
-            (/) zshctl[args:flags]=$(( zshctl[args:flags] | 64 ));;
-            (=) zshctl[args:flags]=$(( zshctl[args:flags] | 128 ));;
-            (:) zshctl[args:flags]=$(( zshctl[args:flags] | 256 ));;
+        (/) zshctl[args:flags]=$(( zshctl[args:flags] | 64 ));;
+        (=) zshctl[args:flags]=$(( zshctl[args:flags] | 128 ));;
+        (:) zshctl[args:flags]=$(( zshctl[args:flags] | 256 ));;
         esac
         zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
     fi
@@ -330,27 +330,27 @@ function args:error {
     typeset func=${1:-} reason=${2:-} flag=${3:-}
     shift 3
     case $reason in
-        complete )
-            if (( ${+functions[complete:${func#execute:}]} )); then
-                printf 'complete:%s %s\n' ${func#execute:} "${(j: :)${(@qq)@}}"
-            else
-                printf 'delegate %s\n' "${(j: :)${(qq)@}}"
-            fi
-            ;;
-        unknown )
-            printf 'unknown argument `%s`.\n' $flag 1>&2
-            exit 1
-            ;;
-        required )
-            printf '`%s` is a required argument.\n' $flag 1>&2
-            exit 1
-            ;;
-        execute )
-            if [[ $flag = --help ]]; then
-                usage $func
-            else
-                abend 'unknown execute directive on `%s` flag `%s`.' $func $flag
-            fi
+    (complete)
+        if (( ${+functions[complete:${func#execute:}]} )); then
+            printf 'complete:%s %s\n' ${func#execute:} "${(j: :)${(@qq)@}}"
+        else
+            printf 'delegate %s\n' "${(j: :)${(qq)@}}"
+        fi
+        ;;
+    (unknown)
+        printf 'unknown argument `%s`.\n' $flag 1>&2
+        exit 1
+        ;;
+    (required)
+        printf '`%s` is a required argument.\n' $flag 1>&2
+        exit 1
+        ;;
+    (execute)
+        if [[ $flag = --help ]]; then
+            usage $func
+        else
+            abend 'unknown execute directive on `%s` flag `%s`.' $func $flag
+        fi
     esac
 }
 
@@ -389,9 +389,9 @@ function parser {
     typeset is_number='
         (){
             case ${1#[-+]} in
-                *[!0-9]* | "" )
-                    %s %s integer %s
-                    ;;
+            (*[!0-9]* | "")
+                %s %s integer %s
+                ;;
             esac
         } %s
     '
@@ -406,124 +406,124 @@ function parser {
     while (( top )); do
         popped=$stack[$top]
         case $state:$popped in
-            # Definitions finished.
-            *:-- )
-                ((top--))
-                break
+        # Definitions finished.
+        (*:--)
+            ((top--))
+            break
+            ;;
+        # Short flags to the argument parser itself. Captial letters
+        # represent global options.Lower case letters are options that
+        # apply the subsequent field defintions or a single next
+        # defintiion depending on option.
+        (*:-*)
+            state=option
+            case $popped in
+            (-D*)
+                delegated=1
                 ;;
-            # Short flags to the argument parser itself. Captial letters
-            # represent global options.Lower case letters are options that
-            # apply the subsequent field defintions or a single next
-            # defintiion depending on option.
-            *:-* )
-                state=option
-                case $popped in
-                    -D* )
-                        delegated=1
-                        ;;
-                    -C* )
-                        completable=1
-                        ;;
-                    -U* )
-                        usage=1
-                        ;;
-                    -@* )
-                        intersperse=1
-                        ;;
-                    -!* )
-                        option[negatable]=1
-                        if (( ${#popped} > 2 )); then
-                            popped="-${popped[3,-1]}"
-                            option[short_negation]=${popped[2,2]}
-                        fi
-                        ;;
-                    -a* )
-                        option[kind]=array
-                        ;;
-                    -A* )
-                        option[kind]=map
-                        ;;
-                    -b* )
-                        option[kind]=boolean
-                        ;;
-                    -c* )
-                        option[kind]=counter
-                        ;;
-                    -d* )
-                        option[defined]=1 # resets after a single defintion.
-                        ;;
-                    -i* )
-                        option[kind]=number
-                        ;;
-                    -r* )
-                        option[required]=1
-                        ;;
-                    -s* )
-                        option[kind]=scalar
-                        ;;
-                    -t* )
-                        option[kind]=toggle
-                        ;;
-                    -x* )
-                        option[execute]=1
-                        ;;
-                esac
+            (-C*)
+                completable=1
+                ;;
+            (-U*)
+                usage=1
+                ;;
+            (-@*)
+                intersperse=1
+                ;;
+            (-!*)
+                option[negatable]=1
                 if (( ${#popped} > 2 )); then
-                    stack[$top]="-${popped[3,-1]}"
-                else
-                    ((top--))
+                    popped="-${popped[3,-1]}"
+                    option[short_negation]=${popped[2,2]}
                 fi
                 ;;
-            # Optional short option followed by a long option.
-            option:[a-zA-Z0-9]#,[a-zA-Z][a-zA-Z-]#[a-z] )
-                split=( "${(@s:,:)popped}" )
-                if [[ -n $split[1] ]]; then
-                    short[$split[1]]=$split[2]
+            (-a*)
+                option[kind]=array
+                ;;
+            (-A*)
+                option[kind]=map
+                ;;
+            (-b*)
+                option[kind]=boolean
+                ;;
+            (-c*)
+                option[kind]=counter
+                ;;
+            (-d*)
+                option[defined]=1 # resets after a single defintion.
+                ;;
+            (-i*)
+                option[kind]=number
+                ;;
+            (-r*)
+                option[required]=1
+                ;;
+            (-s*)
+                option[kind]=scalar
+                ;;
+            (-t*)
+                option[kind]=toggle
+                ;;
+            (-x*)
+                option[execute]=1
+                ;;
+            esac
+            if (( ${#popped} > 2 )); then
+                stack[$top]="-${popped[3,-1]}"
+            else
+                ((top--))
+            fi
+            ;;
+        # Optional short option followed by a long option.
+        (option:[a-zA-Z0-9]#,[a-zA-Z][a-zA-Z-]#[a-z])
+            split=( "${(@s:,:)popped}" )
+            if [[ -n $split[1] ]]; then
+                short[$split[1]]=$split[2]
+            fi
+            option[short]=$split[1]
+            option[long]=$split[2]
+            option[var]=$split[2]
+            options[$option[long]]=${(j: :)${(@qqkv)option}}
+            if (( ! $option[defined] && ! complete )); then
+                case $option[kind] in
+                (counter | boolean | toggle)
+                    printf -v tset 'integer o_%s=0' ${option[var]//-/_}
+                    ;;
+                (array)
+                    printf -v tset 'typeset o_%s=()' ${option[var]//-/_}
+                    ;;
+                (map)
+                    printf -v tset 'typeset -A o_%s=()' ${option[var]//-/_}
+                    ;;
+                (*)
+                    printf -v tset 'typeset o_%s' ${option[var]//-/_}
+                    printf -v tset 'unset o_%s' ${option[var]//-/_}
+                    ;;
+                esac
+                typesets+=( $tset )
+            fi
+            if (( $option[required] )); then
+                missing[$option[long]]=1
+            fi
+            if (( $option[negatable] )); then
+                if (( ${+option[short_negation]} )); then
+                    short[$option[short_negation]]=no-$split[2]
                 fi
-                option[short]=$split[1]
-                option[long]=$split[2]
+                option[negate]=1
+                option[short]=$option[short_negation]
+                option[long]=no-$split[2]
                 option[var]=$split[2]
                 options[$option[long]]=${(j: :)${(@qqkv)option}}
-                if (( ! $option[defined] && ! complete )); then
-                    case $option[kind] in
-                        counter | boolean | toggle )
-                            printf -v tset 'integer o_%s=0' ${option[var]//-/_}
-                            ;;
-                        array )
-                            printf -v tset 'typeset o_%s=()' ${option[var]//-/_}
-                            ;;
-                        map )
-                            printf -v tset 'typeset -A o_%s=()' ${option[var]//-/_}
-                            ;;
-                        * )
-                            printf -v tset 'typeset o_%s' ${option[var]//-/_}
-                            printf -v tset 'unset o_%s' ${option[var]//-/_}
-                            ;;
-                    esac
-                    typesets+=( $tset )
-                fi
-                if (( $option[required] )); then
-                    missing[$option[long]]=1
-                fi
-                if (( $option[negatable] )); then
-                    if (( ${+option[short_negation]} )); then
-                        short[$option[short_negation]]=no-$split[2]
-                    fi
-                    option[negate]=1
-                    option[short]=$option[short_negation]
-                    option[long]=no-$split[2]
-                    option[var]=$split[2]
-                    options[$option[long]]=${(j: :)${(@qqkv)option}}
-                fi
-                option=( kind $option[kind] defined 0 required 0 )
-                ((top--))
-                ;;
-            # Error in parsing.
-            * )
-                print -u 2 "unable to interpret $popped"
-                args:user:error $funcstack[$depth] compile - 0
-                exit 1
-                ;;
+            fi
+            option=( kind $option[kind] defined 0 required 0 )
+            ((top--))
+            ;;
+        # Error in parsing.
+        (*)
+            print -u 2 "unable to interpret $popped"
+            args:user:error $funcstack[$depth] compile - 0
+            exit 1
+            ;;
         esac
     done
 
@@ -539,166 +539,168 @@ function parser {
         popped=$stack[$top]
         last=$(( top == 1 ))
         case $state:$popped in
-            switch:-- )
-                (( complete )) || ((top--))
-                break
+        (switch:--)
+            (( complete )) || ((top--))
+            break
+            ;;
+        (switch:--*)
+            # First determine the flag name so we can look up the options
+            # definition. Note that this case statement has spaces in it
+            # because the ViM Zsh syntax cannot parse it otherwise.
+            case $popped in
+            ( (#b)--([^=]##)=(*) )
+                flag=$match[1]
+                stack[$top]=$match[2]
                 ;;
-            switch:--* )
-                # First determine the flag name so we can look up the options definition.
-                case $popped in
-                    (#b)--([^=]##)=(*) )
-                        flag=$match[1]
-                        stack[$top]=$match[2]
-                        ;;
-                    (#b)--(*) )
-                        flag=$match[1]
-                        ((top--))
-                esac
-                # Should we complain if the argument is ambiguous? Currently, we are
-                # just accepting the first match in alphabetical order.
-                extant=${+options[$flag]} # 0 if missing, 1 if extant.
-                # Check if the flag is valid.
-                case $extant:$complete in
-                    # Display an error if the argument is not recognized.
-                    0:0 )
-                        args:user:error $error $funcstack[$depth] unknown $flag $last
-                        return
-                        ;;
-                    # If we are completing and we do not match, we return to our
-                    # default completion logic which will use the man page to
-                    # match against available options.
-                    0:1 )
-                        printf 'parse=( %s )\n' ${(j: :)"${(@qq)${(@kv)parse}}"}
-                        print return
-                        return
-                        ;;
-                esac
-                option=( "${(@QA)${(z)options[$flag]}}" )
-                option[matched]=$popped
-                missing[$option[long]]=0
-                # Check if assignment syntax was used on non-assignable types
-                case $popped in
-                    (#b)--([^=]##)=* )
-                        case $option[kind] in
-                            boolean | counter )
-                                printf '%s %s unassignable %s %s\n' $error $funcstack[$depth] --$match[1] $last
-                                return
-                                ;;
-                        esac
-                        ;;
-                esac
-                ;;
-            switch:-?* )
-                flag=${popped[2,2]}
-                if (( ! ${+short[${popped[2,2]}]} )); then
-                    printf '%s %s unknown %s %s\n' $error $funcstack[$depth] $popped[1,2] $last
-                    return
-                else
-                    option=( "${(@QA)${(z)options[$short[$popped[2,2]]]}}" )
-                    option[matched]="-$popped[2,2]"
-                    missing[$option[long]]=0
-                    case $option[kind] in
-                        boolean | counter )
-                            if (( ${#popped} == 2 )); then
-                                ((top--))
-                            else
-                                stack[$top]=-${popped[3,-1]}
-                            fi
-                            ;;
-                        * )
-                            if (( ${#popped} == 2 )); then
-                                ((top--))
-                            else
-                                option[short_prefix]=1
-                                stack[$top]=${popped[3,-1]}
-                            fi
-                            ;;
-                    esac
-                fi
-                ;;
-            switch:* )
-                (( intersperse )) || break
-                interspersed+=( $popped )
+            ( (#b)--(*) )
+                flag=$match[1]
                 ((top--))
-                continue
+            esac
+            # Should we complain if the argument is ambiguous? Currently, we are
+            # just accepting the first match in alphabetical order.
+            extant=${+options[$flag]} # 0 if missing, 1 if extant.
+            # Check if the flag is valid.
+            case $extant:$complete in
+            # Display an error if the argument is not recognized.
+            (0:0)
+                args:user:error $error $funcstack[$depth] unknown $flag $last
+                return
                 ;;
-            key:* )
-                if [[ $popped = (#b)([^=]##)=(*) ]]; then
-                    key=$match[1]
-                    stack[$top]=$match[2]
-                else
-                    key=$popped
-                    ((top--))
-                fi
-                state=value
-                continue
+            # If we are completing and we do not match, we return to our
+            # default completion logic which will use the man page to
+            # match against available options.
+            (0:1)
+                printf 'parse=( %s )\n' ${(j: :)"${(@qq)${(@kv)parse}}"}
+                print return
+                return
                 ;;
-            value:* )
+            esac
+            option=( "${(@QA)${(z)options[$flag]}}" )
+            option[matched]=$popped
+            missing[$option[long]]=0
+            # Check if assignment syntax was used on non-assignable types
+            case $popped in
+            ( (#b)--([^=]##)=* )
                 case $option[kind] in
-                    array )
-                        printf 'o_%s+=( %s )\n' ${option[var]//-/_} ${(qq)popped}
-                        ;;
-                    map )
-                        printf '(){ typeset key=%s; o_%s[$key]=%s; }\n' ${(qq)key} ${option[var]//-/_} ${(qq)popped}
-                        ;;
-                    scalar )
-                        printf 'o_%s=%s\n' ${option[var]//-/_} ${(qq)popped}
-                        ;;
-                    number )
-                        printf 'o_%s=%s\n' ${option[var]//-/_} ${(qq)popped}
-                        ;;
-                    boolean )
-                        printf 'o_%s=%d\n' ${option[var]//-/_} $popped
-                        ;;
-                    counter )
-                        printf '((++o_%s))\n' ${option[var]//-/_}
-                        ;;
-                    toggle )
-                        printf 'o_%s=$(( ! o_%s ))\n' ${option[var]//-/_} ${option[var]//-/_}
-                        ;;
-                esac
-                stack[$top]=0
-                state=execute
-                continue
-                ;;
-            execute:0 )
-                if (( ${option[execute]:-0} && ! complete  )); then
-                    printf '%s %s %s %s\n' $error $funcstack[$depth] execute "--$option[long]"
+                (boolean | counter)
+                    printf '%s %s unassignable %s %s\n' $error $funcstack[$depth] --$match[1] $last
                     return
-                fi
-                truth=1
-                state=switch
+                    ;;
+                esac
+                ;;
+            esac
+            ;;
+        (switch:-?*)
+            flag=${popped[2,2]}
+            if (( ! ${+short[${popped[2,2]}]} )); then
+                printf '%s %s unknown %s %s\n' $error $funcstack[$depth] $popped[1,2] $last
+                return
+            else
+                option=( "${(@QA)${(z)options[$short[$popped[2,2]]]}}" )
+                option[matched]="-$popped[2,2]"
+                missing[$option[long]]=0
+                case $option[kind] in
+                (boolean | counter)
+                    if (( ${#popped} == 2 )); then
+                        ((top--))
+                    else
+                        stack[$top]=-${popped[3,-1]}
+                    fi
+                    ;;
+                (*)
+                    if (( ${#popped} == 2 )); then
+                        ((top--))
+                    else
+                        option[short_prefix]=1
+                        stack[$top]=${popped[3,-1]}
+                    fi
+                    ;;
+                esac
+            fi
+            ;;
+        (switch:*)
+            (( intersperse )) || break
+            interspersed+=( $popped )
+            ((top--))
+            continue
+            ;;
+        (key:*)
+            if [[ $popped = (#b)([^=]##)=(*) ]]; then
+                key=$match[1]
+                stack[$top]=$match[2]
+            else
+                key=$popped
                 ((top--))
-                continue
+            fi
+            state=value
+            continue
+            ;;
+        (value:*)
+            case $option[kind] in
+            (array)
+                printf 'o_%s+=( %s )\n' ${option[var]//-/_} ${(qq)popped}
                 ;;
-            * )
-                print derp
-                exit 1
+            (map)
+                printf '(){ typeset key=%s; o_%s[$key]=%s; }\n' ${(qq)key} ${option[var]//-/_} ${(qq)popped}
                 ;;
+            (scalar)
+                printf 'o_%s=%s\n' ${option[var]//-/_} ${(qq)popped}
+                ;;
+            (number)
+                printf 'o_%s=%s\n' ${option[var]//-/_} ${(qq)popped}
+                ;;
+            (boolean)
+                printf 'o_%s=%d\n' ${option[var]//-/_} $popped
+                ;;
+            (counter)
+                printf '((++o_%s))\n' ${option[var]//-/_}
+                ;;
+            (toggle)
+                printf 'o_%s=$(( ! o_%s ))\n' ${option[var]//-/_} ${option[var]//-/_}
+                ;;
+            esac
+            stack[$top]=0
+            state=execute
+            continue
+            ;;
+        (execute:0)
+            if (( ${option[execute]:-0} && ! complete  )); then
+                printf '%s %s %s %s\n' $error $funcstack[$depth] execute "--$option[long]"
+                return
+            fi
+            truth=1
+            state=switch
+            ((top--))
+            continue
+            ;;
+        (*)
+            print derp
+            exit 1
+            ;;
         esac
         zshctl[args:long]=$option[long]
         case $option[kind] in
-            boolean | counter | toggle )
-                ((top++))
-                stack[$top]=$(( ! ${option[negate]:-0} ))
-                state=value
-                ;;
-            map )
-                state=key
-                ;;
-            * )
-                state=value
-                ;;
+        (boolean | counter | toggle)
+            ((top++))
+            stack[$top]=$(( ! ${option[negate]:-0} ))
+            state=value
+            ;;
+        (map)
+            state=key
+            ;;
+        (*)
+            state=value
+            ;;
         esac
     done
     zshctl[args:state]=$state
     if (( ! complete )); then
         # TODO Assert we did not stop mid argument.
         case $state in
-            key )
-                ;;
-            value )
-                ;;
+        (key)
+            ;;
+        (value)
+            ;;
         esac
         for flag in ${(@k)missing}; do
             if (( $missing[$flag] )); then
