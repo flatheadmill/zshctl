@@ -135,7 +135,7 @@ function completion {
         zshctl[args:flags]=$(( zshctl[args:flags] & (~4) ))
     fi
     if [[ -v o_message ]]; then
-        zshctl[args:message]=$o_message[2]
+        zshctl[args:message]=$o_message
         zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
     fi
     if (( $# )); then
