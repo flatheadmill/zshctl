@@ -93,20 +93,27 @@ function :args {
 }
 
 # For completions, we do not have to invoke delegate, we can instead look at
-# the map of COMMANDS to determine if there are additional extension commands,
-# which I believe we are doing in any case to fill out sub-commands in help.
+# the functions_source map to determine if there are additional extension
+# commands, which I believe we are doing in any case to fill out sub-commands
+# in help. For simplicities sake, on the execution path, the invocation of
+# delegate must be explicit. That is, the `:execute:*` function  is not
+# optional, you must provide one even if all it does invoke `delegate`.
 
-# But, for simplicities sake, on the execution path, the invocation of
-# delegate must be explicit.
+# Note that `:args` and `:args:*` are optional since some zshctl programs are
+# container programs that are invoked with environment variables only, so the
+# parser and completion system are not necessary.
 
-# The actual :execute function is optional if the argument parser indicates
-# that the command is a delegation only function.
 function _zshctl_execute {
     typeset func=${1:-}
     shift
     typeset args=${func/#:execute/:args}
-    typeset -A _zshctl=( func $func mode execute )
-    $args "$@"
+    typeset complete=${args/#:args/:complete}
+    zshctl+=( args:func $func args:mode execute )
+    if (( ${+functions[$args]} )); then
+        $args "$@"
+    else
+        $func "$@"
+    fi
 }
 
 # I can imagine that what we want from the args function is indeed all the
@@ -118,45 +125,64 @@ function _zshctl_execute {
 # We do not want to abend on a missing argument, either.
 
 function _zshctl_descend_completion {
-    typeset -A _zshctl=( mode completion )
     typeset sofar=${1:-} args
     shift
     typeset args="$sofar:${1-}"
     typeset delegate=${args//#:args/:execute}
+    typeset complete=${args//#:args/:complete}
     if [[ ${${COMMANDS[$delegate]}[1]} = '/' ]]; then
         source $COMMANDS[$delegate]
         (( ${+functions_source[$delegate]} )) ||
             abend 'unable to source `%s`.' $delegate
         COMMANDS[$delegate]=':'
     fi
-    (( ${+functions_source[$delegate]} )) ||
-        abend 'fatal: no such command `%s`.' ${delegate//:/ }
-    if (( $# && ${+functions[$args]} )); then
+    if (( $# && ${+COMMANDS[$delegate]} )); then
         shift
         $args "$@"
     else
-        exit
+        typeset -A completions=()
+        typeset completion_match=()
+        complete=${sofar//#:args/:complete}
+        $complete "$@"
+        if (( ! $zshctl[args:completed] )); then
+            completions
+            (( zshctl[args:flags] = zshctl[args:flags] | 4 ))
+            zshctl[args:files]=none
+        fi
+        if [[ $shell = bash ]]; then
+            print there
+        fi
+        for hit in nospace prefix suffix filenames incomplete files descriptions message; do
+            printf 'result_settings[%s]=%s\n' $hit ${(qqq)zshctl[args:$hit]}
+        done
+        for hit in "${(@)completion_match}"; do
+            [[ ${parse[incomplete]} != -* && $hit = -* ]] && continue
+            printf 'result_completions+=( %s )\n' ${(qqq)hit}
+            if (( ${+completions[$hit]} )); then
+                printf 'result_settings[key]=%s; result_descriptions[${result_settings[key]}]=%s\n' \
+                    ${(qqq)hit} ${(qqq)completions[$hit]}
+            fi
+        done
     fi
 }
 
 function _zshctl_complete {
+    zshctl+=( args:mode completion args:flags 0 args:completed 0 args:filenames 0  )
     # Purposfully skip the program name in position 5, we are not going to use
     # it.
     typeset func=${1:-} shell=${2:-} debug=${3:-} cword=${4:-}
     shift 5
     typeset args=${func/#:execute/:args}
-    typeset complete=${func/#:execute/:complete}
     # No completion function, return. We really need to follow structure on
     # behalf of the user, not guess the intent.
-    (( ${+functions[$complete]} )) || return
     case $shell in
     (zsh)
         ((cword--))
-        _zshctl_descend_completion '' args "$@"
-        exit
+        zshctl[args:incomplete]=$@[$cword]
+        ((cword--))
+        _zshctl_descend_completion '' args "$@[1,$cword]"
         ;;
     esac
-    exit
 }
 
 function {
@@ -218,6 +244,7 @@ function {
         [[ $func = :execute:* ]] || continue
         COMMANDS[$func]=':'
     done
+    COMMANDS[:execute]=:
     include heredoc parse
     if (( is_zshctl )); then
         : ${functions[:complete]::=true}

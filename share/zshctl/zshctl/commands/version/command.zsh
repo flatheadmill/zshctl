@@ -55,8 +55,14 @@ function :args:version {
     eval "$(args -C -d f,format -bx h,help -- "$@")"
 }
 
+# TODO Want to organize the names for all these different objects used in the
+# system. We have `INCLUDES` and `COMMANDS` all caps which are system
+# variables, perhaps better expressed with a `_zshctl_` prefix, and we have this
+# parse object, here which might be better expressed as `args` to be
+# consistent or within the `zshctl` object as `zshctl[args:state]`, if we want
+# to have one to rule them all.
 function :complete:version {
-    case $parse[state]:$parse[matched] in
+    case $zshctl[args:state]:$zshctl[args:matched] in
     (value:(-f|--format))
         completion terse 'display version number only'
         completion verbose 'display version number and release date'

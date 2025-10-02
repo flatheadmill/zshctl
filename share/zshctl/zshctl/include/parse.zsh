@@ -42,6 +42,7 @@ function usage {
     capitalized=${${capitalized//:/-}:u}
     typeset mandoc=() lines=() split=() line cmd src
     integer dirty=1
+    usage=${usage//#:args/:execute}
     mandoc=( "${(@Af)"$(resource "$usage _ man" $functions_source[$usage])"}" )
     while (( dirty )); do
         dirty=0
@@ -117,43 +118,43 @@ function completion {
         {p,-prefixed}=o_prefixed \
         {S,-short-prefix}=o_short_prefixed \
         {m,-message}:=o_message || abend 'fatal: invalid arguments'
-    parse[flags]=$(( parse[flags] | 4 ))
-    parse[completed]=1
+    zshctl[args:flags]=$(( parse[flags] | 4 ))
+    zshctl[args:completed]=1
     if (( ${#o_wating} && ! parse[waiting] )); then
-        parse[waiting]=1
+        zshctl[args:waiting]=1
         print ':progress'
     fi
     if (( ${#o_short_prefixed} )); then
-        parse[flags]=$(( parse[flags] | 2 ))
-        parse[flags]=$(( parse[flags] | 1024 ))
+        zshctl[args:flags]=$(( zshctl[args:flags] | 2 ))
+        zshctl[args:flags]=$(( zshctl[args:flags] | 1024 ))
     fi
     if (( ${#o_prefixed} )); then
-        parse[flags]=$(( parse[flags] | 512 ))
+        zshctl[args:flags]=$(( zshctl[args:flags] | 512 ))
     fi
     if (( ${#o_ordered} )); then
-        parse[flags]=$(( parse[flags] | 32 ))
+        zshctl[args:flags]=$(( zshctl[args:flags] | 32 ))
     fi
     if (( ${#o_suffix} == 2 )); then
-        parse[flags]=$(( parse[flags] | 2 ))
+        zshctl[args:flags]=$(( zshctl[args:flags] | 2 ))
         case $o_suffix[2] in
-            (/) parse[flags]=$(( parse[flags] | 64 ));;
-            (=) parse[flags]=$(( parse[flags] | 128 ));;
-            (:) parse[flags]=$(( parse[flags] | 256 ));;
+            (/) zshctl[args:flags]=$(( zshctl[args:flags] | 64 ));;
+            (=) zshctl[args:flags]=$(( zshctl[args:flags] | 128 ));;
+            (:) zshctl[args:flags]=$(( zshctl[args:flags] | 256 ));;
         esac
-        parse[flags]=$(( parse[flags] | 4 ))
+        zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
     fi
     if (( ${#o_files} )); then
         print -u 2 files
-        parse[flags]=$(( parse[flags] & (~4) ))
+        zshctl[args:flags]=$(( zshctl[args:flags] & (~4) ))
     fi
     if [[ -n ${o_message[2]} ]]; then
-        parse[message]=$o_message[2]
-        parse[flags]=$(( parse[flags] | 4 ))
+        zshctl[args:message]=$o_message[2]
+        zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
     fi
     if (( $# )); then
         completion_match+=( ${1:-} )
         if (( $# == 2 )); then
-            parse[descriptions]=1
+            zshctl[args:descriptions]=1
             completions+=( ${1:-} ${2:-} )
         fi
     fi
@@ -832,19 +833,19 @@ function parser {
         # If we are invoked from command descent, we must call the actual
         # execution function. In order to use `args` to parse internal
         # function arguments, we also have to reset `_zshctl`.
-        case $_zshctl[mode] in
+        case $zshctl[args:mode] in
         (execute)
-            printf '_zshctl=()\n'
-            printf '%s "$@"\n' $_zshctl[func]
+            printf 'zshctl[args:mode]=inline\n'
+            printf '%s "$@"\n' $zshctl[args:func]
             ;;
         (completion)
-            print -u 2 hit hit
             integer top=2
             while [[ $funcstack[$top] != (:args:*|:args) ]]; do
                 ((top++))
                 (( top <= ${#funcstack} )) || abend 'must be called from an execute function'
             done
-            print -u 2 "${(qqq)option[matched]}"
+            printf 'zshctl[args:matched]=%s\n' ${(qqq)option[matched]}
+            printf 'zshctl[args:state]=%s\n' ${(qqq)parse[state]}
             printf '_zshctl_descend_completion %s "$@"\n' $funcstack[$top]
         esac
     fi
