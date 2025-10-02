@@ -104,31 +104,24 @@ function usage {
 }
 
 function completion {
-    zparseopts -D -F -K -- \
-        {w,-waiting}=o_waiting \
-        {s,-suffix}:=o_suffix \
-        {f,-files}=o_files \
-        {o,-ordered}=o_ordered \
-        {p,-prefixed}=o_prefixed \
-        {S,-short-prefix}=o_short_prefixed \
-        {m,-message}:=o_message || abend 'fatal: invalid arguments'
+    eval "$(args -b w,waiting f,files o,ordered p,prefixed S,short-prefixed -s s,suffix m,message)"
     zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
     zshctl[args:completed]=1
-    if (( ${#o_wating} && ! zshctl[args:waiting] )); then
+    if (( o_wating && ! zshctl[args:waiting] )); then
         zshctl[args:waiting]=1
         print ':progress'
     fi
-    if (( ${#o_short_prefixed} )); then
+    if (( o_short_prefixed )); then
         zshctl[args:flags]=$(( zshctl[args:flags] | 2 ))
         zshctl[args:flags]=$(( zshctl[args:flags] | 1024 ))
     fi
-    if (( ${#o_prefixed} )); then
+    if (( o_prefixed )); then
         zshctl[args:flags]=$(( zshctl[args:flags] | 512 ))
     fi
-    if (( ${#o_ordered} )); then
+    if (( o_ordered )); then
         zshctl[args:flags]=$(( zshctl[args:flags] | 32 ))
     fi
-    if (( ${#o_suffix} == 2 )); then
+    if [[ -v o_suffix ]]; then
         zshctl[args:flags]=$(( zshctl[args:flags] | 2 ))
         case $o_suffix[2] in
             (/) zshctl[args:flags]=$(( zshctl[args:flags] | 64 ));;
@@ -137,11 +130,11 @@ function completion {
         esac
         zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
     fi
-    if (( ${#o_files} )); then
+    if (( o_files )); then
         print -u 2 files
         zshctl[args:flags]=$(( zshctl[args:flags] & (~4) ))
     fi
-    if [[ -n ${o_message[2]} ]]; then
+    if [[ -v o_message ]]; then
         zshctl[args:message]=$o_message[2]
         zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
     fi

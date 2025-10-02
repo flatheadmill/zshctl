@@ -146,7 +146,6 @@ function _zshctl {
             # Return the success of having called _describe
             return 0
         else
-                return 1
             __zshctl_debug "_describe did not find completions."
             __zshctl_debug "Checking if we should do file completion."
             if [ $((directive & shellCompDirectiveNoFileComp)) -ne 0 ]; then
@@ -163,7 +162,12 @@ function _zshctl {
 
                 # We must return the result of this command, so it must be the
                 # last command, or else we must store its result to return it.
-                _arguments '*:filename:_files'" ${flagPrefix}"
+                if [[ -n $result_settings[prefix] ]]; then
+                    __zshctl_debug '*:filename:_files'" -P $result_settings[prefix]"
+                    _arguments '*:filename:_files'" -P $result_settings[prefix]"
+                else
+                    _arguments '*:filename:_files'
+                fi
             fi
         fi
     fi
