@@ -1,7 +1,3 @@
-# ___ :execute:completion _ description ___
-# Install
-# .PG .B __program__
-# shell completions for Zsh or Bash.
 # ___ :execute:completion _ man ___
 # .SH NAME
 # .PG __program__\ completion \- generate shell completions
@@ -12,6 +8,9 @@
 # .PG .SY __program__\ completion
 # .RB [ \-h | \-\-help ]
 # .YS
+# .DC Install
+# .PG .B __program__
+# shell completions for Zsh or Bash.
 # .SH DESCRIPTION
 # Generates completions for Zsh and Bash.
 # .SH OPTIONS

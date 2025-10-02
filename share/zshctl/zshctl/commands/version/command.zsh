@@ -1,9 +1,6 @@
 zmodload zsh/datetime
 
 # TODO Make the format options a bullet list under it's entry in OPTIONS.
-# ___ :execute:version _ description ___
-# Display the current version of
-# .PG .BR __program__ .
 # ___ :execute:version _ man ___
 # .SH NAME
 # .PG __program__\ version \- display version
@@ -13,12 +10,16 @@ zmodload zsh/datetime
 # .PG .SY __program__\ version
 # .RB [ \-h | \-\-help ]
 # .YS
+# .DC Display the current version of
+# .PG .BR __program__ .
 # .SH DESCRIPTION
 # Displays the current version of
 # .PG .BR __program__ .
 # .SH OPTIONS
 # .TP
 # .BR \-f ,\  \-\-format =[ \fIterse\fR | \fIverbose\fR | \fIshell\fR | \fIjson\fR ]
+# .DC Display a verbose version as test, JSON, or shell escaped.
+#
 # Display one of
 # .I terse
 # for just the version number,
@@ -30,7 +31,7 @@ zmodload zsh/datetime
 # for the version number and release date as UNIX epoch as JSON.
 # .TP
 # .BR \-h ,\  \-\-help
-# Help for
+# .DC Help for
 # .PG .BR __program__\ version .
 # ___
 function :execute:version {

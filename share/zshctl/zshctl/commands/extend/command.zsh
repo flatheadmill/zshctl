@@ -1,8 +1,4 @@
-# ___ execute:extend _ description ___
-# Extend
-# .PG .B __program__
-# with additional commands.
-# ___ execute:extend _ man ___
+# ___ :execute:extend _ man ___
 # .SH NAME
 # .PG __program__\ extend \-
 # extend
@@ -15,6 +11,9 @@
 # .PG .SY __program__\ extend
 # .RB [ \-h | \-\-help ]
 # .YS
+# .DC Extend
+# .PG .B __program__
+# with additional commands.
 # .SH DESCRIPTION
 # Extends
 # .PG __program__
@@ -22,7 +21,7 @@
 # .SH OPTIONS
 # .TP
 # .BR \-h ,\  \-\-help
-# Help for
+# .DC Help for
 # .PG .BR __program__\ extend .
 # .SH COMMANDS
 # The following command can be invoked to extend
@@ -32,7 +31,13 @@
 # option.
 # .ZC commands
 # ___
-function execute:extend {
+function :args:extend {
     eval "$(args -UC -bx h,help -- "$@")"
+}
+
+function :execute:extend {
     delegate "$@"
+}
+
+function :complete:extend {
 }

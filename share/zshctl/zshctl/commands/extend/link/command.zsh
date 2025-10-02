@@ -1,6 +1,4 @@
-# ___ execute:extend:link _ description ___
-# Install an extension.
-# ___ execute:extend:link _ man ___
+# ___ :execute:extend:link _ man ___
 # .SH NAME
 # .PB __program__\ extend \link \- install a
 # .PG __program__
@@ -11,6 +9,7 @@
 # .PG .SY __program__\ extend\ link
 # .RB [ \-h | \-\-help ]
 # .YS
+# .DC Install an extension.
 # .SH DESCRIPTION
 # Installs a
 # .PG __program__
@@ -18,11 +17,14 @@
 # .SH OPTIONS
 # .TP
 # .BR \-h ,\  \-\-help
-# Help for
+# .DC Help for
 # .BR zshctl\ extend\ link .
 # ___
-function execute:extend:link {
+function :args:extend:link {
     eval "$(args -U -bx h,help -- "$@")"
+}
+
+function :execute:extend:link {
     typeset subdirectory=.
     (( $# )) && subdirectory=${1:-}
     typeset found=()

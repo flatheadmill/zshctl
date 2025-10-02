@@ -27,53 +27,89 @@ function resource {
 #
 # Perhaps an enviroment variable?
 
+function _zshctl_options {
+}
+
 #
 function usage {
     setopt localoptions extendedglob
     typeset usage=${1:-$funcstack[2]} man=${2:-0} cols="$(echoti cols)"
     typeset release_date=$(strftime '%B %-d, %Y' $zshctl[release_date])
-    typeset capitalized=$zshctl[program]:${usage#*:}
+    typeset capitalized=$zshctl[program]:${usage#*:} state=copy
     capitalized=${${capitalized//:/-}:u}
-    typeset mandoc=() lines=() split=() line cmd src
+    typeset mandoc=() lines=() split=() line cmd src=()
     integer dirty=1
     usage=${usage//#:args/:execute}
     mandoc=( "${(@Af)"$(resource "$usage _ man" $functions_source[$usage])"}" )
+    # Note that we process the mandoc in a dirty loop because the descriptions
+    # we include from sub-commands may have .PG directives that need to be
+    # expanded.
     while (( dirty )); do
         dirty=0
         lines=( "${(@)mandoc}" )
         mandoc=()
         for line in "${(@)lines}"; do
-            case $line in
-                .PG\ * )
-                    line=${line//__program__/$zshctl[program]}
-                    line=${line#.PG }
-                    mandoc+=( "$line" )
-                    ;;
-                .ZC\ * )
-                    line=${line#.ZC }
-                    case $line in
-                        commands )
-                            for cmd in "${(@o)${(@k)_zshctl_commands}}"; do
-                                if [[ $cmd = $usage:[^:]## ]]; then
-                                    if [[ $_zshctl_commands[$cmd] = ':' ]]; then
-                                        src=$functions_source[$cmd]
-                                    else
-                                        src=$_zshctl_commands[$cmd]
-                                    fi
-                                    src=$(resource "$cmd _ description" $src)
-                                    if [[ -n $src ]]; then
-                                        dirty=1
-                                        split=( "${(@ps:\n:)src}" )
-                                        mandoc+=( .TP ".B ${cmd##*:}" .br "${(@)split}" )
-                                    fi
+            case $state:$line in
+            (skip:.SH*)
+                mandoc+=( "$line" )
+                state=copy
+                ;;
+            (skip:*)
+                ;;
+            (copy:.YS*)
+                mandoc+=( "$line" )
+                state=skip
+                ;;
+            (copy:.DC\ *)
+                line=${line#.DC }
+                (( man )) && line="${line[1]:l}${line[2,-1]}"
+                mandoc+=( "$line" )
+                ;;
+            (copy:.PG\ *)
+                line=${line//__program__/$zshctl[program]}
+                line=${line#.PG }
+                mandoc+=( "$line" )
+                ;;
+            (copy:.ZC\ *)
+                line=${line#.ZC }
+                case $line in
+                    commands )
+                        for cmd in "${(@o)${(@k)_zshctl_commands}}"; do
+                            if [[ $cmd = $usage:[^:]## ]]; then
+                                if [[ $_zshctl_commands[$cmd] = ':' ]]; then
+                                    src=$functions_source[$cmd]
+                                else
+                                    src=$_zshctl_commands[$cmd]
                                 fi
-                            done
-                            ;;
-                    esac
-                    ;;
-                * )
-                    mandoc+=( "$line" )
-                    ;;
+                                src=( "${(@Af)"$(resource "$cmd _ man" $src)"}" )
+                                if [[ -n $src ]]; then
+                                    function {
+                                        typeset lines=( "${(@)src}" ) line gather=() state=scan
+                                        for line in "${(@)lines}"; do
+                                            case $state:$line in
+                                            (scan:.YS*)
+                                                state=gather
+                                                ;;
+                                            (gather:.SH*)
+                                                break
+                                                ;;
+                                            (gather:*)
+                                                gather+=( $line )
+                                                ;;
+                                            esac
+                                        done
+                                        dirty=1
+                                        mandoc+=( .TP ".B ${cmd##*:}" .br "${(@)gather}" )
+                                    }
+                                fi
+                            fi
+                        done
+                        ;;
+                esac
+                ;;
+            (*)
+                mandoc+=( "$line" )
+                ;;
             esac
         done
     done
@@ -155,27 +191,27 @@ function completions {
     typeset state=seek mandoc=( '.TH Ignore 1 "Manuals" "STOP" "Manuals"' )
     for line in "${(@Af)lines}"; do
         case $state:$line in
-            *:.SH\ OPTIONS | *:.SH\ COMMANDS )
-                mandoc+=( "$line" )
-                state=tp
-                ;;
-            tp:.TP | desc:.TP )
-                mandoc+=( "$line" )
-                state=br
-                ;;
-            br:* )
-                state=desc
-                mandoc+=( "$line" .br )
-                ;;
-            desc:.SH* )
-                state=none
-                ;;
-            desc:'' )
-                state=tp
-                ;;
-            desc:?* )
-                mandoc+=( "$line" )
-                ;;
+        (*:.SH\ OPTIONS | *:.SH\ COMMANDS)
+            mandoc+=( "$line" )
+            state=tp
+            ;;
+        (tp:.TP | desc:.TP)
+            mandoc+=( "$line" )
+            state=br
+            ;;
+        (br:*)
+            state=desc
+            mandoc+=( "$line" .br )
+            ;;
+        (desc:.SH*)
+            state=none
+            ;;
+        (desc:''|desc:.JN*)
+            state=tp
+            ;;
+        (desc:?*)
+            mandoc+=( "$line" )
+            ;;
         esac
     done
     mandoc+=( '' )
@@ -220,60 +256,61 @@ function completions {
     state=seek
     for line in "${(@)lines}"; do
         case ${${:-$state:$line}//$~backspaced/} in
-            *:STOP* )
-                state=
-                ;;
-            *:OPTIONS | *:COMMANDS )
-                state=key
-                ;;
-            key:?* )
-                # Trim whitespace.
-                key=${(MS)line##[[:graph:]]*[[:graph:]]}
-                # Strip all formatting.
-                key=${key//$~backspaced/}
-                # Look for our value.
-                state=value
-                ;;
-            value:* )
-                # Reset accumulator.
-                quoted=()
-                # Trim whitespace.
-                line=${(MS)line##[[:graph:]]*[[:graph:]]}
-                # Remove the first strike of the character.
-                line=${line//$~backspaced/$'\b'}
-                # While we have a string remaining.
-                while [[ -n $line ]]; do
-                    # If we match...
-                    if [[ $line =~ $regex[bold] ]]; then
-                        # Strip our bolded text of all backspaces.
-                        stripped=${match[2]//$~backspaced[2]/}
-                        # Lead up and quoted bolded text.
-                        quoted+=( $match[1]\`$stripped\` )
-                        # Remainder.
-                        line=$match[-1]
-                    else
-                        # ...otherwise, the line segement has no bold text.
-                        quoted+=( "$line" )
-                        # Break loop.
-                        line=''
-                    fi
-                done
-                line=${(j::)quoted}
-                if [[ $key = -* ]]; then
-                    split=( "${(@Os:, :)key}" )
+        (*:STOP*)
+            state=
+            ;;
+        (*:OPTIONS | *:COMMANDS)
+            state=key
+            ;;
+        (key:?*)
+            # Trim whitespace.
+            key=${(MS)line##[[:graph:]]*[[:graph:]]}
+            # Strip all formatting.
+            key=${key//$~backspaced/}
+            # Look for our value.
+            state=value
+            ;;
+        (value:*)
+            # Reset accumulator.
+            quoted=()
+            # Trim whitespace.
+            line=${(MS)line##[[:graph:]]*[[:graph:]]}
+            # Remove the first strike of the character.
+            line=${line//$~backspaced/$'\b'}
+            # While we have a string remaining.
+            while [[ -n $line ]]; do
+                # If we match...
+                if [[ $line =~ $regex[bold] ]]; then
+                    # Strip our bolded text of all backspaces.
+                    stripped=${match[2]//$~backspaced[2]/}
+                    # Lead up and quoted bolded text.
+                    quoted+=( $match[1]\`$stripped\` )
+                    # Remainder.
+                    line=$match[-1]
                 else
-                    split=( $key )
+                    # ...otherwise, the line segement has no bold text.
+                    quoted+=( "$line" )
+                    # Break loop.
+                    line=''
                 fi
-                for key in "${(@)split}"; do
-                    if [[ $key = *=* ]]; then
-                        key=${key%=*}
-                    fi
-                    zshctl[args:descriptions]=1
-                    completions+=( $key $line )
-                    completion_match+=( $key )
-                done
-                state=key
-                ;;
+            done
+            line=${(j::)quoted}
+            if [[ $key = -* ]]; then
+                split=( "${(@Os:, :)key}" )
+            else
+                split=( $key )
+            fi
+            for key in "${(@)split}"; do
+                if [[ $key = *=* ]]; then
+                    key=${key%=*}
+                fi
+                zshctl[args:descriptions]=1
+                #completions+=( $key ${line[1]:l}$line[2,-1] )
+                completions+=( $key ${line%.} )
+                completion_match+=( $key )
+            done
+            state=key
+            ;;
         esac
     done
 }
