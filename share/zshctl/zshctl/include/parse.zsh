@@ -13,12 +13,6 @@ function resource {
     ' $file
 }
 
-function _zshctl_pushf {
-    typeset string
-    printf -v string "$@"
-    evaluate+=( "$string" )
-}
-
 # Extracts a string using `resource` and runs it through `groff` on Linux or
 # `mandoc` on OS X to create a man page when the user requests help.
 #
@@ -356,7 +350,6 @@ function parser {
     # TODO Make a note of this.
     # zshctl <(print 'program')
 
-    [[ -v _zshctl ]] || typeset -A _zshctl=( mode offhand )
     [[ -v parse ]] || typeset -A parse=( completed 0 filenames 0 descriptions 0 complete 0 flags 0 remainder '' )
     typeset -A completions=()
     typeset completion_match=()

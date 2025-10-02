@@ -4,7 +4,7 @@ __zshctl_debug()
 {
     local message
     if [[ -n ${ZSHCTL_COMP_DEBUG_FILE-} ]]; then
-        printf -v message "$@"
+        printf -v message -- "$@"
         echo "$message" >> "${ZSHCTL_COMP_DEBUG_FILE}"
     fi
 }
