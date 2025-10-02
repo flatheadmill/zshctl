@@ -59,12 +59,12 @@ function usage {
                     line=${line#.ZC }
                     case $line in
                         commands )
-                            for cmd in "${(@o)${(@k)COMMANDS}}"; do
+                            for cmd in "${(@o)${(@k)_zshctl_commands}}"; do
                                 if [[ $cmd = $usage:[^:]## ]]; then
-                                    if [[ $COMMANDS[$cmd] = ':' ]]; then
+                                    if [[ $_zshctl_commands[$cmd] = ':' ]]; then
                                         src=$functions_source[$cmd]
                                     else
-                                        src=$COMMANDS[$cmd]
+                                        src=$_zshctl_commands[$cmd]
                                     fi
                                     src=$(resource "$cmd _ description" $src)
                                     if [[ -n $src ]]; then
@@ -118,9 +118,9 @@ function completion {
         {p,-prefixed}=o_prefixed \
         {S,-short-prefix}=o_short_prefixed \
         {m,-message}:=o_message || abend 'fatal: invalid arguments'
-    zshctl[args:flags]=$(( parse[flags] | 4 ))
+    zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
     zshctl[args:completed]=1
-    if (( ${#o_wating} && ! parse[waiting] )); then
+    if (( ${#o_wating} && ! zshctl[args:waiting] )); then
         zshctl[args:waiting]=1
         print ':progress'
     fi
@@ -379,7 +379,8 @@ function parser {
     typeset -A option=( kind scalar defined 0 required 0 ) short options missing
     typeset split=() declared=() stack=( "${(@Oa)@}" )
     typeset popped on_zeroed state=option typesets=() tset
-    integer top=${#stack} intersperse=0 usage=0 completable=0 delegated=0
+    integer top=${#stack} intersperse=0 usage=0 completable=0 delegated=0 complete=0
+    [[ $zshctl[args:mode] = completion ]] && complete=1
     while (( top )); do
         popped=$stack[$top]
         case $state:$popped in
@@ -461,7 +462,7 @@ function parser {
                 option[long]=$split[2]
                 option[var]=$split[2]
                 options[$option[long]]=${(j: :)${(@qqkv)option}}
-                if (( ! $option[defined] && ! parse[complete] )); then
+                if (( ! $option[defined] && ! complete )); then
                     case $option[kind] in
                         counter | boolean | toggle )
                             printf -v tset 'integer o_%s=0' ${option[var]//-/_}
@@ -634,7 +635,7 @@ function parser {
         last=$(( top == 1 ))
         case $state:$popped in
             switch:-- )
-                (( parse[complete] )) || ((top--))
+                (( complete )) || ((top--))
                 break
                 ;;
             switch:--* )
@@ -652,7 +653,7 @@ function parser {
                 # just accepting the first match in alphabetical order.
                 extant=${+options[$flag]} # 0 if missing, 1 if extant.
                 # Check if the flag is valid.
-                case $extant:$parse[complete] in
+                case $extant:$complete in
                     # Display an error if the argument is not recognized.
                     0:0 )
                         args:user:error $error $funcstack[$depth] unknown $flag $last
@@ -756,7 +757,7 @@ function parser {
                 continue
                 ;;
             execute:0 )
-                if (( ${option[execute]:-0} && ! $parse[complete]  )); then
+                if (( ${option[execute]:-0} && ! complete  )); then
                     printf '%s %s %s %s\n' $error $funcstack[$depth] execute "--$option[long]"
                     return
                 fi
@@ -770,7 +771,7 @@ function parser {
                 exit 1
                 ;;
         esac
-        parse[long]=$option[long]
+        zshctl[args:long]=$option[long]
         case $option[kind] in
             boolean | counter | toggle )
                 ((top++))
@@ -785,7 +786,7 @@ function parser {
                 ;;
         esac
     done
-    parse[state]=$state
+    zshctl[args:state]=$state
     if (( ! parse[complete] )); then
         # TODO Assert we did not stop mid argument.
         case $state in
@@ -834,7 +835,7 @@ function parser {
         # function arguments, we also have to reset `_zshctl`.
         case $zshctl[args:mode] in
         (execute)
-            if (( usage )); then
+            if (( usage && ! ${#combined} )); then
                 printf 'usage %s\n' $funcstack[$depth]
             else
                 printf 'zshctl[args:mode]=inline\n'
@@ -848,7 +849,8 @@ function parser {
                 (( top <= ${#funcstack} )) || abend 'must be called from an execute function'
             done
             printf 'zshctl[args:matched]=%s\n' ${(qqq)option[matched]}
-            printf 'zshctl[args:state]=%s\n' ${(qqq)parse[state]}
+            printf 'zshctl[args:state]=%s\n' ${(qqq)zshctl[args:state]}
+            printf 'zshctl+=( args:mode inline )\n'
             printf '_zshctl_descend_completion %s "$@"\n' $funcstack[$top]
         esac
     fi

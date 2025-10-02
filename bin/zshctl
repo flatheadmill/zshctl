@@ -31,17 +31,26 @@ zshctl[commandable]=1
 zshctl[localized]=1
 zshctl[main]=zshctl
 
+# Basic abend used internally, replaced by a more advanced abend if you
+# `include heredoc`.
+function abend {
+    typeset message
+    printf -v message "$@"
+    print -u 2 $message
+    exit 1
+}
+
 function include {
     while (( $# )); do
-        case "${INCLUDES[$1]}" in
-            /* )
-                source $INCLUDES[$1]
-                INCLUDES[$1]=':'
-                ;;
-            : )
-                ;;
-            * )
-                abend 'unable to include %s' "${(qqq)1}"
+        case "${_zshctl_includes[$1]}" in
+        (/*)
+            source $_zshctl_includes[$1]
+            _zshctl_includes[$1]=':'
+            ;;
+        (:)
+            ;;
+        (*)
+            abend 'unable to include %s' "${(qqq)1}"
         esac
         shift
     done
@@ -73,19 +82,15 @@ function delegate {
     fi
     typeset delegate=$func:$next
     shift
-    if [[ ${${COMMANDS[$delegate]}[1]} = '/' ]]; then
-        source $COMMANDS[$delegate]
+    if [[ ${${_zshctl_commands[$delegate]}[1]} = '/' ]]; then
+        source $_zshctl_commands[$delegate]
         (( ${+functions_source[$delegate]} )) ||
             abend 'unable to source `%s`.' $delegate
-        COMMANDS[$delegate]=':'
+        _zshctl_commands[$delegate]=':'
     fi
     (( ${+functions_source[$delegate]} )) ||
         abend 'fatal: no such command `%s`.' ${delegate//:/ }
     _zshctl_execute $delegate "$@"
-}
-
-function :execute {
-    delegate "$@"
 }
 
 # ___ :execute _ man ___
@@ -129,6 +134,10 @@ function :args {
     eval "$(args -UD -bx h,help -- "$@")"
 }
 
+function :execute {
+    delegate "$@"
+}
+
 # For completions, we do not have to invoke delegate, we can instead look at
 # the functions_source map to determine if there are additional extension
 # commands, which I believe we are doing in any case to fill out sub-commands
@@ -145,8 +154,9 @@ function _zshctl_execute {
     shift
     typeset args=${func/#:execute/:args}
     typeset complete=${args/#:args/:complete}
-    zshctl+=( args:func $func args:mode execute )
+    zshctl+=( args:func $func args:mode execute args:complete 0 )
     if (( ${+functions[$args]} )); then
+        include parse
         $args "$@"
     else
         $func "$@"
@@ -167,14 +177,16 @@ function _zshctl_descend_completion {
     typeset args="$sofar:${1-}"
     typeset delegate=${args//#:args/:execute}
     typeset complete=${args//#:args/:complete}
-    if [[ ${${COMMANDS[$delegate]}[1]} = '/' ]]; then
-        source $COMMANDS[$delegate]
+    if [[ ${${_zshctl_commands[$delegate]}[1]} = '/' ]]; then
+        source $_zshctl_commands[$delegate]
         (( ${+functions_source[$delegate]} )) ||
             abend 'unable to source `%s`.' $delegate
-        COMMANDS[$delegate]=':'
+        _zshctl_commands[$delegate]=':'
     fi
-    if (( $# && ${+COMMANDS[$delegate]} )); then
+    if (( $# && ${+_zshctl_commands[$delegate]} )); then
         shift
+        zshctl+=( args:mode completion args:complete 1 )
+        include parse
         $args "$@"
     else
         typeset -A completions=()
@@ -193,7 +205,7 @@ function _zshctl_descend_completion {
             printf 'result_settings[%s]=%s\n' $hit ${(qqq)zshctl[args:$hit]}
         done
         for hit in "${(@)completion_match}"; do
-            [[ ${parse[incomplete]} != -* && $hit = -* ]] && continue
+            [[ $zshctl[args:incomplete] != -* && $hit = -* ]] && continue
             printf 'result_completions+=( %s )\n' ${(qqq)hit}
             if (( ${+completions[$hit]} )); then
                 printf 'result_settings[key]=%s; result_descriptions[${result_settings[key]}]=%s\n' \
@@ -223,11 +235,24 @@ function _zshctl_complete {
 }
 
 function {
-    typeset -A INCLUDES=() COMMANDS=()
+    # Include by file name, maps to the absolute path to the file or to `:`
+    # after the file is sourced upon inclusion.
+    typeset -A _zshctl_includes=()
+    # Definitive list of available commands. Maps `:execute:*` function name
+    # to the source file or to `:` after the file is sourced. When sourced,
+    # you can find the source file in the `functions_source` associative
+    # array. Note that `${+functions_source[does_not_exist]}` always returns
+    # `1`, even if the function does not exist, so we rely on
+    # `_zshctl_commands` to determine command existance.
+    typeset -A _zshctl_commands=()
     integer is_zshctl=1
     typeset command_path=() match=()
     typeset shebang dir base func src
     zshctl[argzero]=$ZSH_ARGZERO
+    # Shebang check. Do not be surprised when a file is sourced when you type
+    # `zshctl foo` if `foo` exists in the current directory and it has a
+    # zshctl shebang line. It feels like a security risk, and perhaps it is,
+    # but it's not much different from typing `zsh foo`.
     while
         if (( $zshctl[commandable] )); then
             command_path+=( "${zshctl[argzero]:A:h:h}/share/${zshctl[argzero]:t}" )
@@ -259,33 +284,43 @@ function {
             false
         fi
     do; :; done
+    # The `localized` flag means that we will extend our programs with
+    # extension commands and includes in our ~/.local directory. (We could
+    # also extend from /usr/share/, but not today.)
     if (( zshctl[commandable] && zshctl[localized] )); then
         command_path+=( ~/.local/share/${zshctl[program]} )
     fi
     # The value for uncompiled functions is the path to the source, so we use
-    # ":" functions because it is not a popular file name.
+    # ":" in functions as separators because it is the POSIX path separator.
     for dir in "${(@)command_path}"; do
         for src in "$dir"/*/commands/**/command.zsh(N); do
             func=${${src#$base/*/commands/}%/command.zsh}
-            COMMANDS[:execute:${func//\//:}]=$src
+            _zshctl_commands[:execute:${func//\//:}]=$src
         done
         for src in "$dir"/*/include/*.zsh(N); do
-            INCLUDES[${src:t:r}]=$src
+            _zshctl_includes[${src:t:r}]=$src
         done
         for src in $dir/release.zsh(N); do
-            # TODO What was this about?
+            # TODO What was this about? Looks like something that is always
+            # included, but why is it named `release`? If you cannot find a
+            # use for it, remove it.
             source $src
         done
     done
+    # Mark the default `:execute` function as sourced.
+    _zshctl_commands[:execute]=:
+    # Mark functions that were sourced by the shebang program as extant and
+    # sourced.
     for func in "${(@k)functions_source}"; do
         [[ $func = :execute:* ]] || continue
-        COMMANDS[$func]=':'
+        _zshctl_commands[$func]=':'
     done
-    COMMANDS[:execute]=:
-    include heredoc parse
+    # Create a stub `:complete` function if we were not invoked by shebang.
     if (( is_zshctl )); then
         : ${functions[:complete]::=true}
     fi
+    # `__complete` is a special argument passed by completions, so we follow
+    # the completion path for it, otherwise the execute path.
     if [[ $1 = __complete ]]; then
         shift
         _zshctl_complete :execute "$@"
