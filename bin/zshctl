@@ -246,10 +246,10 @@ function _zshctl_descend_completion {
         done
         for hit in "${(@)completion_match}"; do
             [[ $zshctl[args:incomplete] != -* && $hit = -* ]] && continue
-            printf 'result_completions+=( %s )\n' ${(qqq)hit}
+            printf 'result_completions+=( %s )\n' ${(qq)hit}
             if (( ${+completions[$hit]} )); then
                 printf 'result_settings[key]=%s; result_descriptions[${result_settings[key]}]=%s\n' \
-                    ${(qqq)hit} ${(qqq)completions[$hit]}
+                    ${(qq)hit} ${(qq)completions[$hit]}
             fi
         done
     fi
