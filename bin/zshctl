@@ -241,7 +241,7 @@ function _zshctl_descend_completion {
             # Include only the completions that match our incomplete match.
             completion_match=( "${(@M)completion_match:#$zshctl[args:incomplete]*}" )
         fi
-        for hit in nospace prefix suffix filenames incomplete files descriptions message; do
+        for hit in nospace prefix suffix filenames incomplete files descriptions message valid; do
             printf 'result_settings[%s]=%s\n' $hit ${(qqq)zshctl[args:$hit]}
         done
         for hit in "${(@)completion_match}"; do

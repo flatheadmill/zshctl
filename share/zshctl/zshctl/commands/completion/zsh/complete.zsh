@@ -3,6 +3,8 @@ compdef _zshctl zshctl
 
 # zsh completion for zshctl                                  -*- shell-script -*-
 
+zmodload zsh/datetime
+
 function __zshctl_debug {
     local file="$ZSHCTL_COMP_DEBUG_FILE" message
     if [[ -n ${file} ]]; then
@@ -15,55 +17,92 @@ function _zshctl {
     unsetopt localoptions MONITOR
 
     typeset out line completions=() executable=()
+    typeset -gA __zshctl_cache
 
     # TODO What else do we get to play with.
     __zshctl_debug '========= starting completion logic =========='
     __zshctl_debug 'CURRENT: %d, words: %s' $CURRENT ${(j: :)${(@qq)words}}
 
-    executable=(
-        "${words[1]}" __complete zsh ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
-            $CURRENT "${(@)words}"
-    )
-    __zshctl_debug 'About to call: %s' "${(j: :)${(@qq)${(@)executable}}}"
+    typeset cache_key="${(j: :)${(@qq)words[1,$(( $CURRENT - 1 ))]}}" cache_hit cache_prefix
+    __zshctl_debug 'CACHE KEY: %s' $cache_key
+    integer start=0
 
-    if [[ ! -v _autocomplete__func_opts ]]; then
-        typeset putback=${${BUFFER#$LBUFFER}[1]:- }
-        integer code spinner=0
-        exec 3>&1
-        coproc {
-            coproc :
-            typeset spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
-            read -t 0.2 -r line
-            [[ -z $line ]] || return
-            printf '\e[?25l' 1>&3
-            integer i=0
-            while [[ -z $line ]]; do
-                i=$(( (i + 1) % ${#spin} ))
-                printf $spin[$(( i + 1 ))] 1>&3
-                echo -en "\033[1D" 1>&3
-                read -t 0.1 -r line
-            done
-            printf '%s\b' ${putback:-} 1>&3
-            printf '\e[?25h' 1>&3
-        }
-        spinner=$!
-        trap '(( spinner )) && print -p close' EXIT INT TERM
-        __zshctl_debug 'Spinner PID: %d' $spinner
-        out=$( "${(@)executable}" )
-        code=$?
-        print -p close 2>/dev/null # Pipe may be broken.
-        wait $spinner
-        spinner=0
-        exec 3>&-
+    # One enhancement for the cache would be to have the cache value be an
+    # container that maps by prefix since the key for something like `op get`
+    # would be resetting as you went through a path `vault/item/field`, but
+    # this is a place to start and the interface from the application will not
+    # change.
+    if (( $EPOCHSECONDS - ${+__zshctl_cache[last:]:-0} > 30 )); then
+        __zshctl_debug 'WIPE CACHE'
+        __zshctl_cache=()
     else
-        __zshctl_debug "autocomplete detected"
-        out=$( "${(@)executable}" )
-        code=$?
+        __zshctl_debug 'key <%s> $words[$CURRENT] <%s> prefix <%s> valid <%s>' $cache_key ${words[$CURRENT]} \
+            ${__zshctl_cache[prefix:$cache_key]} ${__zshctl_cache[valid:$cache_key]}
+        if [[
+            ${+__zshctl_cache[prefix:$cache_key]} -ne 0 &&
+            ${+__zshctl_cache[valid:$cache_key]} -ne 0 &&
+            $words[$CURRENT] = ${__zshctl_cache[prefix:$cache_key]}* &&
+            $words[$CURRENT] =~ ${__zshctl_cache[valid:$cache_key]}
+        ]]; then
+            __zshctl_debug 'PREFIX OKAY'
+            cache_hit=${__zshctl_cache[out:$cache_key]:-}
+        fi
     fi
 
-    if (( code )); then
-        __zshctl_debug "Completion received error. Ignoring completions."
-        return
+    if [[ -z $cache_hit ]]; then
+        integer start secs nsecs
+        for secs nsecs in "${(@)epochtime}"; do
+            start=$(( (secs * 1000) + (nsecs / 1000000) ))
+        done
+
+        executable=(
+            "${words[1]}" __complete zsh ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
+                $CURRENT "${(@)words}"
+        )
+        __zshctl_debug 'About to call: %s' "${(j: :)${(@qq)${(@)executable}}}"
+
+        if [[ ! -v _autocomplete__func_opts ]]; then
+            typeset putback=${${BUFFER#$LBUFFER}[1]:- }
+            integer code spinner=0
+            exec 3>&1
+            coproc {
+                coproc :
+                typeset spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
+                read -t 0.2 -r line
+                [[ -z $line ]] || return
+                printf '\e[?25l' 1>&3
+                integer i=0
+                while [[ -z $line ]]; do
+                    i=$(( (i + 1) % ${#spin} ))
+                    printf $spin[$(( i + 1 ))] 1>&3
+                    echo -en "\033[1D" 1>&3
+                    read -t 0.1 -r line
+                done
+                printf '%s\b' ${putback:-} 1>&3
+                printf '\e[?25h' 1>&3
+            }
+            spinner=$!
+            trap '(( spinner )) && print -p close' EXIT INT TERM
+            __zshctl_debug 'Spinner PID: %d' $spinner
+            out=$( "${(@)executable}" )
+            code=$?
+            print -p close 2>/dev/null # Pipe may be broken.
+            wait $spinner
+            spinner=0
+            exec 3>&-
+        else
+            __zshctl_debug "autocomplete detected"
+            out=$( "${(@)executable}" )
+            code=$?
+        fi
+
+        if (( code )); then
+            __zshctl_debug "Completion received error. Ignoring completions."
+            return
+        fi
+    else
+        __zshctl_debug 'CACHE HIT'
+        out=$cache_hit
     fi
 
     # Use eval to handle any environment variables and such
@@ -72,6 +111,18 @@ function _zshctl {
     typeset result_completions=()
     typeset -A result_settings result_descriptions
     eval "$out"
+
+    if (( start )) && [[ -n $result_settings[valid] ]]; then
+        for secs nsecs in "${(@)epochtime}"; do
+            if (( $(( (secs * 1000) + (nsecs / 1000000) )) - start > 300 )); then
+                __zshctl_debug 'CACHING'
+                __zshctl_cache[out:$cache_key]=$out
+                __zshctl_cache[last:]=$EPOCHSECONDS
+                __zshctl_cache[prefix:$cache_key]=$result_settings[prefix]
+                __zshctl_cache[valid:$cache_key]=$result_settings[valid]
+            fi
+        done
+    fi
 
     if [[ -n $result_settings[message] ]]; then
         _message -r "${result_settings[message]}"

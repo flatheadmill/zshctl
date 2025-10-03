@@ -140,7 +140,7 @@ function usage {
 }
 
 function completion {
-    eval "$(args -b w,waiting f,files o,ordered p,prefixed S,short-prefixed -s s,suffix m,message -- "$@")"
+    eval "$(args -b w,waiting f,files o,ordered p,prefixed S,short-prefixed -s v,valid s,suffix m,message -- "$@")"
     zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
     zshctl[args:completed]=1
     if (( o_wating && ! zshctl[args:waiting] )); then
@@ -169,6 +169,9 @@ function completion {
     if (( o_files )); then
         print -u 2 files
         zshctl[args:flags]=$(( zshctl[args:flags] & (~4) ))
+    fi
+    if [[ -v o_valid ]]; then
+        zshctl[args:valid]=$o_valid
     fi
     if [[ -v o_message ]]; then
         zshctl[args:message]=$o_message
