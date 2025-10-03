@@ -195,6 +195,9 @@ function completions {
             mandoc+=( "$line" )
             state=tp
             ;;
+        (tp:.HS)
+            break
+            ;;
         (tp:.TP | desc:.TP)
             mandoc+=( "$line" )
             state=br
