@@ -21,7 +21,6 @@
 # arguments are a Go fetish, and we survived for half a century without them.
 
 zmodload zsh/parameter
-zmodload zsh/datetime
 
 typeset -xgA zshctl
 
