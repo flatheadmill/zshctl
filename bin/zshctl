@@ -39,6 +39,8 @@ function abend {
     exit 1
 }
 
+# Load Zsh as needed. Track included sources in a map containing the absolute
+# path to the source. Replace the absolute path with a colon after loading.
 function include {
     while (( $# )); do
         case "${_zshctl_includes[$1]}" in
