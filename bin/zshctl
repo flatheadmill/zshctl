@@ -35,7 +35,7 @@ zshctl[main]=zshctl
 # `include heredoc`.
 function abend {
     typeset message
-    printf -v message "$@"
+    printf -v message -- "$@"
     print -u 2 $message
     exit 1
 }
