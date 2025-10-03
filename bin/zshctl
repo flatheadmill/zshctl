@@ -192,7 +192,9 @@ function _zshctl_descend_completion {
         typeset -A completions=()
         typeset completion_match=()
         complete=${sofar//#:args/:complete}
-        $complete "$@"
+        if (( ${+functions[$complete]} )); then
+            $complete "$@"
+        fi
         if (( ! $zshctl[args:completed] )); then
             completions $sofar
             (( zshctl[args:flags] = zshctl[args:flags] | 4 ))
