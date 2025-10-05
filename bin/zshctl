@@ -207,7 +207,7 @@ function _zshctl_descend_completion {
 
 function _zshctl_completed {
     local key
-    for key in descriptions encache filenames files incomplete key message nospace prefix suffix valid; do
+    for key in delimiter descriptions encache filenames files incomplete key message nospace prefix suffix valid; do
         printf 'result_settings[%s]=%s\n' $key "${(@qq)zshctl[args:$key]}"
         printf 'result_settings[%s]=%s\n' $key "${(@qq)zshctl[args:$key]}" >> $zshctl[args:debug]
     done

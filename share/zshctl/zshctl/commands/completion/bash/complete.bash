@@ -23,8 +23,11 @@ __zshctl_get_completion_results() {
     local zsh_quoted_words out code
 
     # We used to do this manipulation in `zshctl` because we wanted the Zsh
-    # parsed shell words, but we're not always calling `zshctl` with caching so
-    # we shell out to `zsh` to get the words as parsed by Zsh.
+    # parsed shell words, but that came to an end with the caching
+    # implementation. The cleanup side can't be invoked with the incomplete word
+    # because it is being pulled from the cache, so we made a general rule that
+    # defined the inputs and output. It is up to the completion code to convert
+    # its word input into Zsh parsed input on its own.
     zsh_quoted_words=$(zsh -c '
         words=( "${(@QA)${(z)0}}" )
         (( ${#words} != ${#${(z)${:-${0}x}}} )) && words+=( "" )
@@ -185,20 +188,24 @@ __zshctl_get_completion_results() {
 
     # An older comment.
     #
-    # Bash creates "words" by splitting on all sorts of characters that do not
-    # delineate shell words. If we are at an equals or our previous character
-    # was an equals, we do not need the asignee part of the prefix.
+    # Bash creates "words" by splitting on `COMP_WORDBREAKS`. If `:` is one of
+    # the characters in `COMP_WORDBREAKS` and we are completing
+    # `administrator:pas` seeking the completion `administrator:password=`, then
+    # the word that Bash believes it is completing is `pas` because it broke on
+    # the `:`. As noted, we never really know what is going to be in
+    # `COMP_WORDBREAKS` because anyone can add something to it. It is global to
+    # the active shell.
     #
-    # It appears that we have to do some cleanup based on the words given to use
-    # by Bash that we did not use to descent the tree. We used a Zsh shell words
-    # parse of the line.
+    # Currently, we address this by having our `zshctl` completion code set a
+    # `zshctl[args:delimiter]=:` for the above case. It is a shim. `:` appears
+    # to always be in `COMP_WORDBREAKS` now. Not sure if it is a default or if
+    # someone is adding it, but it tends to be there. It is not onerous for the
+    # `zshctl` code to add a delimiter. It is easy enough to spot a character
+    # that might be a problem for Bash, a character that you are indeed using as
+    # a delimiter, but the delimeter is not used by the Zsh code.
     #
-    # And yet I do not understand why we are stripping the delimiter from our
-    # completion_match if we used Zsh split words.
-    #
-    # Oh, it is perhaps because we have split on a delimiter, and so now we have
-    # to shorten our match based on our Zsh words to be the prefix of Bash
-    # words, stripping up to the delimiter.
+    # We could check if the delimiter is actually in `COMP_WORDBREAKS`, but
+    # we're currently in "works on my machine" mode until further notice.
     if [[ -n ${result_settings[delimiter]} &&
         (
             ${COMP_WORDS[${COMP_CWORD}]} = ${result_settings[delimiter]} ||
@@ -206,10 +213,11 @@ __zshctl_get_completion_results() {
         )
     ]]; then
         result_settings[prefix]=${result_settings[prefix]#*${result_settings[delimiter]}}
-        # TODO Above to Bash.
-        result_settings[incomplete]=${result_settings[incomplete]#*${result_settings[delimiter]}}
+        incomplete=${incomplete#*${result_settings[delimiter]}}
         result_completions=( "${result_completions[@]#*${result_settings[delimiter]}}" )
     fi
+
+    __zshctl_debug 'result_settings[prefix] <%s>\n' ${result_settings[prefix]}
 
     # We are going to smoosh the way Zsh does.
     if [[ -n ${result_settings[suffix]} ]]; then
@@ -387,7 +395,8 @@ __zshctl_handle_completion_types() {
             if [[ $comp == "$cur"* ]]; then
                 COMPREPLY+=("$comp")
             fi
-        done < <(printf "%s\n" "${completions[@]}")
+            # TODO Claude, didnt' we already filter the above?
+        done < <(printf "%s\n" "${result_completions[@]}")
         ;;
 
     *)
