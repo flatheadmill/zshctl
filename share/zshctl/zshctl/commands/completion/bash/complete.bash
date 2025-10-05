@@ -9,15 +9,71 @@ __zshctl_debug()
     fi
 }
 
-# This function calls the zshctl program to obtain the completion
-# results and the directive.  It fills the 'out' and 'directive' vars.
-__zshctl_get_completion_results() {
-    # Create a cache for long-running completions.
-    declare -gA __zshctl_cache
-    # Makes any changes made by `set` local to the current function.
-    local -
-    # Turn off job monitoring so we can use `coproc` without chattering.
-    set +m
+__zshctl_spinnered() {
+    # Get the character that we'll put back when the spinner stops spinning.
+    local putback=${COMP_LINE:$COMP_POINT:1}
+    # Variables for the spinner and the invocation of our program.
+    local spinner_PID=0 code spinner_fd=0 unspun=0
+    local -a spinner
+    # Spinner shutdown. When hitting Ctl+C this will stop the spinner, but it
+    # ordinarily leaves the prompt in a bad state. When you Ctl+C at the prompt
+    # in Bash it will print ^C at the end of the line and then redraw an empty
+    # prompt on a newline. Hitting Ctl+C while spinner is running will leave the
+    # a spinner character on the line before Bash prints an end of line and
+    # redaws the prompt. Other times the new prompt is not drawn and if the user
+    # presses enter, Bash attempts to run the command on the line, but it errors
+    # because first character of the line is deleted. Therefore, you should
+    # never create a `zshctl` shebang program with completions named `grm` or
+    # the like because it will get edited to `rm`.
+    #
+    # This is as good as it gets for now. The character delete is seen in the
+    # `gcloud` spinner as well in Bash.
+    unspin() {
+        local signal=${1:-}
+        shift
+        # Stop the spinner and wait for it to finish. If we do not wait we might
+        # exit this function and get job control spew on the terminal because our
+        # local settings to hush the spew will be reset when we return.
+        __zshctl_debug 'CALLED <%s> <%s> <%s> <%s>' $unspun $signal ${spinner[1]} $spinner_PID
+        (( unspun )) && return
+        __zshctl_debug 'SENDING SIGNAL'
+        unspun=1
+        (( ${spinner[1]:-0} )) && echo $signal >&"${spinner[1]}" 2>/dev/null
+        [[ $signal != OVER ]] && exit 1
+    }
+    trap 'unspin INT' INT
+    trap 'unspin RETURN' RETURN
+    {
+        {
+            coproc spinner {
+                typeset interrupted=0
+                putback() {
+                    # echo -en "${putback:- }\033[1D" 1>&2 # putback
+                    interrupted=1
+                    echo ME TOO >> $ZSHCTL_COMP_DEBUG_FILE
+                }
+                trap putback  INT
+                local LC_CTYPE=C    # important
+                local charwidth=3   # also, important
+                local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
+                read -t 0.2 -r line # if we have a line we never start spinning
+                [[ -z $line ]] || return
+                printf '\e[?25l' 1>&2 # hide cursor
+                local i=0
+                while [[ -z $line ]]; do
+                    i=$(( (i + $charwidth ) % ${#spin} ))
+                    (( ! interrupted )) && printf '%s\033[1D' ${spin:$i:$charwidth} 1>&2
+                    read -t 0.1 -r line # snooze
+                done
+                __zshctl_debug 'SPINNER DONE: <%s>' $line
+                # Because spinner is scribbling on the terminal, if it is stopped by
+                # an INT, it does not attempt to put back the character it overwrote
+                # with its spinner characters. Leaves a spinner character.
+                [[ $line != INT ]] && printf '%s\033[1D' "${putback:- }" 1>&2 # putback
+                printf '\e[?25h' 1>&2 # normal cursor
+            }
+        }
+    }
 
     local -a zshctl zsh_words
     local zsh_quoted_words out code
@@ -86,33 +142,6 @@ __zshctl_get_completion_results() {
         out=${__zshctl_cache[key:$key]}
         __zshctl_debug '%s' "$out"
         if [[ -z $out ]]; then
-            # Get the character that we'll put back when the spinner stops spinning.
-            local putback=${COMP_LINE:$COMP_POINT:1}
-            # Variables for the spinner and the invocation of our program.
-            local spinner_PID code
-            local -a spinner
-            exec 3>&1
-            {
-                {
-                    coproc spinner {
-                        local LC_CTYPE=C    # important
-                        local charwidth=3   # also, important
-                        local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
-                        read -t 0.2 -r line # if we have a line we never start spinning
-                        [[ -z $line ]] || return
-                        printf '\e[?25l' 1>&3 # hide cursor
-                        local i=0
-                        while [[ -z $line ]]; do
-                            i=$(( (i + $charwidth ) % ${#spin} ))
-                            printf "%s" ${spin:$i:$charwidth} 1>&3
-                            echo -en "\033[1D" 1>&3
-                            read -t 0.1 -r line # snooze
-                        done
-                        echo -en "${putback:- }\033[1D" 1>&3 # putback
-                        printf '\e[?25h' 1>&3 # normal cursor
-                    }
-                }
-            } 2>/dev/null
             __zshctl_debug 'CACHE MISS'
             zshctl=(
                 "${COMP_WORDS[0]}" __encache ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
@@ -135,13 +164,6 @@ __zshctl_get_completion_results() {
             out=$( "${zshctl[@]}" 2>/dev/null )
             code=$?
 
-            # Stop the spinner and wait for it to finish. If we do not wait we might
-            # exit this function and get job control spew on the terminal because our
-            # local settings to hush the spew will be reset when we return.
-            echo close >&"${spinner[1]}"
-            wait $spinner_PID
-            exec 3>&-
-
             # We could display a cleaner error message using our error message
             # display below, but for now we just bail.
             if (( code )); then
@@ -161,6 +183,34 @@ __zshctl_get_completion_results() {
             __zshctl_debug 'ENCACHE OUTPUT'
         fi
     fi
+    unspin OVER
+    wait $spinner_PID
+    echo "$out"
+    return 0
+}
+
+# This function calls the zshctl program to obtain the completion
+# results and the directive.  It fills the 'out' and 'directive' vars.
+__zshctl_get_completion_results() {
+    # Create a cache for long-running completions.
+    declare -gA __zshctl_cache
+    # Makes any changes made by `set` local to the current function.
+    local -
+    # Turn off job monitoring so we can use `coproc` without chattering.
+    set +m
+    local out code
+    out=$(__zshctl_spinnered)
+    code=$?
+    __zshctl_debug 'FINAL OUT: <%s> <%s>\n' $code "$out"
+    if (( code )); then
+        return 1
+    else
+        return 0
+    fi
+
+    #echo close >&"${spinner[1]}" 2>/dev/null
+    #wait $spinner_PID
+    #exec {spinner_fd}>&- 2>/dev/null
 
     # Some complaints here, but we did manage to figure it out.
 
@@ -589,6 +639,8 @@ __start_zshctl()
     __zshctl_debug 'COMP_LINE<%s> COMP_POINT<%s> <%s>' \
         "$COMP_LINE" "$COMP_POINT" "${COMP_LINE:$COMP_POINT:3}"
 
+    trap >> $ZSHCTL_COMP_DEBUG_FILE
+    __zshctl_debug 'TRAPS ABOVE'
     __zshctl_get_completion_results
 }
 
