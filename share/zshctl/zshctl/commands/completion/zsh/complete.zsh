@@ -38,8 +38,8 @@ function __zshctl_actual {
     __zshctl_debug 'CURRENT: %d, words: %s' $CURRENT ${(j: :)${(@qq)words}}
 
     typeset out zshctl=(
-        "${words[1]}" __complete zsh ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
-            $CURRENT "${(@)words}"
+        "${words[1]}" __complete ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
+            ${#words} "${(@)words}" $CURRENT
     )
     __zshctl_debug 'About to call: %s' "${(j: :)${(@qq)${(@)zshctl}}}"
     out=$( "${(@)zshctl}" )
@@ -67,14 +67,14 @@ function __zshctl_actual {
         last=${__zshctl_cache[last:]:-0}
         mtime=$(zstat -F %s +mtime $HOME/.local/state/zshctl/invalidate)
         __zshctl_debug 'CACHE AGE: <%d>' $(( EPOCHSECONDS - last ))
-        if (( (EPOCHSECONDS - last) > 60 || last < mtime )); then
+        if (( ${ZSHCTL_WIPE_CACHE:-0} || (EPOCHSECONDS - last) > 60 || last < mtime )); then
             __zshctl_debug 'WIPE CACHE'
             __zshctl_cache=()
         fi
         out=$__zshctl_cache[key:$key]
         if [[ -z $out ]]; then
             zshctl=(
-                "${words[1]}" __encache zsh ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
+                "${words[1]}" __encache ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
                     "${(@QA)${(z)result_settings[encache]}}"
             )
             __zshctl_debug 'About to call: %s' "${(j: :)${(@qq)${(@)zshctl}}}"

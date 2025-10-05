@@ -12,12 +12,27 @@ __zshctl_debug()
 # This function calls the zshctl program to obtain the completion
 # results and the directive.  It fills the 'out' and 'directive' vars.
 __zshctl_get_completion_results() {
+    # Create a cache for long-running completions.
+    declare -gA __zshctl_cache
     # Makes any changes made by `set` local to the current function.
     local -
     # Turn off job monitoring so we can use `coproc` without chattering.
     set +m
 
-    local requestComp lastParam lastChar args
+    local -a zshctl zsh_words
+    local zsh_quoted_words out code
+
+    # We used to do this manipulation in `zshctl` because we wanted the Zsh
+    # parsed shell words, but we're not always calling `zshctl` with caching so
+    # we shell out to `zsh` to get the words as parsed by Zsh.
+    zsh_quoted_words=$(zsh -c '
+        words=( "${(@QA)${(z)0}}" )
+        (( ${#words} != ${#${(z)${:-${0}x}}} )) && words+=( "" )
+        print "${(j: :)${(@qq)words}}"
+    ' "${COMP_LINE:0:$COMP_POINT}")
+    __zshctl_debug "QUOTED: <%s>" "$zsh_quoted_words"
+    eval "zsh_words=( $zsh_quoted_words )"
+    local incomplete=${zsh_words[-1]}
 
     # Start a spinner with a delay. Spinner animates by waiting on standard
     # input with a timeout. We cancel the timer by writing to its standard
@@ -26,70 +41,125 @@ __zshctl_get_completion_results() {
     # Bonus is that we don't have to wait for a timer to expire and come back
     # around to break a loop, we awake immediately if sleeping on a read.
 
-    # Get the character that we'll put back when the spinner stops spinning.
-    local putback=${COMP_LINE:$COMP_POINT:1}
-    # Variables for the spinner and the invocation of our program.
-    local spinner_PID code
-    local -a spinner execute
-    exec 3>&1
-    {
-        {
-            coproc spinner {
-                local LC_CTYPE=C    # important
-                local charwidth=3   # also, important
-                local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
-                read -t 0.2 -r line # if we have a line we never start spinning
-                [[ -z $line ]] || return
-                printf '\e[?25l' 1>&3 # hide cursor
-                local i=0
-                while [[ -z $line ]]; do
-                    i=$(( (i + $charwidth ) % ${#spin} ))
-                    printf "%s" ${spin:$i:$charwidth} 1>&3
-                    echo -en "\033[1D" 1>&3
-                    read -t 0.1 -r line # snooze
-                done
-                echo -en "${putback:- }\033[1D" 1>&3 # putback
-                printf '\e[?25h' 1>&3 # normal cursor
-            }
-        }
-    } 2>/dev/null
-
-    # Calling ${COMP_WORD[0]} instead of directly zshctl allows to handle aliases.
-    execute=(
+    # Calling ${COMP_WORD[0]} instead of zshctl directly allows to handle aliases.
+    zshctl=(
         ${COMP_WORDS[0]}
         __complete
-        bash "${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}"
-        "$COMP_LINE"
-        "$COMP_POINT"
-        "$COMP_WORDBREAKS"
-        "$COMP_TYPE"
-        "$COMP_KEY"
-        "$COMP_CWORD"
-        "${COMP_WORDS[@]}"
+        "${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}"
+        "${#zsh_words[@]}" "${zsh_words[@]}" "${#zsh_words[@]}"
     )
-    __zshctl_debug 'About to call: %s' "$(IFS=, ; echo "${execute[@]@Q}")"
-    out=$( "${execute[@]}" 2>/dev/null )
+    __zshctl_debug 'About to call: %s' "$(IFS=, ; echo "${zshctl[@]@Q}")"
+    out=$( "${zshctl[@]}" 2>/dev/null )
     code=$?
 
-    # Stop the spinner and wait for it to finish. If we do not wait we might
-    # exit this function and get job control spew on the terminal because our
-    # local settings to hush the spew will be reset when we return.
-    echo close >&"${spinner[1]}"
-    wait $spinner_PID
-    exec 3>&-
-
-    # Oh, well.
+    # We could display a cleaner error message using our error message display
+    # below, but for now we just bail.
     if (( code )); then
         __zshctl_debug "Completion failed: $code"
         return
     fi
 
-    __zshctl_debug "$out"
+    __zshctl_debug '%s' "$out"
 
     # Evaluate the output from our program.
     typeset -A result_settings result_descriptions
     typeset -a result_completions
     eval $out
+
+    local key=${result_settings[key]} last mtime now=$(date +%s)
+    if [[ -n $key ]]; then
+        __zshctl_debug 'CACHE PROBE'
+        if [[ ! -e $HOME/.local/state/zshctl/invalidate ]]; then
+            mkdir -p $HOME/.local/state/zshctl
+            touch $HOME/.local/state/zshctl/invalidate
+        fi
+        last=${__zshctl_cache[last:]:-0}
+        mtime=$(stat -c %Y $HOME/.local/state/zshctl/invalidate)
+        __zshctl_debug "CACHE AGE: $(( EPOCHSECONDS - last ))"
+        if (( ${ZSHCTL_WIPE_CACHE:-0} || (EPOCHSECONDS - last) > 60 || last < mtime )); then
+            __zshctl_debug 'WIPE CACHE'
+            __zshctl_cache=()
+        fi
+        out=${__zshctl_cache[key:$key]}
+        __zshctl_debug '%s' "$out"
+        if [[ -z $out ]]; then
+            # Get the character that we'll put back when the spinner stops spinning.
+            local putback=${COMP_LINE:$COMP_POINT:1}
+            # Variables for the spinner and the invocation of our program.
+            local spinner_PID code
+            local -a spinner
+            exec 3>&1
+            {
+                {
+                    coproc spinner {
+                        local LC_CTYPE=C    # important
+                        local charwidth=3   # also, important
+                        local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
+                        read -t 0.2 -r line # if we have a line we never start spinning
+                        [[ -z $line ]] || return
+                        printf '\e[?25l' 1>&3 # hide cursor
+                        local i=0
+                        while [[ -z $line ]]; do
+                            i=$(( (i + $charwidth ) % ${#spin} ))
+                            printf "%s" ${spin:$i:$charwidth} 1>&3
+                            echo -en "\033[1D" 1>&3
+                            read -t 0.1 -r line # snooze
+                        done
+                        echo -en "${putback:- }\033[1D" 1>&3 # putback
+                        printf '\e[?25h' 1>&3 # normal cursor
+                    }
+                }
+            } 2>/dev/null
+            __zshctl_debug 'CACHE MISS'
+            zshctl=(
+                "${COMP_WORDS[0]}" __encache ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
+            )
+            # Because `zshctl` so so extensible, we won't always know who wrote
+            # the command set the value of `encache`, if they did it correctly,
+            # so we make a defensive parse and stringify using Zsh before we
+            # evaluate. This will wrap `;` in a single quote, for example.
+            local encache
+            encache=$(
+                zsh -c '
+                    print "${(j: :)${(@qq)${(@QA)${(z)0}}}}"
+                ' "${result_settings[encache]}"
+            )
+            __zshctl_debug 'ENCACHE: <%s>\n' "$encache"
+            eval "zshctl+=( ${result_settings[encache]} )"
+
+            # Invoke our call to retrieve the cachable completions.
+            __zshctl_debug 'About to call: %s' "$(IFS=, ; echo "${zshctl[@]@Q}")"
+            out=$( "${zshctl[@]}" 2>/dev/null )
+            code=$?
+
+            # Stop the spinner and wait for it to finish. If we do not wait we might
+            # exit this function and get job control spew on the terminal because our
+            # local settings to hush the spew will be reset when we return.
+            echo close >&"${spinner[1]}"
+            wait $spinner_PID
+            exec 3>&-
+
+            # We could display a cleaner error message using our error message
+            # display below, but for now we just bail.
+            if (( code )); then
+                __zshctl_debug "Completion failed: $code"
+                return
+            fi
+        else
+            __zshctl_debug 'CACHE HIT'
+        fi
+        result_completions=()
+        __zshctl_debug "$out"
+        eval "$out"
+        __zshctl_debug EVALED
+        if [[ -z ${result_settings[message]} ]]; then
+            __zshctl_cache[key:$key]=$out
+            __zshctl_cache[last:]=$EPOCHSECONDS
+            __zshctl_debug 'ENCACHE OUTPUT'
+        fi
+    fi
+
+    # Some complaints here, but we did manage to figure it out.
 
     # For Bash completions all we can do is append the prefix.
     #if [[ -n ${result_settings[prefix]} && ${result_settings[prefix]} != *= ]]; then
@@ -102,6 +172,63 @@ __zshctl_get_completion_results() {
     #    result_settings[nospace]=1
     #    result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
     #fi
+
+    # At the time of writing, it appears that Bash is unable to complete `!` nor
+    # `>` so adding strings to `COMPREPLY` that lead with those characters
+    # ensures that they are displayed, but they cannot be acted upon.
+    if [[ -n "${result_settings[message]}" ]]; then
+        __zshctl_debug ERROR
+        COMPREPLY+=( "! ERROR" )
+        COMPREPLY+=( "> ${result_settings[message]}" )
+        return
+    fi
+
+    # An older comment.
+    #
+    # Bash creates "words" by splitting on all sorts of characters that do not
+    # delineate shell words. If we are at an equals or our previous character
+    # was an equals, we do not need the asignee part of the prefix.
+    #
+    # It appears that we have to do some cleanup based on the words given to use
+    # by Bash that we did not use to descent the tree. We used a Zsh shell words
+    # parse of the line.
+    #
+    # And yet I do not understand why we are stripping the delimiter from our
+    # completion_match if we used Zsh split words.
+    #
+    # Oh, it is perhaps because we have split on a delimiter, and so now we have
+    # to shorten our match based on our Zsh words to be the prefix of Bash
+    # words, stripping up to the delimiter.
+    if [[ -n ${result_settings[delimiter]} &&
+        (
+            ${COMP_WORDS[${COMP_CWORD}]} = ${result_settings[delimiter]} ||
+            ${COMP_WORDS[$(( COMP_CWORD - 1 ))]} = ${result_settings[delimiter]}
+        )
+    ]]; then
+        result_settings[prefix]=${result_settings[prefix]#*${result_settings[delimiter]}}
+        # TODO Above to Bash.
+        result_settings[incomplete]=${result_settings[incomplete]#*${result_settings[delimiter]}}
+        result_completions=( "${result_completions[@]#*${result_settings[delimiter]}}" )
+    fi
+
+    # We are going to smoosh the way Zsh does.
+    if [[ -n ${result_settings[suffix]} ]]; then
+        result_settings[nospace]=1
+    fi
+
+    # Add the prefix to all completion matches.
+    result_completions=( "${result_completions[@]/#/${result_settings[prefix]}}" )
+    # Add the suffix to all completion matches.
+    result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
+    # Include only the completions that match our incomplete match.
+    local -a filtered=()
+    local comp
+    for comp in "${result_completions[@]}"; do
+        [[ $comp == ${incomplete}* ]] && filtered+=( "$comp" )
+    done
+    result_completions=( "${filtered[@]}" )
+
+
     # We will probably not set no space independent of a suffix.
     if (( ${result_settings[nospace]} )); then
         compopt -o nospace
@@ -276,7 +403,7 @@ __zshctl_handle_standard_completion_case() {
     # Short circuit to optimize if we don't have descriptions
     if [[ "${result_settings[descriptions]}" -ne 1 ]]; then
         __zshctl_debug "trying the cheap reply"
-        IFS=$'\n' read -ra COMPREPLY -d '' < <(compgen -W "${result_completions[*]}" -- "${result_settings[incomplete]}")
+        IFS=$'\n' read -ra COMPREPLY -d '' < <(compgen -W "${result_completions[*]}" -- "${incomplete}")
         __zshctl_debug "$(IFS=$'\n'; echo "${COMPREPLY[@]}")"
         return 0
     fi
@@ -376,9 +503,16 @@ __start_zshctl()
     COMPREPLY=()
 
     __zshctl_debug "========= zshctl completion =========="
+    __zshctl_debug 'COMP_LINE: %q' "$COMP_LINE"
+    __zshctl_debug 'COMP_POINT: %q' "$COMP_POINT"
+    __zshctl_debug 'COMP_WORDBREAKS: %q' "$COMP_WORDBREAKS"
+    __zshctl_debug 'COMP_TYPE: %s' "$COMP_TYPE"
+    __zshctl_debug 'COMP_KEY: %s' "$COMP_KEY"
+    __zshctl_debug 'COMP_CWORD: %s' "$COMP_CWORD"
+
     local w
     for w in "${COMP_WORDS[@]}"; do
-        __zshctl_debug "COMP_WORD: $w"
+        __zshctl_debug 'COMP_WORD: %q' "$w"
     done
 
     # We start off with `COMP_WORDS` and `COMP_CWORD`. The words in
@@ -392,7 +526,7 @@ __start_zshctl()
     # `--protocol=ftp`, etc. You can only replace a specific "WORD" so
     # `COMP_WORDBREAKS` tends to include `=`.
     #
-    # Tends to include because it's a global. You cannot make changes that are
+    # "Tends to" include because it's a global. You cannot make changes that are
     # local to a specific completion. The source for the `git` completion will
     # add the colon to `COMP_WORDBREAKS` if it is not already there.
     #
@@ -429,8 +563,8 @@ __start_zshctl()
     # command line is run.
     #
     # Note that Zsh does not have these problems. It recognizes process
-    # expansion and substitution as a word of the future and makes it part of
-    # a single word. The words you recive will have expansion and substitution
+    # expansion and substitution as a word of the future and makes it part of a
+    # single word. The words you recive will have expansion and substitution
     # quoted and they will be split on space. Zsh has the ability to filter
     # completions with prefixes and append suffixes before display, so it can
     # work with full words.
@@ -446,9 +580,7 @@ __start_zshctl()
     __zshctl_debug 'COMP_LINE<%s> COMP_POINT<%s> <%s>' \
         "$COMP_LINE" "$COMP_POINT" "${COMP_LINE:$COMP_POINT:3}"
 
-    local out directive
     __zshctl_get_completion_results
-    #__zshctl_process_completion_results
 }
 
 complete -o default -F __start_zshctl zshctl

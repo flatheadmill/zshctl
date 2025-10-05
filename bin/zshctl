@@ -206,77 +206,53 @@ function _zshctl_descend_completion {
 }
 
 function _zshctl_completed {
-    if [[ $shell = bash ]]; then
-        # An older comment.
-        #
-        # Bash creates "words" by splitting on all sorts of characters
-        # that do not delineate shell words. If we are at an equals or our
-        # previous character was an equals, we do not need the asignee
-        # part of the prefix.
-        #
-        # It appears that we have to do some cleanup based on the words
-        # given to use by Bash that we did not use to descent the tree. We
-        # used a Zsh shell words parse of the line.
-        #
-        # And yet I do not understand why we are stripping the delimiter
-        # from our completion_match if we used Zsh split words.
-        #
-        # Oh, it is perhaps because we have split on a delimiter, and so
-        # now we have to shorten our match based on our Zsh words to be
-        # the prefix of Bash words, stripping up to the delimiter.
-        if [[
-            -n $zshctl[args:delimiter] &&
-            (
-                $_zshctl_bash_words[$_zshctl_cword] = $zshctl[args:delimiter] ||
-                $_zshctl_bash_words[$(( _zshctl_cword - 1 ))] = $zshctl[args:delimiter]
-            )
-        ]]; then
-            zshctl[args:prefix]=${zshctl[args:prefix]#*$zshctl[args:delimiter]}
-            zshctl[args:incomplete]=${zshctl[args:incomplete]#*$zshctl[args:delimiter]}
-            completion_match=( "${(@)completion_match#*$zshctl[args:delimiter]}" )
-        fi
-        # We are going to smoosh the way Zsh does.
-        if [[ -n $zshctl[args:suffix] ]]; then
-            zshctl[args:nospace]=1
-        fi
-        # Add the prefix to all completion matches.
-        completion_match=( "${(@)completion_match/#/$zshctl[args:prefix]}" )
-        # Add the suffix to all completion matches.
-        completion_match=( "${(@)^completion_match}$zshctl[args:suffix]" )
-        # Include only the completions that match our incomplete match.
-        completion_match=( "${(@M)completion_match:#$zshctl[args:incomplete]*}" )
-    fi
-    for hit in nospace prefix suffix filenames incomplete files descriptions message key valid encache; do
-        printf 'result_settings[%s]=%s\n' $hit ${(qq)zshctl[args:$hit]}
+    local key
+    for key in descriptions encache filenames files incomplete key message nospace prefix suffix valid; do
+        printf 'result_settings[%s]=%s\n' $key "${(@qq)zshctl[args:$key]}"
+        printf 'result_settings[%s]=%s\n' $key "${(@qq)zshctl[args:$key]}" >> $zshctl[args:debug]
     done
-    for hit in "${(@)completion_match}"; do
-        [[ $zshctl[args:incomplete] != -* && $hit = -* ]] && continue
-        printf 'result_completions+=( %s )\n' ${(qq)hit}
-        if (( ${+completions[$hit]} )); then
+    for key in "${(@)completion_match}"; do
+        [[ $zshctl[args:incomplete] != -* && $key = -* ]] && continue
+        printf 'result_completions+=( %s )\n' ${(qq)key}
+        if (( ${+completions[$key]} )); then
             printf 'result_settings[_key]=%s; result_descriptions[${result_settings[_key]}]=%s\n' \
-                ${(qq)hit} ${(qq)completions[$hit]}
+                ${(qq)key} ${(qq)completions[$key]}
         fi
     done
 }
 
+function _zshctl_completion_arguments {
+    typeset next=${1:-} words=()
+    zshctl+=(
+        args:debug ${2:-/dev/null}
+        args:flags 0        # Are we using this? Can we avoid it?
+        args:completed 0
+        args:filenames 0
+    )
+    typeset -i cword=${3:-}
+    shift 3
+    typeset words=( "${@[2,$cword]}" )
+    shift $cword
+    typeset -i current=${1:-}
+    shift
+    ((current--))
+    zshctl[args:incomplete]=$words[$current]
+    ((current--))
+    words=( "${(@)words[1,$current]}" )
+    $next "$@"
+}
+
+# Meant to be called from our completion functions, so no defensive programming
+# as of yet.
 function _zshctl_complete {
-    zshctl+=( args:debug ${2:-} args:mode completion args:flags 0 args:completed 0 args:filenames 0  )
+    zshctl+=( args:mode completion )
     # Purposfully skip the program name in position 5, we are not going to use
     # it.
-    typeset shell=${1:-} words=() _zshctl_bash_words=()
-    integer _zshctl_cword
-    shift 2
-    typeset func=:execute args=:args
+    typeset _zshctl_bash_words=() func=:execute args=:args
     # No completion function, return. We really need to follow structure on
     # behalf of the user, not guess the intent.
-    case $shell in
+    case x:$shell in
     (zsh)
-        _zshctl_cword=${1:-}
-        shift 2
-        ((_zshctl_cword--))
-        zshctl[args:incomplete]=$@[$_zshctl_cword]
-        ((_zshctl_cword--))
-        words=( "$@[1,$_zshctl_cword]" )
         ;;
     (bash)
         line=${1:-}             # COMP_LINE
@@ -284,13 +260,13 @@ function _zshctl_complete {
         # wordbreaks=${3:-}     # COMP_WORDBREAKS
         # kind=${4:-}           # COMP_TYPE
         # key=${5:-}            # COMP_KEY (ASCII last keystroke?)
-        _zshctl_cword=${6:-}
+        cword=${6:-}
         shift 6
-        ((_zshctl_cword++))     # Bash is zero indexed.
-        print -l -- "CWORD: $_zshctl_cword" >> $zshctl[args:debug]
+        ((cword++))     # Bash is zero indexed.
+        print -l -- "CWORD: $cword" >> $zshctl[args:debug]
         print -l -- "$@" >> $zshctl[args:debug]
         # We preserve this for inspection at the end of completion.
-        _zshctl_bash_words=( "$@" )
+        _zshctl_bash_words=( "$@[1,$cword]" )
         # I've preserved this comment even though I don't know what it means.
         #
         # We clip for Bash. It doesn't seem to do mid-word completion
@@ -316,7 +292,6 @@ function _zshctl_complete {
             zshctl[args:incomplete]=$words[-1]
             words=( "${(@)words[2,-2]}" )
         fi
-        print -l -- snert snert "${(@)words}" >> $zshctl[args:debug]
         print "<$line> <${line[1,$point]}> <$point>" >> $zshctl[args:debug]
         ;;
     esac
@@ -324,10 +299,15 @@ function _zshctl_complete {
 }
 
 function _zshctl_encache {
+    zshctl+=(
+        args:debug ${1:-/dev/null}
+        args:flags 0        # Are we using this? Can we avoid it?
+        args:completed 0
+        args:filenames 0
+    )
     include parse
-    zshctl+=( args:debug ${2:-} args:flags 0 args:completed 0 args:filenames 0  )
-    typeset shell=${1:-} encache=${3:-}
-    shift 3
+    typeset encache=${2:-}
+    shift 2
     typeset func=${encache//#:encache/:execute}
     if [[ ${${_zshctl_commands[$func]}[1]} = '/' ]]; then
         source $_zshctl_commands[$func]
@@ -431,7 +411,7 @@ function {
     case ${1:-} in
     (__complete)
         shift
-        _zshctl_complete "$@"
+        _zshctl_completion_arguments _zshctl_complete "$@"
         ;;
     (__encache)
         shift

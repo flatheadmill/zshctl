@@ -759,7 +759,7 @@ function parser {
             integer top=2
             while [[ $funcstack[$top] != (:args:*|:args) ]]; do
                 ((top++))
-                (( top <= ${#funcstack} )) || abend 'must be called from an execute function'
+                (( top <= ${#funcstack} )) || abend 'must be called from an args function'
             done
             printf 'zshctl[args:matched]=%s\n' ${(qqq)option[matched]}
             printf 'zshctl[args:state]=%s\n' ${(qqq)zshctl[args:state]}
