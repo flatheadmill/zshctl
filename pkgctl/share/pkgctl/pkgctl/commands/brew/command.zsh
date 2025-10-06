@@ -1,4 +1,4 @@
-function execute:brew {
+function :execute:brew {
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'

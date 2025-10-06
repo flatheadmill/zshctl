@@ -1,6 +1,6 @@
 #!/zshctl/bin/zshctl
 
-function execute:apk {
+function :execute:apk {
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'

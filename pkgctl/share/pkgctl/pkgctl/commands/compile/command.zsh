@@ -1,4 +1,5 @@
-function execute:compile {
+function :execute:compile {
+    include heredoc
     typeset version=$NEXT_VERSION
     # Get the seconds since the epoch of the commit.
     date=$(git -C /zshctl show --no-patch --format=%ct)
