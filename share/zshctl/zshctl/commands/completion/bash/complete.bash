@@ -9,6 +9,28 @@ __zshctl_debug()
     fi
 }
 
+__zshctl_error_message() {
+    local message=${1:-}
+    # Notes on an earlier message display strategy.
+    #
+    # At the time of writing, it appears that Bash is unable to complete `!` nor
+    # `>` so adding strings to `COMPREPLY` that lead with those characters
+    # ensures that they are displayed, but they cannot be acted upon.
+    #COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
+    #COMPREPLY+=( "> ${result_settings[message]}" )
+
+    # But instead, we'll do like Cobra does and blather all over the user's
+    # terminal with printf. The prompt format is only available from Bash 4.4.
+    printf '\n%s\n\n%s' "$message" "${PS1@P}${COMP_LINE[@]}"
+
+    # It's amazing that this works, scribbling all over the terminal like this,
+    # especially with the `kill -WINCH $$` on SIGINT and SIGQUIT.
+
+    # We do not want Bash to display anything other than our message.
+    compopt +o default
+    COMPREPLY=()
+}
+
 # This function calls the zshctl program to obtain the completion
 # results and the directive.  It fills the 'out' and 'directive' vars.
 __zshctl_get_completion_results() {
@@ -121,6 +143,8 @@ __zshctl_get_completion_results() {
     } 2> /dev/null
     exec {spinner_fd}>&-
 
+    # Keep in mind that your long-running completions within `zshctl` should
+    # respond correctly to SIGINT and SIGQUIT or none of this works.
     __zshctl_spinner_shutdown() {
         typeset code=${1:-} tab=$'\t'
         shift
@@ -135,9 +159,13 @@ __zshctl_get_completion_results() {
             wait $spinner_PID
             printf '%s\033[1D\e[?25h' "${putback:- }" 1>&2 # putback and normal cursor
 
-
-            # The prompt format is only available from bash 4.4.
-            printf '\nUser interrupt.\n\n%s' "${PS1@P}${COMP_LINE[@]}"
+            # Respond to the user. Note that with Ctl+\ the cursor is supposed
+            # to be left in the same position so that the user can keep typing.
+            # With no background process, this will not redraw the line, but if
+            # here is no backround process why press Ctl+\? Our implementation
+            # will redraw for both Ctl+C and Ctl+\ and you will be able to
+            # continue editing for both.
+            __zshctl_error_message 'User interrupt.'
 
             # We do not want Bash to display anything other than our message.
             compopt +o default
@@ -145,8 +173,6 @@ __zshctl_get_completion_results() {
 
             # Kick readline.
             kill -WINCH $$
-
-            return 0
             ;;
         # Otherwise, we can do a graceful shutdown down the spinner.
         (*)
@@ -194,8 +220,7 @@ __zshctl_get_completion_results() {
     out=$( "${zshctl[@]}" 2>/dev/null )
     code=$?
 
-    # We could display a cleaner error message using our error message display
-    # below, but for now we just bail.
+    # Return on an error from `zshctl`, possible Ctl+C or Ctl+\.
     if (( code )); then
         __zshctl_spinner_shutdown $code
         return 0
@@ -247,11 +272,10 @@ __zshctl_get_completion_results() {
             out=$( "${zshctl[@]}" 2>/dev/null )
             code=$?
 
-            # We could display a cleaner error message using our error message
-            # display below, but for now we just bail.
+            # Return on an error from `zshctl`, possible Ctl+C or Ctl+\.
             if (( code )); then
                 __zshctl_spinner_shutdown $code
-                return
+                return 0
             fi
         else
             __zshctl_debug 'CACHE HIT'
@@ -270,7 +294,16 @@ __zshctl_get_completion_results() {
     # Graceful spinner shutdown.
     __zshctl_spinner_shutdown 0
 
-    # Some complaints here, but we did manage to figure it out.
+    # From here on out you get the default behavior for Ctl+C and Ctl+\. This
+    # means that the user will on rare occasion have a different experience when
+    # interrupting a completion, but it will be one of only two experiences, our
+    # custom experience, the default experience, and the line with the hidden
+    # edit will not be experienced. We can tell you why you got one or the
+    # other, so it is not so mysterious. Attempting to extend the spinner life
+    # so that there is only one experience is futile, there will always be a
+    # window and you're just reducing the odd, not eliminiating the case.
+
+    # On to processing our completions.
 
     # Compare the following to the `activeHelp` implementation in the Cobra
     # completions of `kubectl` and determine if what they're doing actually
@@ -280,25 +313,11 @@ __zshctl_get_completion_results() {
     # Would require a better understaning of readline and WINCH.
     #
     if [[ -n "${result_settings[message]}" ]]; then
+        # Print the error message, we do not offer a helper message option, just
+        # an error message.
         __zshctl_debug 'MESSAGE <%s>' "${result_settings[message]}"
-
-        # Notes on an earlier message display strategy.
-        #
-        # At the time of writing, it appears that Bash is unable to complete `!`
-        # nor `>` so adding strings to `COMPREPLY` that lead with those
-        # characters ensures that they are displayed, but they cannot be acted upon.
-        #COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
-        #COMPREPLY+=( "> ${result_settings[message]}" )
-
-        # But instead, we'll do like Cobra does and blather all over the user's
-        # terminal with printf. The prompt format is only available from Bash 4.4.
-        printf '\n%s\n\n%s' "${result_settings[message]}" "${PS1@P}${COMP_LINE[@]}"
-
-        # We do not want Bash to display anything other than our message.
-        compopt +o default
-        COMPREPLY=()
-
-        # Please display nothing.
+        __zshctl_error_message "${result_settings[message]}"
+        # Please display out carefully constructed nothing.
         return 0
     fi
 
