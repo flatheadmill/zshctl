@@ -55,54 +55,69 @@ __zshctl_get_completion_results() {
     # There are many different behaviors you'll see, but the worst one by far is
     # the when hitting Ctl+C the cursor will move to the first characer of the
     # current line, leaving a ^C at it's previous position. If you press enter,
-    # it will run the command but the first character will be stripped.
-    # Therefore, you should never create a `zshctl` shebang program with
-    # completions named `grm` or the like because it will get edited to `rm`.
+    # it will run the command but the first character will be stripped. You will
+    # not have seen that the first character has been deleted. It is effectively
+    # a hidden edit, so if the user decided to press enter because the command
+    # looks benign if incompleted, they will not run the program displayed in
+    # the terminal. They will run a program with the same name less the frist
+    # character. Therefore, you if you were to ever create a `zshctl` shebang
+    # program with completions named `grm`, Bash completions would eventually
+    # edit the name to `rm` and if you're lucky you'll just see an error
+    # message from `rm`.
     #
-    # All of the tricks employed here are to prevent this alarming behavior and
-    # to accept whatever other behaviors result. These may include leaving
-    # spinner characters on the terminal, or displaying the default completion
-    # as a result of pressing Ctl+L. It also means that we have to carefully
-    # exit every path in our code, we can't have one tidy `trap` with a shutdown
-    # function to do it all for us.
-    #
-    # What appears to be working, for now, is `kill -WINCH $$` which tells
-    # readline that the window size changed, so it recalcuates its cursor
-    # position, possibly redraws the line. This signal is not used any other
-    # Bash completion on my Ubuntu instance, so it will our trade secret.
-    #
-    # As far as I can tell, this is a problem for any this is a problem for any
-    # Bash completion that can be interrupted, as demonstrated by kubectl,
-    # gcloud, and others. The `WINCH` signal forces `readline` to recalculate
-    # cursor position and prevents the corruption.
+    # Both `kubectl` and `gcloud` exhibit this behavior in response to Ctl+C.
+    # You can see the user experience below, where the user has pressed Ctl+C
+    # during a background process and then presses enter/return.
     #
     #   alan@stuttgart:~/code/flatheadmill/zshctl$ kubectl get ns ^C
     #
     #   ubectl: command not found
     #   alan@stuttgart:~/code/flatheadmill/zshctl$
     #
-    # The above is sending an interrupt to `kubectl` on Bash on Linux.
+    # It is not a product of the backspaces printed during spinner animation.
+    # `gcloud` does the same. It has a spinner animation, but `kubectl` does
+    # not. The problem is reproducible in the completions of these other
+    # programs.
     #
     # Believing that this behavior was a product of the backspaces in the
     # spinner meant that I spent a lot of time suspecting the spinner.
     #
+    # All of the tricks employed here are to prevent this alarming behavior and
+    # to accept whatever other behaviors result. These may include leaving
+    # spinner characters on the terminal, or displaying the default completion
+    # as a result of pressing Ctl+C. It also means that we have to carefully
+    # exit every path in our code, we can't have one tidy `trap` with a shutdown
+    # function to do it all for us.
+    #
+    # What appears to be working, for now, is `kill -WINCH $$` which tells
+    # readline that the window size changed, so it recalcuates its cursor
+    # position, possibly redraws the line. This signal is not used any other
+    # Bash completion on my Ubuntu instance, so it will be our trade secret.
+    #
+    # As far as I can tell, this is a problem for any this is a problem for any
+    # Bash completion that can be interrupted, as demonstrated by kubectl,
+    # gcloud, and others. I assume that the `WINCH` signal forces `readline` to
+    # recalculate cursor position and prevents the corruption. I have yet to see
+    # a downside to sending the `WINCH`, which would only be sent in response to
+    # Ctl+C or Ctl+\, not during normal, uninterrupted completion.
+    #
     # A final note to self to say that the line editing leaving a butchered
-    # command in user's prompt was what you wanted to solve for, not for anthing
-    # else and you are going to live with the redraws, default completions, and
-    # whatever else.
+    # command in user's prompt was what you wanted to solve for, not for
+    # anything else and you are going to live with the redraws, default
+    # completion spew, and whatever else.
     #
     # Note subsequent to the final note. These completions are working pretty
     # consistently, exhibiting our designed behavior for the most part,
-    # occasiontally you will catch it with a Ctl+C after the spinner has
-    # stopped and then it will exhibit default Bash behavior for completions
-    # with no background processes.
+    # occasionally you will catch it with a Ctl+C after the spinner has stopped
+    # and then it will exhibit default Bash behavior for completions with no
+    # background processes.
 
     # We always run the spinner. It won't start spinning until 200ms have
     # and will alter the input line if it does not actually spin. We listen on
     # standard in and we used to send it messages to stop it, but now we just
     # wait for the next iteration. We may restore message sending.
     local spinner_fd
-    exec {spinner_fd}>&1
+    exec {spinner_fd}>&1    # Copy standard out.
     {
         # When error-free, the spinner is stopped by sending a message to break
         # it's loop. To handle Ctl+C and Ctl+\ we set a trap.
@@ -111,10 +126,22 @@ __zshctl_get_completion_results() {
             # We set a trap to ensure that the spinner will stop, that it will
             # not continue to spin if other steps in this completion fail to
             # terminate it correctly. We set a flag and then we close standard
-            # in. We were having a problem where the reads would not wake up
-            # after the signal and required a subsequent signal, the user would
-            # have to press Ctl+C a second time. Closing standard in will wake
-            # any reads with an EOF regardless of timers.
+            # in.
+            #
+            # Closing standard in seems obvious now, but it was not always there
+            # and I was having a problem where the reads would not wake up after
+            # the signal and required a subsequent signal, the user would have
+            # to press Ctl+C a second time. Closing standard in will wake any
+            # reads with an EOF regardless of timers.
+            #
+            # Apparently, sending signals can cause Bash to lose track of its
+            # read timer. This behavior is arbitrary. Most of the time the read
+            # would timeout and leave the loop, but sometimes it be stuck on a
+            # read. Not sure if this was a race between the loop and the trap,
+            # or if a waiting read would just break on occasion.
+            #
+            # Closing standard in is better in any case. It means that the
+            # spinner begins to stop immediately, not on a next tick.
             __zshctl_spinner_trap() {
                 interrupted=1
                 exec 0>&-
@@ -141,7 +168,7 @@ __zshctl_get_completion_results() {
             # up properly, that's okay so long as the spinner is not spinning.
         }
     } 2> /dev/null
-    exec {spinner_fd}>&-
+    exec {spinner_fd}>&-    # Close our copy, it has been inherited.
 
     # Keep in mind that your long-running completions within `zshctl` should
     # respond correctly to SIGINT and SIGQUIT or none of this works.
@@ -151,11 +178,10 @@ __zshctl_get_completion_results() {
         __zshctl_debug 'SPINNER SHUTDOWN: code <%s>, spinner_PID <%s>, ${spinner[1]} <%s>, spinner_fd <%s>' $code $spinner_PID ${spinner[1]} $spinner_fd
         case $code in
         (130|131)
-            # When we get SIGINT or SIGQUIT, the user is impatient, but they are
-            # going to have to wait until the next spinner tick because things
-            # are in a fragile state. Sending message down the pipe if the pipe
-            # is closed sometimes causes the shell to exit. The spinner will
-            # stop spinning soon enough.
+            # When `zshctl` ends with SIGINT or SIGQUIT, it means that our
+            # spinner also got the same signal and it is now shutting down
+            # because of its trap. The trap has closed standard input and marked
+            # a flag that will cause the animation loop to exit.
             wait $spinner_PID
             printf '%s\033[1D\e[?25h' "${putback:- }" 1>&2 # putback and normal cursor
 
@@ -167,16 +193,23 @@ __zshctl_get_completion_results() {
             # continue editing for both.
             __zshctl_error_message 'User interrupt.'
 
-            # We do not want Bash to display anything other than our message.
-            compopt +o default
-            COMPREPLY=()
-
-            # Kick readline.
+            # Our stupendous Readline kick.
             kill -WINCH $$
             ;;
-        # Otherwise, we can do a graceful shutdown down the spinner.
         (*)
+            # Otherwise, we can do a graceful shutdown down the spinner.
+            #
+            # We could try sending a signal to the spinner someday, but this
+            # currently works and in all my fiddling I found so many things that
+            # should work that didn't, writing to closed file handles should be
+            # benign but it cased Ctl+\ to exit bash, for example. A simple
+            # `kill -TERM` on the spinner made to that subseqent tab would
+            # insert a tab instead of complete. When I'm ready to detect
+            # side-effects, I may return to put a `kill -INT $spinner_PID` here.
+            #
+            # Appears to work, `kill -INT`.
             echo bye >&"${spinner[1]}" 2>/dev/null
+            # kill -INT $spinner_PID 2>/dev/null
             wait $spinner_PID
             printf '%s\033[1D\e[?25h' "${putback:- }" 1>&2 # putback and normal cursor
             ;;
@@ -302,6 +335,12 @@ __zshctl_get_completion_results() {
     # other, so it is not so mysterious. Attempting to extend the spinner life
     # so that there is only one experience is futile, there will always be a
     # window and you're just reducing the odd, not eliminiating the case.
+    #
+    # Appears to have resolved the hidden edit. Apprached this with no
+    # confidence that it could be resolved. Amazed that it works and works so
+    # reliably, consistently. Struggled to find the proper concurrency.
+    #
+    # No one will ever use this code. Pity.
 
     # On to processing our completions.
 
