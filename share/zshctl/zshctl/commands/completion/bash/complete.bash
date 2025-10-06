@@ -9,15 +9,24 @@ __zshctl_debug()
     fi
 }
 
-# We run out actual introspection of `zshctl` and animate our spinner in a
-# separate process so we can set signal handlers and have them reap, and
-# duplicate file handles without changing them in the user's shell.
-__zshctl_spinnered() {
+# This function calls the zshctl program to obtain the completion
+# results and the directive.  It fills the 'out' and 'directive' vars.
+__zshctl_get_completion_results() {
+    # Create a cache for long-running completions.
+    declare -gA __zshctl_cache
+    # Makes any changes made by `set` local to the current function.
+    local -
+    # Turn off job monitoring so we can use `coproc` without chattering.
+    set +m
+
+    # Spinner initialization.
+
     # Get the character that we'll put back when the spinner stops spinning.
     local putback=${COMP_LINE:$COMP_POINT:1}
     # Variables for the spinner and the invocation of our program.
     local spinner_PID=0 code spinner_fd=0 unspun=0
     local -a spinner
+
     # What follows is a discussion of the spinner, but more importantly of
     # interruption of background processes in Bash completion functions.
     #
@@ -60,72 +69,72 @@ __zshctl_spinnered() {
     # else and you are going to live with the redraws, default completions, and
     # whatever else.
 
-    #
-    unspin() {
-        local signal=${1:-}
-        shift
-        # Stop the spinner and wait for it to finish. If we do not wait we might
-        # exit this function and get job control spew on the terminal because our
-        # local settings to hush the spew will be reset when we return.
-        __zshctl_debug 'CALLED <%s> <%s> <%s> <%s>' $unspun $signal ${spinner[1]} $spinner_PID
-        (( unspun )) && return
-        __zshctl_debug 'STILL SPINNING'
-        unspun=1
-        local pid=$spinner_PID
-        (( ${spinner[1]:-0} )) && echo $signal >&"${spinner[1]}" 2>/dev/null
-        if [[ $signal = OVER ]]; then
-            __zshctl_debug 'PUTBACK: <%s>\n' "${putback:- }"
-            printf '%s\033[1D' "${putback:- }" 1>&2 # putback
-            printf '\e[?25h' 1>&2 # normal cursor
-            wait $pid
-        elif [[ $signal = ERROR ]]; then
-            printf '\e[?25h' 1>&2 # normal cursor
-            wait $pid
-        fi
-    }
-    # We do not actually want to exit immediately when we get Ctl+C (SIGINT) or
-    # Ctl+\ (SIGQUIT) from the user, we want to reap the spinner and `zshctl`.
-    trap 'true' INT QUIT
-
-    if [[ $ZSHCTL_DISABLE_SPINNER -eq 1 ]]; then
-        unspun=1
-    else
+    # We always run the spinner. It won't start spinning until 200ms have
+    # and will alter the input line if it does not actually spin. We listen on
+    # standard in and we used to send it messages to stop it, but now we just
+    # wait for the next iteration. We may restore message sending.
+    local spinner_fd
+    exec {spinner_fd}>&1
     {
-        {
-            coproc spinner {
-                local interrupted=0
-                putback() {
-                    # echo -en "${putback:- }\033[1D" 1>&2 # putback
-                    interrupted=1
-                    __zshctl_debug 'SPINNER INTERRUPT'
-                }
-                trap putback INT
-                local LC_CTYPE=C    # important
-                local charwidth=3   # also, important
-                local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
-                read -t 0.2 -r line # if we have a line we never start spinning
-                [[ -z $line ]] || return
-                printf '\e[?25l' 1>&2 # hide cursor
-                local i=0
-                while (( ! interrupted )) && [[ -z $line ]]; do
-                    i=$(( (i + $charwidth ) % ${#spin} ))
-                    # (( ! interrupted )) && printf '%s\033[1D' ${spin:$i:$charwidth} 1>&2
-                    printf '%s\033[1D' ${spin:$i:$charwidth} 1>&2
-                    read -t 0.1 -r line # snooze
-                done
-                if false && (( interrupted )); then
-                    __zshctl_debug 'SPINNER SNOOZE'
-                    read -t 1.5 -r line
-                fi
-                __zshctl_debug 'SPINNER DONE: <%s>' $line
-                # Because spinner is scribbling on the terminal, if it is stopped by
-                # an INT, it does not attempt to put back the character it overwrote
-                # with its spinner characters. Leaves a spinner character.
+        coproc spinner {
+            local interrupted=0
+            __zshctl_spinner_signals() {
+                # echo -en "${putback:- }\033[1D" 1>&2 # putback
+                interrupted=1
+                __zshctl_debug 'SPINNER INTERRUPT'
             }
+            trap __zshctl_spinner_signals INT QUIT
+            local LC_CTYPE=C    # important
+            local charwidth=3   # also, important
+            local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
+            read -t 0.2 -r line # if we have a line we never start spinning
+            [[ $interrupted -eq 0 && -z $line ]] || return
+            printf '\e[?25l' 1>&$spinner_fd # hide cursor
+            local i=0
+            while (( ! interrupted )) && [[ -z $line ]]; do
+                i=$(( (i + $charwidth ) % ${#spin} ))
+                # (( ! interrupted )) && printf '%s\033[1D' ${spin:$i:$charwidth} 1>&2
+                printf '%s\033[1D' ${spin:$i:$charwidth} 1>&$spinner_fd
+                read -t 0.1 -r line # snooze
+            done
+            if false && (( interrupted )); then
+                __zshctl_debug 'SPINNER SNOOZE'
+                read -t 1.5 -r line
+            fi
+            __zshctl_debug 'SPINNER DONE: <%s>' $line
+            # Because spinner is scribbling on the terminal, if it is stopped by
+            # an INT, it does not attempt to put back the character it overwrote
+            # with its spinner characters. Leaves a spinner character.
         }
-    }
-    fi
+    } 2> /dev/null
+    exec {spinner_fd}>&-
 
+    __zshctl_spinner_shutdown() {
+        typeset code=${1:-} tab=$'\t'
+        shift
+        __zshctl_debug 'SPINNER SHUTDOWN: code <%s>, spinner_PID <%s>, ${spinner[1]} <%s>, spinner_fd <%s>' $code $spinner_PID ${spinner[1]} $spinner_fd
+        case $code in
+        # When we get SIGINT or SIGQUIT, the user is impatient, but they are
+        # going to have to wait until the next spinner tick because things are
+        # in a fragile state, the spinner will stop spinning soon enough.
+        (130|131)
+            printf '\e[?25h' 1>&2   # normal cursor
+            wait $spinner_pid
+            compopt -o nosort
+            COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
+            COMPREPLY+=( "> User interrupt." )
+            kill -WINCH $$          # Kick readline.
+            ;;
+        # Otherwise, we can do a graceful shutdown down the spinner.
+        (*)
+            echo bye >&"${spinner[1]}" 2>/dev/null
+            wait $spinner_pid
+            printf '%s\033[1D\e[?25h' "${putback:- }" 1>&2 # putback and normal cursor
+            ;;
+        esac
+    }
+
+    # Defensive copy of the spinner pid, because I've seen it get unset.
     local spinner_pid=$spinner_PID
     local -a zshctl zsh_words
     local zsh_quoted_words out code
@@ -163,14 +172,12 @@ __zshctl_spinnered() {
     out=$( "${zshctl[@]}" 2>/dev/null )
     code=$?
 
+
     # We could display a cleaner error message using our error message display
     # below, but for now we just bail.
     if (( code )); then
-        __zshctl_debug "EARLY RETURN: $code"
-        printf '\e[?25h' 1>&2 # normal cursor
-        wait $spinner_pid
-        __zshctl_debug "EARLY RETURN WAIT DONE RETURNING: $code"
-        return 1
+        __zshctl_spinner_shutdown $code
+        return 0
     fi
 
     __zshctl_debug '%s' "$out"
@@ -222,8 +229,7 @@ __zshctl_spinnered() {
             # We could display a cleaner error message using our error message
             # display below, but for now we just bail.
             if (( code )); then
-                unspin OVER
-                __zshctl_debug "Completion failed: $code"
+                __zshctl_spinner_shutdown $code
                 return
             fi
         else
@@ -239,30 +245,8 @@ __zshctl_spinnered() {
             __zshctl_debug 'ENCACHE OUTPUT'
         fi
     fi
-    unspin OVER
-    echo "$out"
-    return 0
-}
 
-# This function calls the zshctl program to obtain the completion
-# results and the directive.  It fills the 'out' and 'directive' vars.
-__zshctl_get_completion_results() {
-    # Create a cache for long-running completions.
-    declare -gA __zshctl_cache
-    # Makes any changes made by `set` local to the current function.
-    local -
-    # Turn off job monitoring so we can use `coproc` without chattering.
-    set +m
-    local out code
-    out=$(__zshctl_spinnered)
-    code=$?
-    __zshctl_debug 'FINAL OUT: <%s> <%s>\n' $code "$out"
-    if (( code )); then
-        kill -WINCH $$
-        return 0
-    fi
-    return 0
-
+    __zshctl_spinner_shutdown 0
     #echo close >&"${spinner[1]}" 2>/dev/null
     #wait $spinner_PID
     #exec {spinner_fd}>&- 2>/dev/null
@@ -286,7 +270,7 @@ __zshctl_get_completion_results() {
     # ensures that they are displayed, but they cannot be acted upon.
     if [[ -n "${result_settings[message]}" ]]; then
         __zshctl_debug ERROR
-        COMPREPLY+=( "! ERROR" )
+        COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
         COMPREPLY+=( "> ${result_settings[message]}" )
         return
     fi
