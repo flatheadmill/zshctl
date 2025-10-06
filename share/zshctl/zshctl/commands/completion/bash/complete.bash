@@ -194,7 +194,6 @@ __zshctl_get_completion_results() {
     out=$( "${zshctl[@]}" 2>/dev/null )
     code=$?
 
-
     # We could display a cleaner error message using our error message display
     # below, but for now we just bail.
     if (( code )); then
@@ -626,6 +625,12 @@ __zshctl_format_comp_descriptions()
 
 __start_zshctl()
 {
+    # Would work with 4.4 as well, probably. No way for me to support it.
+    if (( BASH_VERSINFO[0] < 5 )); then
+        printf '\nzshctl completion requires Bash 5+\n' >&2
+        return 1
+    fi
+
     local cur prev words cword split
 
     # You can read all about the spinner, it's limitations and whether or not
