@@ -320,10 +320,10 @@ __zshctl_get_completion_results() {
     # `zshctl` code to add a delimiter. It is easy enough to spot a character
     # that might be a problem for Bash, a character that you are indeed using as
     # a delimiter, but the delimeter is not used by the Zsh code.
+
     #
-    # We could check if the delimiter is actually in `COMP_WORDBREAKS`, but
-    # we're currently in "works on my machine" mode until further notice.
     if [[ -n ${result_settings[delimiter]} &&
+        "$COMP_WORDBREAKS" = *${result_settings[delimiter]}* &&
         (
             ${COMP_WORDS[${COMP_CWORD}]} = ${result_settings[delimiter]} ||
             ${COMP_WORDS[$(( COMP_CWORD - 1 ))]} = ${result_settings[delimiter]}
