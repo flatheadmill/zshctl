@@ -9,25 +9,58 @@ __zshctl_debug()
     fi
 }
 
+# We run out actual introspection of `zshctl` and animate our spinner in a
+# separate process so we can set signal handlers and have them reap, and
+# duplicate file handles without changing them in the user's shell.
 __zshctl_spinnered() {
     # Get the character that we'll put back when the spinner stops spinning.
     local putback=${COMP_LINE:$COMP_POINT:1}
     # Variables for the spinner and the invocation of our program.
     local spinner_PID=0 code spinner_fd=0 unspun=0
     local -a spinner
-    # Spinner shutdown. When hitting Ctl+C this will stop the spinner, but it
-    # ordinarily leaves the prompt in a bad state. When you Ctl+C at the prompt
-    # in Bash it will print ^C at the end of the line and then redraw an empty
-    # prompt on a newline. Hitting Ctl+C while spinner is running will leave the
-    # a spinner character on the line before Bash prints an end of line and
-    # redaws the prompt. Other times the new prompt is not drawn and if the user
-    # presses enter, Bash attempts to run the command on the line, but it errors
-    # because first character of the line is deleted. Therefore, you should
-    # never create a `zshctl` shebang program with completions named `grm` or
-    # the like because it will get edited to `rm`.
+    # What follows is a discussion of the spinner, but more importantly of
+    # interruption of background processes in Bash completion functions.
     #
-    # This is as good as it gets for now. The character delete is seen in the
-    # `gcloud` spinner as well in Bash.
+    # There are many different behaviors you'll see, but the worst one by far is
+    # the when hitting Ctl+C the cursor will move to the first characer of the
+    # current line, leaving a ^C at it's previous position. If you press enter,
+    # it will run the command but the first character will be stripped.
+    # Therefore, you should never create a `zshctl` shebang program with
+    # completions named `grm` or the like because it will get edited to `rm`.
+    #
+    # All of the tricks employed here are to prevent this alarming behavior and
+    # to accept whatever other behaviors result. These may include leaving
+    # spinner characters on the terminal, or displaying the default completion
+    # as a result of pressing Ctl+L. It also means that we have to carefully
+    # exit every path in our code, we can't have one tidy `trap` with a shutdown
+    # function to do it all for us.
+    #
+    # What appears to be working, for now, is `kill -WINCH $$` which tells
+    # readline that the window size changed, so it recalcuates its cursor
+    # position, possibly redraws the line. This signal is not used any other
+    # Bash completion on my Ubuntu instance, so it will our trade secret.
+    #
+    # As far as I can tell, this is a problem for any this is a problem for any
+    # Bash completion that can be interrupted, as demonstrated by kubectl,
+    # gcloud, and others. The `WINCH` signal forces `readline` to recalculate
+    # cursor position and prevents the corruption.
+    #
+    #   alan@stuttgart:~/code/flatheadmill/zshctl$ kubectl get ns ^C
+    #
+    #   ubectl: command not found
+    #   alan@stuttgart:~/code/flatheadmill/zshctl$
+    #
+    # The above is sending an interrupt to `kubectl` on Bash on Linux.
+    #
+    # Believing that this behavior was a product of the backspaces in the
+    # spinner meant that I spent a lot of time suspecting the spinner.
+    #
+    # A final note to self to say that the line editing leaving a butchered
+    # command in user's prompt was what you wanted to solve for, not for anthing
+    # else and you are going to live with the redraws, default completions, and
+    # whatever else.
+
+    #
     unspin() {
         local signal=${1:-}
         shift
@@ -36,23 +69,37 @@ __zshctl_spinnered() {
         # local settings to hush the spew will be reset when we return.
         __zshctl_debug 'CALLED <%s> <%s> <%s> <%s>' $unspun $signal ${spinner[1]} $spinner_PID
         (( unspun )) && return
-        __zshctl_debug 'SENDING SIGNAL'
+        __zshctl_debug 'STILL SPINNING'
         unspun=1
+        local pid=$spinner_PID
         (( ${spinner[1]:-0} )) && echo $signal >&"${spinner[1]}" 2>/dev/null
-        [[ $signal != OVER ]] && exit 1
+        if [[ $signal = OVER ]]; then
+            __zshctl_debug 'PUTBACK: <%s>\n' "${putback:- }"
+            printf '%s\033[1D' "${putback:- }" 1>&2 # putback
+            printf '\e[?25h' 1>&2 # normal cursor
+            wait $pid
+        elif [[ $signal = ERROR ]]; then
+            printf '\e[?25h' 1>&2 # normal cursor
+            wait $pid
+        fi
     }
-    trap 'unspin INT' INT
-    trap 'unspin RETURN' RETURN
+    # We do not actually want to exit immediately when we get Ctl+C (SIGINT) or
+    # Ctl+\ (SIGQUIT) from the user, we want to reap the spinner and `zshctl`.
+    trap 'true' INT QUIT
+
+    if [[ $ZSHCTL_DISABLE_SPINNER -eq 1 ]]; then
+        unspun=1
+    else
     {
         {
             coproc spinner {
-                typeset interrupted=0
+                local interrupted=0
                 putback() {
                     # echo -en "${putback:- }\033[1D" 1>&2 # putback
                     interrupted=1
-                    echo ME TOO >> $ZSHCTL_COMP_DEBUG_FILE
+                    __zshctl_debug 'SPINNER INTERRUPT'
                 }
-                trap putback  INT
+                trap putback INT
                 local LC_CTYPE=C    # important
                 local charwidth=3   # also, important
                 local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
@@ -60,21 +107,26 @@ __zshctl_spinnered() {
                 [[ -z $line ]] || return
                 printf '\e[?25l' 1>&2 # hide cursor
                 local i=0
-                while [[ -z $line ]]; do
+                while (( ! interrupted )) && [[ -z $line ]]; do
                     i=$(( (i + $charwidth ) % ${#spin} ))
-                    (( ! interrupted )) && printf '%s\033[1D' ${spin:$i:$charwidth} 1>&2
+                    # (( ! interrupted )) && printf '%s\033[1D' ${spin:$i:$charwidth} 1>&2
+                    printf '%s\033[1D' ${spin:$i:$charwidth} 1>&2
                     read -t 0.1 -r line # snooze
                 done
+                if false && (( interrupted )); then
+                    __zshctl_debug 'SPINNER SNOOZE'
+                    read -t 1.5 -r line
+                fi
                 __zshctl_debug 'SPINNER DONE: <%s>' $line
                 # Because spinner is scribbling on the terminal, if it is stopped by
                 # an INT, it does not attempt to put back the character it overwrote
                 # with its spinner characters. Leaves a spinner character.
-                [[ $line != INT ]] && printf '%s\033[1D' "${putback:- }" 1>&2 # putback
-                printf '\e[?25h' 1>&2 # normal cursor
             }
         }
     }
+    fi
 
+    local spinner_pid=$spinner_PID
     local -a zshctl zsh_words
     local zsh_quoted_words out code
 
@@ -114,8 +166,11 @@ __zshctl_spinnered() {
     # We could display a cleaner error message using our error message display
     # below, but for now we just bail.
     if (( code )); then
-        __zshctl_debug "Completion failed: $code"
-        return
+        __zshctl_debug "EARLY RETURN: $code"
+        printf '\e[?25h' 1>&2 # normal cursor
+        wait $spinner_pid
+        __zshctl_debug "EARLY RETURN WAIT DONE RETURNING: $code"
+        return 1
     fi
 
     __zshctl_debug '%s' "$out"
@@ -167,6 +222,7 @@ __zshctl_spinnered() {
             # We could display a cleaner error message using our error message
             # display below, but for now we just bail.
             if (( code )); then
+                unspin OVER
                 __zshctl_debug "Completion failed: $code"
                 return
             fi
@@ -184,7 +240,6 @@ __zshctl_spinnered() {
         fi
     fi
     unspin OVER
-    wait $spinner_PID
     echo "$out"
     return 0
 }
@@ -203,10 +258,10 @@ __zshctl_get_completion_results() {
     code=$?
     __zshctl_debug 'FINAL OUT: <%s> <%s>\n' $code "$out"
     if (( code )); then
-        return 1
-    else
+        kill -WINCH $$
         return 0
     fi
+    return 0
 
     #echo close >&"${spinner[1]}" 2>/dev/null
     #wait $spinner_PID
@@ -558,6 +613,10 @@ __zshctl_format_comp_descriptions()
 __start_zshctl()
 {
     local cur prev words cword split
+
+    # You can read all about the spinner, it's limitations and whether or not
+    # you want to enable it.
+    local ZSHCTL_DISABLE_SPINNER=0
 
     COMPREPLY=()
 
