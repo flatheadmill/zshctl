@@ -78,12 +78,11 @@ __zshctl_get_completion_results() {
     {
         coproc spinner {
             local interrupted=0
-            __zshctl_spinner_signals() {
-                # echo -en "${putback:- }\033[1D" 1>&2 # putback
+            __zshctl_spinner_trap() {
                 interrupted=1
-                __zshctl_debug 'SPINNER INTERRUPT'
+                __zshctl_debug 'SPINNER TRAP'
             }
-            trap __zshctl_spinner_signals INT QUIT
+            trap __zshctl_spinner_trap INT QUIT
             local LC_CTYPE=C    # important
             local charwidth=3   # also, important
             local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
@@ -93,14 +92,10 @@ __zshctl_get_completion_results() {
             local i=0
             while (( ! interrupted )) && [[ -z $line ]]; do
                 i=$(( (i + $charwidth ) % ${#spin} ))
-                # (( ! interrupted )) && printf '%s\033[1D' ${spin:$i:$charwidth} 1>&2
                 printf '%s\033[1D' ${spin:$i:$charwidth} 1>&$spinner_fd
                 read -t 0.1 -r line # snooze
+                __zshctl_debug 'snoozed <%s> <%s>' "$line" $interrupted
             done
-            if false && (( interrupted )); then
-                __zshctl_debug 'SPINNER SNOOZE'
-                read -t 1.5 -r line
-            fi
             __zshctl_debug 'SPINNER DONE: <%s>' $line
             # Because spinner is scribbling on the terminal, if it is stopped by
             # an INT, it does not attempt to put back the character it overwrote
@@ -118,12 +113,33 @@ __zshctl_get_completion_results() {
         # going to have to wait until the next spinner tick because things are
         # in a fragile state, the spinner will stop spinning soon enough.
         (130|131)
-            printf '\e[?25h' 1>&2   # normal cursor
-            wait $spinner_pid
-            compopt -o nosort
-            COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
-            COMPREPLY+=( "> User interrupt." )
+            #echo bye >&"${spinner[1]}" 2>/dev/null
+            kill -INT $spinner_PID 2>/dev/null
+            wait $spinner_PID
+            printf '%s\033[1D\e[?25h' "${putback:- }" 1>&2 # putback and normal cursor
+            #printf '\e[?25h' 1>&2   # normal cursor
+            compopt +o default
+            __zshctl_debug 'MESSAGE <%s>' "${result_settings[message]}"
+            #__zshctl_debug ERROR
+            #COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
+            #COMPREPLY+=( "> ${result_settings[message]}" )
+            printf "\n";
+            printf "User interrupt.\n"
+            printf "\n"
+
+            # The prompt format is only available from bash 4.4.
+            # We test if it is available before using it.
+            if (x=${PS1@P}) 2> /dev/null; then
+                printf "%s" "${PS1@P}${COMP_LINE[@]}"
+            else
+                # Can't print the prompt.  Just print the
+                # text the user had typed, it is workable enough.
+                printf "%s" "${COMP_LINE[@]}"
+            fi
+            COMPREPLY=()
+            compopt >> "$ZSHCTL_COMP_DEBUG_FILE"
             kill -WINCH $$          # Kick readline.
+            return 0
             ;;
         # Otherwise, we can do a graceful shutdown down the spinner.
         (*)
@@ -265,14 +281,38 @@ __zshctl_get_completion_results() {
     #    result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
     #fi
 
+    # Compare the following to the `activeHelp` implementation in the Cobra
+    # completions of `kubectl` and determine if what they're doing actually
+    # works. `kubectl` does have the chopped character problem, so this is
+    # probably better if all we want to display is errors and not context help.
+    #
+    # Would require a better understaning of readline and WINCH.
+    #
     # At the time of writing, it appears that Bash is unable to complete `!` nor
     # `>` so adding strings to `COMPREPLY` that lead with those characters
     # ensures that they are displayed, but they cannot be acted upon.
     if [[ -n "${result_settings[message]}" ]]; then
-        __zshctl_debug ERROR
-        COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
-        COMPREPLY+=( "> ${result_settings[message]}" )
-        return
+        compopt +o default
+        __zshctl_debug 'MESSAGE <%s>' "${result_settings[message]}"
+        #__zshctl_debug ERROR
+        #COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
+        #COMPREPLY+=( "> ${result_settings[message]}" )
+        printf "\n";
+        printf "%s\n" "${result_settings[message]}"
+        printf "\n"
+
+        # The prompt format is only available from bash 4.4.
+        # We test if it is available before using it.
+        if (x=${PS1@P}) 2> /dev/null; then
+            printf "%s" "${PS1@P}${COMP_LINE[@]}"
+        else
+            # Can't print the prompt.  Just print the
+            # text the user had typed, it is workable enough.
+            printf "%s" "${COMP_LINE[@]}"
+        fi
+        COMPREPLY=()
+        compopt >> "$ZSHCTL_COMP_DEBUG_FILE"
+        return 0
     fi
 
     # An older comment.
@@ -530,6 +570,7 @@ __zshctl_handle_standard_completion_case() {
         __zshctl_debug "Removed description from single completion, which is now: ${comp}"
         COMPREPLY[0]=$comp
     else # Format the descriptions
+        __zshctl_debug 'WILL FORMAT'
         __zshctl_format_comp_descriptions $longest
     fi
 }
@@ -592,6 +633,7 @@ __zshctl_format_comp_descriptions()
             __zshctl_debug "Final comp: $comp"
         fi
     done
+    compopt >> "$ZSHCTL_COMP_DEBUG_FILE"
 }
 
 __start_zshctl()
