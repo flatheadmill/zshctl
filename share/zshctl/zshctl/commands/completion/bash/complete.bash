@@ -149,13 +149,14 @@ __zshctl_get_completion_results() {
             }
             trap __zshctl_spinner_trap INT QUIT
             # Wait a bit before spinning, may not be necessary.
+            local line
             read -t 0.2 -r line
             [[ $interrupted -eq 0 && -z $line ]] || return
             # From StackOverflow. https://unix.stackexchange.com/a/565551
             printf '\e[?25l' 1>&$spinner_fd # hide cursor
             local LC_CTYPE=C    # important
             local charwidth=3   # also, important
-            local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
+            local spin='⣾⣽⣻⢿⡿⣟⣯⣷'
             local i=0
             while [[ $interrupted -eq 0 && -z $line ]]; do
                 i=$(( (i + $charwidth ) % ${#spin} ))
