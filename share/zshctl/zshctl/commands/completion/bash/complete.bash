@@ -68,6 +68,12 @@ __zshctl_get_completion_results() {
     # command in user's prompt was what you wanted to solve for, not for anthing
     # else and you are going to live with the redraws, default completions, and
     # whatever else.
+    #
+    # Note subsequent to the final note. These completions are working pretty
+    # consistently, exhibiting our designed behavior for the most part,
+    # occasiontally you will catch it with a Ctl+C after the spinner has
+    # stopped and then it will exhibit default Bash behavior for completions
+    # with no background processes.
 
     # We always run the spinner. It won't start spinning until 200ms have
     # and will alter the input line if it does not actually spin. We listen on
@@ -76,30 +82,41 @@ __zshctl_get_completion_results() {
     local spinner_fd
     exec {spinner_fd}>&1
     {
+        # When error-free, the spinner is stopped by sending a message to break
+        # it's loop. To handle Ctl+C and Ctl+\ we set a trap.
         coproc spinner {
             local interrupted=0
+            # We set a trap to ensure that the spinner will stop, that it will
+            # not continue to spin if other steps in this completion fail to
+            # terminate it correctly. We set a flag and then we close standard
+            # in. We were having a problem where the reads would not wake up
+            # after the signal and required a subsequent signal, the user would
+            # have to press Ctl+C a second time. Closing standard in will wake
+            # any reads with an EOF regardless of timers.
             __zshctl_spinner_trap() {
                 interrupted=1
+                exec 0>&-
                 __zshctl_debug 'SPINNER TRAP'
             }
             trap __zshctl_spinner_trap INT QUIT
+            # Wait a bit before spinning, may not be necessary.
+            read -t 0.2 -r line
+            [[ $interrupted -eq 0 && -z $line ]] || return
+            # From StackOverflow. https://unix.stackexchange.com/a/565551
+            printf '\e[?25l' 1>&$spinner_fd # hide cursor
             local LC_CTYPE=C    # important
             local charwidth=3   # also, important
             local spin='⣾⣽⣻⢿⡿⣟⣯⣷' line
-            read -t 0.2 -r line # if we have a line we never start spinning
-            [[ $interrupted -eq 0 && -z $line ]] || return
-            printf '\e[?25l' 1>&$spinner_fd # hide cursor
             local i=0
-            while (( ! interrupted )) && [[ -z $line ]]; do
+            while [[ $interrupted -eq 0 && -z $line ]]; do
                 i=$(( (i + $charwidth ) % ${#spin} ))
                 printf '%s\033[1D' ${spin:$i:$charwidth} 1>&$spinner_fd
                 read -t 0.1 -r line # snooze
                 __zshctl_debug 'snoozed <%s> <%s>' "$line" $interrupted
             done
             __zshctl_debug 'SPINNER DONE: <%s>' $line
-            # Because spinner is scribbling on the terminal, if it is stopped by
-            # an INT, it does not attempt to put back the character it overwrote
-            # with its spinner characters. Leaves a spinner character.
+            # Don't clean up here. We clean up outside and if we fail to clean
+            # up properly, that's okay so long as the spinner is not spinning.
         }
     } 2> /dev/null
     exec {spinner_fd}>&-
@@ -109,49 +126,38 @@ __zshctl_get_completion_results() {
         shift
         __zshctl_debug 'SPINNER SHUTDOWN: code <%s>, spinner_PID <%s>, ${spinner[1]} <%s>, spinner_fd <%s>' $code $spinner_PID ${spinner[1]} $spinner_fd
         case $code in
-        # When we get SIGINT or SIGQUIT, the user is impatient, but they are
-        # going to have to wait until the next spinner tick because things are
-        # in a fragile state, the spinner will stop spinning soon enough.
         (130|131)
-            #echo bye >&"${spinner[1]}" 2>/dev/null
-            kill -INT $spinner_PID 2>/dev/null
+            # When we get SIGINT or SIGQUIT, the user is impatient, but they are
+            # going to have to wait until the next spinner tick because things
+            # are in a fragile state. Sending message down the pipe if the pipe
+            # is closed sometimes causes the shell to exit. The spinner will
+            # stop spinning soon enough.
             wait $spinner_PID
             printf '%s\033[1D\e[?25h' "${putback:- }" 1>&2 # putback and normal cursor
-            #printf '\e[?25h' 1>&2   # normal cursor
-            compopt +o default
-            __zshctl_debug 'MESSAGE <%s>' "${result_settings[message]}"
-            #__zshctl_debug ERROR
-            #COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
-            #COMPREPLY+=( "> ${result_settings[message]}" )
-            printf "\n";
-            printf "User interrupt.\n"
-            printf "\n"
+
 
             # The prompt format is only available from bash 4.4.
-            # We test if it is available before using it.
-            if (x=${PS1@P}) 2> /dev/null; then
-                printf "%s" "${PS1@P}${COMP_LINE[@]}"
-            else
-                # Can't print the prompt.  Just print the
-                # text the user had typed, it is workable enough.
-                printf "%s" "${COMP_LINE[@]}"
-            fi
+            printf '\nUser interrupt.\n\n%s' "${PS1@P}${COMP_LINE[@]}"
+
+            # We do not want Bash to display anything other than our message.
+            compopt +o default
             COMPREPLY=()
-            compopt >> "$ZSHCTL_COMP_DEBUG_FILE"
-            kill -WINCH $$          # Kick readline.
+
+            # Kick readline.
+            kill -WINCH $$
+
             return 0
             ;;
         # Otherwise, we can do a graceful shutdown down the spinner.
         (*)
             echo bye >&"${spinner[1]}" 2>/dev/null
-            wait $spinner_pid
+            wait $spinner_PID
             printf '%s\033[1D\e[?25h' "${putback:- }" 1>&2 # putback and normal cursor
             ;;
         esac
     }
 
     # Defensive copy of the spinner pid, because I've seen it get unset.
-    local spinner_pid=$spinner_PID
     local -a zshctl zsh_words
     local zsh_quoted_words out code
 
@@ -262,24 +268,10 @@ __zshctl_get_completion_results() {
         fi
     fi
 
+    # Graceful spinner shutdown.
     __zshctl_spinner_shutdown 0
-    #echo close >&"${spinner[1]}" 2>/dev/null
-    #wait $spinner_PID
-    #exec {spinner_fd}>&- 2>/dev/null
 
     # Some complaints here, but we did manage to figure it out.
-
-    # For Bash completions all we can do is append the prefix.
-    #if [[ -n ${result_settings[prefix]} && ${result_settings[prefix]} != *= ]]; then
-    #    result_completions=( "${result_completions[@]/#/${result_settings[prefix]}}" )
-    #fi
-    # For Bash completions all we can do is append the suffix. When we have
-    # a suffix it means we want to keep building a word, that is it is `=` or
-    # `/` and we are building an assignment or a path, so no space.
-    #if [[ -n ${result_settings[suffix]} ]]; then
-    #    result_settings[nospace]=1
-    #    result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
-    #fi
 
     # Compare the following to the `activeHelp` implementation in the Cobra
     # completions of `kubectl` and determine if what they're doing actually
@@ -288,30 +280,26 @@ __zshctl_get_completion_results() {
     #
     # Would require a better understaning of readline and WINCH.
     #
-    # At the time of writing, it appears that Bash is unable to complete `!` nor
-    # `>` so adding strings to `COMPREPLY` that lead with those characters
-    # ensures that they are displayed, but they cannot be acted upon.
     if [[ -n "${result_settings[message]}" ]]; then
-        compopt +o default
         __zshctl_debug 'MESSAGE <%s>' "${result_settings[message]}"
-        #__zshctl_debug ERROR
+
+        # Notes on an earlier message display strategy.
+        #
+        # At the time of writing, it appears that Bash is unable to complete `!`
+        # nor `>` so adding strings to `COMPREPLY` that lead with those
+        # characters ensures that they are displayed, but they cannot be acted upon.
         #COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
         #COMPREPLY+=( "> ${result_settings[message]}" )
-        printf "\n";
-        printf "%s\n" "${result_settings[message]}"
-        printf "\n"
 
-        # The prompt format is only available from bash 4.4.
-        # We test if it is available before using it.
-        if (x=${PS1@P}) 2> /dev/null; then
-            printf "%s" "${PS1@P}${COMP_LINE[@]}"
-        else
-            # Can't print the prompt.  Just print the
-            # text the user had typed, it is workable enough.
-            printf "%s" "${COMP_LINE[@]}"
-        fi
+        # But instead, we'll do like Cobra does and blather all over the user's
+        # terminal with printf. The prompt format is only available from Bash 4.4.
+        printf '\n%s\n\n%s' "${result_settings[message]}" "${PS1@P}${COMP_LINE[@]}"
+
+        # We do not want Bash to display anything other than our message.
+        compopt +o default
         COMPREPLY=()
-        compopt >> "$ZSHCTL_COMP_DEBUG_FILE"
+
+        # Please display nothing.
         return 0
     fi
 
