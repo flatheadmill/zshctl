@@ -503,7 +503,6 @@ function parser {
                     ;;
                 (*)
                     printf -v tset 'typeset o_%s' ${option[var]//-/_}
-                    printf -v tset 'unset o_%s' ${option[var]//-/_}
                     ;;
                 esac
                 typesets+=( $tset )
