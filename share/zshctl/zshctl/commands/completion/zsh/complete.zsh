@@ -110,12 +110,12 @@ function __zshctl_actual {
     # Use eval to handle any environment variables and such
     __zshctl_debug "completion output: ${out}"
 
-    typeset result_completions=()
-    typeset -A result_settings result_descriptions
+    typeset completions=()
+    typeset -A settings descriptions
     eval "$out"
 
     integer last mtime
-    typeset key=$result_settings[key]
+    typeset key=$settings[key]
     if [[ -n $key ]]; then
         if [[ ! -e $HOME/.local/state/zshctl/invalidate ]]; then
             mkdir -p $HOME/.local/state/zshctl
@@ -132,7 +132,7 @@ function __zshctl_actual {
         if [[ -z $out ]]; then
             zshctl=(
                 "${words[1]}" __encache ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
-                    "${(@QA)${(z)result_settings[invoke]}}"
+                    "${(@QA)${(z)settings[invoke]}}"
             )
             __zshctl_debug 'About to call: %s' "${(j: :)${(@qq)${(@)zshctl}}}"
             out=$( "${(@)zshctl}" )
@@ -145,9 +145,9 @@ function __zshctl_actual {
         else
             __zshctl_debug 'CACHE HIT'
         fi
-        result_completions=()
+        completions=()
         eval "$out"
-        if [[ -z $result_settings[message] ]]; then
+        if [[ -z $settings[message] ]]; then
             __zshctl_cache[key:$key]=$out
             __zshctl_cache[last:]=$EPOCHSECONDS
             __zshctl_debug "encache output: ${out}"
@@ -156,61 +156,61 @@ function __zshctl_actual {
 
     __zshctl_spinner_shutdown
 
-    if [[ -n $result_settings[message] ]]; then
-        _message -r "${result_settings[message]}"
+    if [[ -n $settings[message] ]]; then
+        _message -r "${settings[message]}"
         return
     fi
 
     typeset comp_args=()
-    if [[ -n $result_settings[suffix] ]]; then
-        comp_args+=( -q -S "$result_settings[suffix]" )
-    elif (( $result_settings[nospace] )); then
+    if [[ -n $settings[suffix] ]]; then
+        comp_args+=( -q -S "$settings[suffix]" )
+    elif (( $settings[nospace] )); then
         comp_args+=( -S '' )
     fi
 
-    if [[ -n $result_settings[prefix] ]]; then
-        comp_args+=( -P "$result_settings[prefix]" )
+    if [[ -n $settings[prefix] ]]; then
+        comp_args+=( -P "$settings[prefix]" )
     fi
 
-    typeset args_args=()
-    if [[ $result_settings[order] -eq 1 ]]; then
+    typeset describe_args=()
+    if [[ $settings[order] -eq 1 ]]; then
         __zshctl_debug "Activating keep order."
-        args_args+=( -V )
+        describe_args+=( -V )
     fi
 
-    if (( $result_settings[descriptions] )); then
-        for completion in "${(@)result_completions}"; do
-            completions+=( "$completion:$result_descriptions[$completion]" )
+    typeset described
+    if (( $settings[descriptions] )); then
+        for completion in "${(@)completions}"; do
+            described+=( "$completion:$descriptions[$completion]" )
         done
     else
-        completions=( "${(@)result_completions}" )
+        described=( "${(@)completions}" )
     fi
 
-    function __zshctl_generic_completer {
-        __zshctl_debug "COMPLETION"
-        # What goes here, something like this?
-        typeset expl # TIL This is an array, but it will become one upon assignment.
-        typeset option=${result_settings[matched]}
-        option=option-${option#-*}-1
-        typeset cmd=${result_settings[slug]}
-        typeset curcontext=":completion:_zshctl::${cmd}:${option}:values"
-        __zshctl_debug 'comp_args <%s>' "${(@qq)comp_args}"
-        __zshctl_debug 'completions <%s>' "${(j: :)${(@qq)completions}}"
-        _describe 'value' completions "${(@)comp_args}"
-        _wanted values expl 'value' compadd
-    }
-
-    if [[ -n $result_settings[matched] ]]; then
-        typeset arguments
-        printf -v arguments '%s[output format]:format:__zshctl_generic_completer' $result_settings[matched]
-        __zshctl_debug "SYNTHETIC <%s>" $arguments
-         __zshctl_debug "Function exists: %s" "${+functions[__zshctl_generic_completer]}"
-        # Our synthetic Zsh completion.
-        _arguments '*:ignored:' $arguments
+    typeset option describe=()
+    case $settings[state] in
+    (switch)
         return
-    fi
+        ;;
+    (value)
+        describe_args+=( -t values )
+        option=option-${settings[matched]##*-}-1
+        typeset curcontext=":completion:_zshctl::${settings[command]}:${option}"
+        __zshctl_debug 'comp_args <%s>' "${(j: :)${(@qq)comp_args}}"
+        __zshctl_debug 'describe_args <%s>' "${(j: :)${(@qq)describe_args}}"
+        __zshctl_debug 'curcontext <%s>' $curcontext
+        __zshctl_debug 'described <%s>' "${(j: :)${(@qq)described}}"
+        describe=(
+            _describe "${(@)describe_args}" 'value' described "${(@)comp_args}"
+        )
+        __zshctl_debug 'Calling _describe: %s' "${(j: :)${(@qq)describe}}"
+        "${(@)describe}"
+        return
+        ;;
+    esac
+
     typeset describe=(
-        _describe "${(@)args_args}" completions completions "${(@)comp_args}"
+        _describe "${(@)describe_args}" completions described "${(@)comp_args}"
     )
     __zshctl_debug 'Calling _describe: %s' "${(j: :)${(@qq)describe}}"
     if "${(@)describe}"; then
@@ -232,10 +232,10 @@ function __zshctl_actual {
 
             # We must return the result of this command, so it must be the
             # last command, or else we must store its result to return it.
-            if [[ -n $result_settings[prefix] ]]; then
-                __zshctl_debug '*:filename:_files'" -P $result_settings[prefix]"
+            if [[ -n $settings[prefix] ]]; then
+                __zshctl_debug '*:filename:_files'" -P $settings[prefix]"
                 # What is -P and how does it relate to -g?
-                _arguments '*:filename:_files'" -P $result_settings[prefix]"
+                _arguments '*:filename:_files'" -P $settings[prefix]"
             else
                 _arguments '*:filename:_files'
             fi

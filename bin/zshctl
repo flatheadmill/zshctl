@@ -192,7 +192,7 @@ function _zshctl_descend_completion {
     else
         typeset -A completions=()
         typeset completion_match=()
-        [[ $sofar != :args ]] && zshctl[args:slug]=${zshctl[args:slug]}${${sofar#:args}//:/-}
+        [[ $sofar != :args ]] && zshctl[args:command]=${zshctl[args:command]}${${sofar#:args}//:/-}
         complete=${sofar//#:args/:complete}
         if (( ${+functions[$complete]} )); then
             $complete "$@"
@@ -209,13 +209,13 @@ function _zshctl_completed {
     for key in ${(@ko)zshctl}; do
         [[ $key = args:* && $key != args:(debug|incomplete) ]] || continue
         key=${key#args:}
-        printf 'result_settings[%s]=%s\n' $key "${(@qq)zshctl[args:$key]}"
+        printf 'settings[%s]=%s\n' $key "${(@qq)zshctl[args:$key]}"
     done
     for key in "${(@)completion_match}"; do
         [[ $zshctl[args:incomplete] != -* && $key = -* ]] && continue
-        printf 'result_completions+=( %s )\n' ${(qq)key}
+        printf 'completions+=( %s )\n' ${(qq)key}
         if (( ${+completions[$key]} )); then
-            printf 'result_settings[_key]=%s; result_descriptions[${result_settings[_key]}]=%s\n' \
+            printf 'settings[_key]=%s; descriptions[${settings[_key]}]=%s\n' \
                 ${(qq)key} ${(qq)completions[$key]}
         fi
     done
@@ -240,7 +240,7 @@ function _zshctl_completion_arguments {
 # Meant to be called from our completion functions, so no defensive programming
 # as of yet.
 function _zshctl_complete {
-    zshctl+=( args:kind none args:mode completion args:slug ${zshctl[argzero]:A:t} )
+    zshctl+=( args:kind none args:mode completion 'args:command' ${zshctl[argzero]:A:t} )
     # Purposfully skip the program name in position 5, we are not going to use
     # it.
     typeset _zshctl_bash_words=() func=:execute args=:args

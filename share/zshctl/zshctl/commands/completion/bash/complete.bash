@@ -17,7 +17,7 @@ __zshctl_error_message() {
     # `>` so adding strings to `COMPREPLY` that lead with those characters
     # ensures that they are displayed, but they cannot be acted upon.
     #COMPREPLY+=( "$(printf '! ERROR %*s' $((${COLUMNS:-80} - 9)) '')" )
-    #COMPREPLY+=( "> ${result_settings[message]}" )
+    #COMPREPLY+=( "> ${settings[message]}" )
 
     # But instead, we'll do like Cobra does and blather all over the user's
     # terminal with printf. The prompt format is only available from Bash 4.4.
@@ -263,11 +263,11 @@ __zshctl_get_completion_results() {
     __zshctl_debug '%s' "$out"
 
     # Evaluate the output from our program.
-    typeset -A result_settings result_descriptions
-    typeset -a result_completions
+    typeset -A settings descriptions
+    typeset -a completions
     eval $out
 
-    local key=${result_settings[key]} last mtime now=$(date +%s)
+    local key=${settings[key]} last mtime now=$(date +%s)
     if [[ -n $key ]]; then
         __zshctl_debug 'CACHE PROBE'
         if [[ ! -e $HOME/.local/state/zshctl/invalidate ]]; then
@@ -296,7 +296,7 @@ __zshctl_get_completion_results() {
             encache=$(
                 zsh -c '
                     print "${(j: :)${(@qq)${(@QA)${(z)0}}}}"
-                ' "${result_settings[invoke]}"
+                ' "${settings[invoke]}"
             )
             __zshctl_debug 'ENCACHE: <%s>\n' "$encache"
             eval "zshctl+=( $encache )"
@@ -314,11 +314,11 @@ __zshctl_get_completion_results() {
         else
             __zshctl_debug 'CACHE HIT'
         fi
-        result_completions=()
+        completions=()
         __zshctl_debug "$out"
         eval "$out"
         __zshctl_debug EVALED
-        if [[ -z ${result_settings[message]} ]]; then
+        if [[ -z ${settings[message]} ]]; then
             __zshctl_cache[key:$key]=$out
             __zshctl_cache[last:]=$EPOCHSECONDS
             __zshctl_debug 'ENCACHE OUTPUT'
@@ -352,11 +352,11 @@ __zshctl_get_completion_results() {
     #
     # Would require a better understaning of readline and WINCH.
     #
-    if [[ -n "${result_settings[message]}" ]]; then
+    if [[ -n "${settings[message]}" ]]; then
         # Print the error message, we do not offer a helper message option, just
         # an error message.
-        __zshctl_debug 'MESSAGE <%s>' "${result_settings[message]}"
-        __zshctl_error_message "${result_settings[message]}"
+        __zshctl_debug 'MESSAGE <%s>' "${settings[message]}"
+        __zshctl_error_message "${settings[message]}"
         # Please display out carefully constructed nothing.
         return 0
     fi
@@ -380,46 +380,46 @@ __zshctl_get_completion_results() {
     # a delimiter, but the delimeter is not used by the Zsh code.
 
     #
-    if [[ -n ${result_settings[delimiter]} &&
-        "$COMP_WORDBREAKS" = *${result_settings[delimiter]}* &&
+    if [[ -n ${settings[delimiter]} &&
+        "$COMP_WORDBREAKS" = *${settings[delimiter]}* &&
         (
-            ${COMP_WORDS[${COMP_CWORD}]} = ${result_settings[delimiter]} ||
-            ${COMP_WORDS[$(( COMP_CWORD - 1 ))]} = ${result_settings[delimiter]}
+            ${COMP_WORDS[${COMP_CWORD}]} = ${settings[delimiter]} ||
+            ${COMP_WORDS[$(( COMP_CWORD - 1 ))]} = ${settings[delimiter]}
         )
     ]]; then
-        result_settings[prefix]=${result_settings[prefix]#*${result_settings[delimiter]}}
-        incomplete=${incomplete#*${result_settings[delimiter]}}
-        result_completions=( "${result_completions[@]#*${result_settings[delimiter]}}" )
+        settings[prefix]=${settings[prefix]#*${settings[delimiter]}}
+        incomplete=${incomplete#*${settings[delimiter]}}
+        completions=( "${completions[@]#*${settings[delimiter]}}" )
     fi
 
-    __zshctl_debug 'result_settings[prefix] <%s>\n' ${result_settings[prefix]}
+    __zshctl_debug 'settings[prefix] <%s>\n' ${settings[prefix]}
 
     # We are going to smoosh the way Zsh does.
-    if [[ -n ${result_settings[suffix]} ]]; then
-        result_settings[nospace]=1
+    if [[ -n ${settings[suffix]} ]]; then
+        settings[nospace]=1
     fi
 
     # Add the prefix to all completion matches.
-    result_completions=( "${result_completions[@]/#/${result_settings[prefix]}}" )
+    completions=( "${completions[@]/#/${settings[prefix]}}" )
     # Add the suffix to all completion matches.
-    result_completions=( "${result_completions[@]/%/${result_settings[suffix]}}" )
+    completions=( "${completions[@]/%/${settings[suffix]}}" )
     # Include only the completions that match our incomplete match.
     local -a filtered=()
     local comp
-    for comp in "${result_completions[@]}"; do
+    for comp in "${completions[@]}"; do
         [[ $comp == ${incomplete}* ]] && filtered+=( "$comp" )
     done
-    result_completions=( "${filtered[@]}" )
+    completions=( "${filtered[@]}" )
 
 
     # We will probably not set no space independent of a suffix.
-    if (( ${result_settings[nospace]} )); then
+    if (( ${settings[nospace]} )); then
         compopt -o nospace
     fi
     # We are completing a path and setting this will display only the last
     # part of the completed path. `foo/bar` and `foo/baz` will display `bar`
     # and `baz` if the user is completing `foo/`.
-    if (( ${result_settings[filenames]} )); then
+    if (( ${settings[filenames]} )); then
         compopt -o filenames -o noquote
     fi
     # ^ Problem with this is that it cannot be used for actual filenames
@@ -432,7 +432,7 @@ __zshctl_get_completion_results() {
     #
     # TODO Come back and make `noquote` a separate option.
 
-    __zshctl_debug "$(IFS=$'\n'; echo "${result_completions[@]}")"
+    __zshctl_debug "$(IFS=$'\n'; echo "${completions[@]}")"
 
     # Outgoing, but we have to get to files.
     local shellCompDirectiveError=1
@@ -571,7 +571,7 @@ __zshctl_handle_completion_types() {
                 COMPREPLY+=("$comp")
             fi
             # TODO Claude, didnt' we already filter the above?
-        done < <(printf "%s\n" "${result_completions[@]}")
+        done < <(printf "%s\n" "${completions[@]}")
         ;;
 
     *)
@@ -585,9 +585,9 @@ __zshctl_handle_standard_completion_case() {
     local tab=$'\t' comp
 
     # Short circuit to optimize if we don't have descriptions
-    if [[ "${result_settings[descriptions]}" -ne 1 ]]; then
+    if [[ "${settings[descriptions]}" -ne 1 ]]; then
         __zshctl_debug "trying the cheap reply"
-        IFS=$'\n' read -ra COMPREPLY -d '' < <(compgen -W "${result_completions[*]}" -- "${incomplete}")
+        IFS=$'\n' read -ra COMPREPLY -d '' < <(compgen -W "${completions[*]}" -- "${incomplete}")
         __zshctl_debug "$(IFS=$'\n'; echo "${COMPREPLY[@]}")"
         return 0
     fi
@@ -596,11 +596,11 @@ __zshctl_handle_standard_completion_case() {
 
     local longest=0
     local compline
-    __zshctl_debug "result_completions<${#result_completions}> incomplete<${result_settings[incomplete]}>"
-    for comp in "${result_completions[@]}"; do
+    __zshctl_debug "completions<${#completions}> incomplete<${settings[incomplete]}>"
+    for comp in "${completions[@]}"; do
         __zshctl_debug "comp<${comp}>"
-        [[ "$comp" = "${result_settings[incomplete]}"* ]] || continue
-        compline="${comp}$tab${result_descriptions[$comp]}"
+        [[ "$comp" = "${settings[incomplete]}"* ]] || continue
+        compline="${comp}$tab${descriptions[$comp]}"
         COMPREPLY+=( "$compline" )
         if (( ${#comp} > longest )); then
             longest=${#comp}
