@@ -383,24 +383,8 @@ function parser {
     typeset error=$1 depth=$2
     shift 2
 
-    # TODO Make a note of this.
-    # zshctl <(print 'program')
-
-    [[ -v parse ]] || typeset -A parse=( completed 0 filenames 0 descriptions 0 complete 0 flags 0 remainder '' )
     typeset -A completions=()
     typeset completion_match=()
-
-    # TODO Unused, do we validate in this way? Probably, or assigning to
-    # `integer` gets lost.
-    typeset is_number='
-        (){
-            case ${1#[-+]} in
-            (*[!0-9]* | "")
-                %s %s integer %s
-                ;;
-            esac
-        } %s
-    '
 
     # Initial loop to grab the definition and to define the variables to which
     # arguments will be assigned.
@@ -714,56 +698,32 @@ function parser {
         done
     fi
     typeset combined=( "${(@)interspersed}" "${(@Oa)stack[1,$top]}" )
-    if (( parse[complete] )); then
-        printf 'parse=( %s )\n' ${(j: :)"${(@qq)${(@kv)parse}}"}
-        if [[ $state = value && ${#combined} -eq 0 ]]; then
-            combined+=( '' )
-        fi
-        # TODO Come back and remove all the `true`.
-        if (( completable )); then
-            if [[ $combined = (-|--) ]]; then
-                true
-            else
-                if (( ${+functions[complete${parse[func]#execute}]} )); then
-                    printf 'parse[matched]=%s\n' ${(qqq)option[matched]}
-                    print ${functions_source[complete:op:put]} >> $parse[debug]
-                    printf 'complete%s %s\n' ${parse[func]#execute} "${(j: :)${(@qq)combined}}"
-                else
-                    printf 'delegate %s\n' "${(j: :)${(@qq)combined}}"
-                fi
-            fi
-        else
-            true
-        fi
-        print return
+    if (( ${#combined} )); then
+        printf 'set -- %s\n' ${(j: :)${(@qq)combined}}
     else
-        if (( ${#combined} )); then
-            printf 'set -- %s\n' ${(j: :)${(@qq)combined}}
-        else
-            printf 'set --\n'
-        fi
-        # If we are invoked from command descent, we must call the actual
-        # execution function. In order to use `args` to parse internal
-        # function arguments, we also have to reset `_zshctl`.
-        case $zshctl[args:mode] in
-        (execute)
-            if (( usage && ! ${#combined} )); then
-                printf 'usage %s\n' $funcstack[$depth]
-            else
-                printf 'zshctl[args:mode]=inline\n'
-                printf '%s "$@"\n' $zshctl[args:func]
-            fi
-            ;;
-        (completion)
-            integer top=2
-            while [[ $funcstack[$top] != (:args:*|:args) ]]; do
-                ((top++))
-                (( top <= ${#funcstack} )) || abend 'must be called from an args function'
-            done
-            printf 'zshctl[args:matched]=%s\n' ${(qqq)option[matched]}
-            printf 'zshctl[args:state]=%s\n' ${(qqq)zshctl[args:state]}
-            printf 'zshctl+=( args:mode inline )\n'
-            printf '_zshctl_descend_completion %s "$@"\n' $funcstack[$top]
-        esac
+        printf 'set --\n'
     fi
+    # If we are invoked from command descent, we must call the actual
+    # execution function. In order to use `args` to parse internal
+    # function arguments, we also have to reset `_zshctl`.
+    case $zshctl[args:mode] in
+    (execute)
+        if (( usage && ! ${#combined} )); then
+            printf 'usage %s\n' $funcstack[$depth]
+        else
+            printf 'zshctl[args:mode]=inline\n'
+            printf '%s "$@"\n' $zshctl[args:func]
+        fi
+        ;;
+    (completion)
+        integer top=2
+        while [[ $funcstack[$top] != (:args:*|:args) ]]; do
+            ((top++))
+            (( top <= ${#funcstack} )) || abend 'must be called from an args function'
+        done
+        printf 'zshctl[args:matched]=%s\n' ${(qqq)option[matched]}
+        printf 'zshctl[args:state]=%s\n' ${(qqq)zshctl[args:state]}
+        printf 'zshctl+=( args:mode inline )\n'
+        printf '_zshctl_descend_completion %s "$@"\n' $funcstack[$top]
+    esac
 }
