@@ -30,7 +30,10 @@ function _zshctl {
 function __zshctl_actual {
     # TODO What else do we get to play with.
     __zshctl_debug '========= starting completion logic =========='
-    __zshctl_debug 'CURRENT: %d, words: %s' $CURRENT ${(j: :)${(@qq)words}}
+    __zshctl_debug 'CURRENT: %d, words: %s, curcontext %s' $CURRENT ${(j: :)${(@qq)words}} $curcontext
+
+    integer ret=1
+    _call_function ret _zshctl-foo
 
     # What does this do?
     unsetopt localoptions MONITOR
@@ -170,7 +173,7 @@ function __zshctl_actual {
     fi
 
     typeset args_args=()
-    if [ $((directive & shellCompDirectiveKeepOrder)) -ne 0 ]; then
+    if [[ $result_settings[order] -eq 1 ]]; then
         __zshctl_debug "Activating keep order."
         args_args+=( -V )
     fi
@@ -181,6 +184,30 @@ function __zshctl_actual {
         done
     else
         completions=( "${(@)result_completions}" )
+    fi
+
+    function __zshctl_generic_completer {
+        __zshctl_debug "COMPLETION"
+        # What goes here, something like this?
+        typeset expl # TIL This is an array, but it will become one upon assignment.
+        typeset option=${result_settings[matched]}
+        option=option-${option#-*}-1
+        typeset cmd=${result_settings[slug]}
+        typeset curcontext=":completion:_zshctl::${cmd}:${option}:values"
+        __zshctl_debug 'comp_args <%s>' "${(@qq)comp_args}"
+        __zshctl_debug 'completions <%s>' "${(j: :)${(@qq)completions}}"
+        _describe 'value' completions "${(@)comp_args}"
+        _wanted values expl 'value' compadd
+    }
+
+    if [[ -n $result_settings[matched] ]]; then
+        typeset arguments
+        printf -v arguments '%s[output format]:format:__zshctl_generic_completer' $result_settings[matched]
+        __zshctl_debug "SYNTHETIC <%s>" $arguments
+         __zshctl_debug "Function exists: %s" "${+functions[__zshctl_generic_completer]}"
+        # Our synthetic Zsh completion.
+        _arguments '*:ignored:' $arguments
+        return
     fi
     typeset describe=(
         _describe "${(@)args_args}" completions completions "${(@)comp_args}"
