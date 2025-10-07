@@ -296,10 +296,10 @@ __zshctl_get_completion_results() {
             encache=$(
                 zsh -c '
                     print "${(j: :)${(@qq)${(@QA)${(z)0}}}}"
-                ' "${result_settings[encache]}"
+                ' "${result_settings[invoke]}"
             )
             __zshctl_debug 'ENCACHE: <%s>\n' "$encache"
-            eval "zshctl+=( ${result_settings[encache]} )"
+            eval "zshctl+=( $encache )"
 
             # Invoke our call to retrieve the cachable completions.
             __zshctl_debug 'About to call: %s' "$(IFS=, ; echo "${zshctl[@]@Q}")"

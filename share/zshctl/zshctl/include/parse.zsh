@@ -18,8 +18,8 @@ function resource {
 #
 # `usage` -- underbar delimited name of command.
 
-# TODO Rabbit hole. I'm trying to find a way to edit and preview with the
-# formatting which leads me to comment out `| less` and run
+# I'm trying to find a way to edit and preview with the formatting which leads
+# me to comment out `| less` and run
 #
 # ```
 # while true; do zshctl gce key | less -XE; sleep 1; done
@@ -139,43 +139,41 @@ function usage {
     exit
 }
 
-function completion {
-    eval "$(args -b w,waiting f,files o,ordered p,prefixed S,short-prefixed -s v,valid s,suffix m,message -- "$@")"
-    zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
-    zshctl[args:completed]=1
-    if (( o_wating && ! zshctl[args:waiting] )); then
-        zshctl[args:waiting]=1
-        print ':progress'
-    fi
-    if (( o_short_prefixed )); then
-        zshctl[args:flags]=$(( zshctl[args:flags] | 2 ))
-        zshctl[args:flags]=$(( zshctl[args:flags] | 1024 ))
-    fi
-    if (( o_prefixed )); then
-        zshctl[args:flags]=$(( zshctl[args:flags] | 512 ))
-    fi
-    if (( o_ordered )); then
-        zshctl[args:flags]=$(( zshctl[args:flags] | 32 ))
+function completion:encache {
+    eval "$(args k,key v,valid p,prefix s,suffix -- "$@")"
+    zshctl[args:kind]=encache
+    zshctl[args:key]=$o_key
+    if [[ -v o_prefix ]]; then
+        zshctl[args:prefix]=$o_prefix
     fi
     if [[ -v o_suffix ]]; then
-        zshctl[args:flags]=$(( zshctl[args:flags] | 2 ))
-        case $o_suffix[2] in
-        (/) zshctl[args:flags]=$(( zshctl[args:flags] | 64 ));;
-        (=) zshctl[args:flags]=$(( zshctl[args:flags] | 128 ));;
-        (:) zshctl[args:flags]=$(( zshctl[args:flags] | 256 ));;
-        esac
-        zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
+        zshctl[args:suffix]=$o_suffix
     fi
-    if (( o_files )); then
-        print -u 2 files
-        zshctl[args:flags]=$(( zshctl[args:flags] & (~4) ))
+    zshctl[args:invoke]=${(j: :)${(@qq)@}}
+}
+
+function completion:files {
+    zshctl[args:kind]=files
+    zshctl[args:filters]=${(j: :)${(@qq)@}}
+}
+
+function completion {
+    eval "$(args -b o,ordered f,filenames -s k,key v,valid p,prefix s,suffix m,message -- "$@")"
+    zshctl[args:kind]=completions
+    if (( o_ordered )); then
+        zshctl[args:ordered]=1
+    fi
+    if [[ -v o_suffix ]]; then
+        zshctl[args:suffix]=$o_suffix
     fi
     if [[ -v o_valid ]]; then
         zshctl[args:valid]=$o_valid
     fi
     if [[ -v o_message ]]; then
         zshctl[args:message]=$o_message
-        zshctl[args:flags]=$(( zshctl[args:flags] | 4 ))
+    fi
+    if (( o_filenames )); then
+        zshctl[args:filenames]=1
     fi
     if (( $# )); then
         completion_match+=( ${1:-} )
@@ -186,7 +184,7 @@ function completion {
     fi
 }
 
-function completions {
+function _zshctl_completions {
     typeset func=${1:-}
     shift
     typeset lines=() line
@@ -310,23 +308,17 @@ function completions {
                 if [[ $key = *=* ]]; then
                     key=${key%=*}
                 fi
-                zshctl[args:descriptions]=1
-                #completions+=( $key ${line[1]:l}$line[2,-1] )
-                completions+=( $key ${line%.} )
-                completion_match+=( $key )
+                completion -- $key ${line%.}
             done
             state=key
             ;;
         esac
     done
+    completion
 }
 
-function _parser_print_error {
+function _unused__parser_print_error {
     printf '%s %s %s %q %s\n' "$@"
-}
-
-function _parser_stash_error {
-    print -u 2 DO NOT CALL ME ANYMORE
 }
 
 # What if we called this something other than error, something like helper,

@@ -196,10 +196,8 @@ function _zshctl_descend_completion {
         if (( ${+functions[$complete]} )); then
             $complete "$@"
         fi
-        if (( ! $zshctl[args:completed] )); then
-            completions $sofar
-            (( zshctl[args:flags] = zshctl[args:flags] | 4 ))
-            zshctl[args:files]=none
+        if [[ $zshctl[args:kind] = none ]]; then
+            _zshctl_completions $sofar
         fi
         _zshctl_completed
     fi
@@ -207,9 +205,10 @@ function _zshctl_descend_completion {
 
 function _zshctl_completed {
     local key
-    for key in delimiter descriptions encache filenames files incomplete key message nospace prefix suffix valid; do
+    for key in ${(@ko)zshctl}; do
+        [[ $key = args:* && $key != args:(debug|mode|matched|state|incomplete) ]] || continue
+        key=${key#args:}
         printf 'result_settings[%s]=%s\n' $key "${(@qq)zshctl[args:$key]}"
-        printf 'result_settings[%s]=%s\n' $key "${(@qq)zshctl[args:$key]}" >> $zshctl[args:debug]
     done
     for key in "${(@)completion_match}"; do
         [[ $zshctl[args:incomplete] != -* && $key = -* ]] && continue
@@ -223,12 +222,7 @@ function _zshctl_completed {
 
 function _zshctl_completion_arguments {
     typeset next=${1:-} words=()
-    zshctl+=(
-        args:debug ${2:-/dev/null}
-        args:flags 0        # Are we using this? Can we avoid it?
-        args:completed 0
-        args:filenames 0
-    )
+    zshctl+=( args:debug ${2:-/dev/null} )
     typeset -i cword=${3:-}
     shift 3
     typeset words=( "${@[2,$cword]}" )
@@ -245,7 +239,7 @@ function _zshctl_completion_arguments {
 # Meant to be called from our completion functions, so no defensive programming
 # as of yet.
 function _zshctl_complete {
-    zshctl+=( args:mode completion )
+    zshctl+=( args:kind none args:mode completion )
     # Purposfully skip the program name in position 5, we are not going to use
     # it.
     typeset _zshctl_bash_words=() func=:execute args=:args
@@ -299,12 +293,7 @@ function _zshctl_complete {
 }
 
 function _zshctl_encache {
-    zshctl+=(
-        args:debug ${1:-/dev/null}
-        args:flags 0        # Are we using this? Can we avoid it?
-        args:completed 0
-        args:filenames 0
-    )
+    zshctl+=( args:debug ${1:-/dev/null} args:kind none )
     include parse
     typeset encache=${2:-}
     shift 2
