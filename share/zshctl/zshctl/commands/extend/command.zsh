@@ -38,6 +38,3 @@ function :args:extend {
 function :execute:extend {
     delegate "$@"
 }
-
-function :complete:extend {
-}

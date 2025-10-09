@@ -28,6 +28,12 @@ function _zshctl {
 }
 
 function __zshctl_actual {
+    # Disable to restore to expected array expansion.
+    setopt localoptions NO_rcexpandparam
+
+    # Silence job control messages from the spinner coproc.
+    unsetopt localoptions monitor
+
     # TODO What else do we get to play with.
     __zshctl_debug '========= starting completion logic =========='
     __zshctl_debug 'CURRENT: %d, words: %s, curcontext %s' $CURRENT ${(j: :)${(@qq)words}} $curcontext
@@ -35,9 +41,6 @@ function __zshctl_actual {
 
     integer ret=1
     _call_function ret _zshctl-foo
-
-    # What does this do?
-    unsetopt localoptions MONITOR
 
     integer code spinner=0
 
@@ -192,9 +195,10 @@ function __zshctl_actual {
     __zshctl_debug 'original curcontext <%s>' $curcontext
     __zshctl_debug 'completer <%s>' $completer
 
+    typeset filters=( "${(@QA)${(@z)settings[filters]}}" )
     typeset option describe=() curcontext
-    case $settings[state] in
-    (command)
+    case $settings[kind]:$settings[state] in
+    (completions:command)
         describe_args+=( -t commands )
         curcontext=":_zshctl:$completer:${settings[command]}:argument-1"
         describe=(
@@ -205,7 +209,7 @@ function __zshctl_actual {
         "${(@)describe}"
         return
         ;;
-    (option)
+    (completions:option)
         describe_args+=( -t options )
         curcontext=":_zshctl:$completer:${settings[command]}:"
         describe=(
@@ -216,7 +220,7 @@ function __zshctl_actual {
         "${(@)describe}"
         return
         ;;
-    (value)
+    (completions:value)
         describe_args+=( -t values )
         option=option-${settings[matched]##*-}-${settings[offset]}
         typeset curcontext=":_zshctl:$completer:${settings[command]}:${option}"
@@ -232,42 +236,25 @@ function __zshctl_actual {
         __zshctl_debug 'curcontext <%s>' $curcontext
         return
         ;;
-    (nothing)
-        return 1
+    (completions:nothing)
+        ;;
+    (directories:*)
+        typeset curcontext=":_zshctl:$completer:${settings[command]}:argument-rest"
+        __zshctl_debug 'curcontext <%s>' $curcontext
+        __zshctl_debug 'filters <%s>'  ${#filters}
+        __zshctl_debug 'filters <%s>'  ${(@qq)filters}
+        __zshctl_debug 'filters <%s>'  ${settings[filters]}
+        _directories
+        return
+        ;;
+    (files:*)
+        typeset curcontext=":_zshctl:$completer:${settings[command]}:argument-rest"
+        __zshctl_debug 'curcontext <%s>' $curcontext
+        _files
+        return
         ;;
     esac
-    typeset describe=(
-        _describe "${(@)describe_args}" completions described "${(@)comp_args}"
-    )
-    __zshctl_debug 'Calling _describe: %s' "${(j: :)${(@qq)describe}}"
-    if "${(@)describe}"; then
-        __zshctl_debug "_describe found some completions"
-    else
-        __zshctl_debug "_describe did not find completions."
-        __zshctl_debug "Checking if we should do file completion."
-        if [ $((directive & shellCompDirectiveNoFileComp)) -ne 0 ]; then
-            __zshctl_debug "deactivating file completion"
-
-            # We must return an error code here to let zsh know that there were no
-            # completions found by _describe; this is what will trigger other
-            # matching algorithms to attempt to find completions.
-            # For example zsh can match letters in the middle of words.
-            return 1
-        else
-            # Perform file completion
-            __zshctl_debug "Activating file completion"
-
-            # We must return the result of this command, so it must be the
-            # last command, or else we must store its result to return it.
-            if [[ -n $settings[prefix] ]]; then
-                __zshctl_debug '*:filename:_files'" -P $settings[prefix]"
-                # What is -P and how does it relate to -g?
-                _arguments '*:filename:_files'" -P $settings[prefix]"
-            else
-                _arguments '*:filename:_files'
-            fi
-        fi
-    fi
+    return 1
 }
 
 # don't run the completion function when being source-ed or eval-ed

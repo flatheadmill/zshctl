@@ -152,6 +152,11 @@ function completion:encache {
     zshctl[args:invoke]=${(j: :)${(@qq)@}}
 }
 
+function completion:directories {
+    zshctl[args:kind]=directories
+    zshctl[args:filters]=${(j: :)${(@qq)@}}
+}
+
 function completion:files {
     zshctl[args:kind]=files
     zshctl[args:filters]=${(j: :)${(@qq)@}}
@@ -523,7 +528,11 @@ function parser {
         printf '%s\n' ${(pj:\n:)typesets}
     fi
 
-    state=option
+    if (( top )); then
+        state=option
+    else
+        state=arguments
+    fi
     zshctl[args:offset]=1
 
     integer last
@@ -534,6 +543,7 @@ function parser {
         case $state:$popped in
         (option:--)
             (( complete )) || ((top--))
+            zshctl[args:state]=arguments
             break
             ;;
         (option:--*)
@@ -612,7 +622,10 @@ function parser {
             fi
             ;;
         (option:*)
-            (( intersperse )) || break
+            if (( ! intersperse )); then
+                zshctl[args:state]=arguments
+                break
+            fi
             interspersed+=( $popped )
             ((top--))
             continue

@@ -46,6 +46,6 @@ function :execute:extend:link {
     ls -la ~/.local/share/$zshctl[program]/${extend[link_as]}
 }
 
-function :completion:extend:link {
-    [[ $zshctl[args:state] = arguments ]] && completion:files
+function :complete:extend:link {
+    [[ $zshctl[args:state] = arguments ]] && completion:directories
 }
