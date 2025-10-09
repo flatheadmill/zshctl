@@ -199,7 +199,6 @@ function _zshctl_descend_completion {
         fi
         if [[ $zshctl[args:kind] = none ]]; then
             _zshctl_completions $sofar
-        printf '<%s> <%s>\n' $zshctl[args:kind] ${#completion_match} >> $zshctl[args:debug]
             if (( ! ${#completion_match} )); then
                 zshctl[args:state]=nothing
             elif [[ $zshctl[args:incomplete] != -* ]]; then
@@ -213,7 +212,7 @@ function _zshctl_descend_completion {
 function _zshctl_completed {
     local key
     for key in ${(@ko)zshctl}; do
-        [[ $key = args:* && $key != args:(debug|incomplete) ]] || continue
+        [[ $key = args:* && $key != args:(debug) ]] || continue
         key=${key#args:}
         printf 'settings[%s]=%s\n' $key "${(@qq)zshctl[args:$key]}"
     done

@@ -445,111 +445,45 @@ __zshctl_get_completion_results() {
     local shellCompDirectiveEquals=128
     local shellCompDirectiveColon=256
 
-    if (((directive & shellCompDirectiveError) != 0)); then
-        # Error code.  No completion.
-        __zshctl_debug "Received error from custom completion go code"
-        return
-    else
-        if (((directive & shellCompDirectiveSlash) != 0)); then
-            out=$(awk -v suffix=/ '$0 != "" { print $0 suffix }' <<<"$out")
-        elif (((directive & shellCompDirectiveEquals) != 0)); then
-            out=$(awk -v suffix== '$0 != "" { print $0 suffix }' <<<"$out")
-        elif (((directive & shellCompDirectiveColon) != 0)); then
-            out=$(awk -v suffix=: '$0 != "" { print $0 suffix }' <<<"$out")
-        fi
-        if (((directive & shellCompDirectiveNoSpace) != 0)); then
-            if [[ $(type -t compopt) == builtin ]]; then
-                __zshctl_debug "Activating no space"
-                compopt -o nospace
-            else
-                __zshctl_debug "No space directive not supported in this version of bash"
-            fi
-        fi
-        if (((directive & shellCompDirectiveKeepOrder) != 0)); then
-            if [[ $(type -t compopt) == builtin ]]; then
-                # no sort isn't supported for bash less than < 4.4
-                if [[ ${BASH_VERSINFO[0]} -lt 4 || ( ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -lt 4 ) ]]; then
-                    __zshctl_debug "No sort directive not supported in this version of bash"
-                else
-                    __zshctl_debug "Activating keep order"
-                    compopt -o nosort
-                fi
-            else
-                __zshctl_debug "No sort directive not supported in this version of bash"
-            fi
-        fi
-        if (((directive & shellCompDirectiveNoFileComp) != 0)); then
-            if [[ $(type -t compopt) == builtin ]]; then
-                __zshctl_debug "Activating no file completion"
-                compopt +o default
-            else
-                __zshctl_debug "No file completion directive not supported in this version of bash"
-            fi
-        fi
+    if [[ ${settings[ordered]} -eq 1 ]]; then
+        compopt -o nosort
     fi
 
-    # Separate activeHelp from normal completions
-    local completions=()
-    local activeHelp=()
-
-    local directive=0
-
-    if (((directive & shellCompDirectiveFilterFileExt) != 0)); then
-        # File extension filtering
-        local fullFilter filter filteringCmd
-
-        # Do not use quotes around the $completions variable or else newline
-        # characters will be kept.
-        for filter in ${completions[*]}; do
-            fullFilter+="$filter|"
-        done
-
-        filteringCmd="_filedir $fullFilter"
-        __zshctl_debug "File filtering command: $filteringCmd"
-        $filteringCmd
-    elif (((directive & shellCompDirectiveFilterDirs) != 0)); then
-        # File completion for directories only
-
-        local subdir
-        subdir=${completions[0]}
-        if [[ -n $subdir ]]; then
-            __zshctl_debug "Listing directories in $subdir"
-            pushd "$subdir" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1 || return
+    case "${settings[kind]}:${settings[state]}" in
+    (completions:nothing)
+        __zshctl_debug NOTHING
+        compopt +o default
+        COMPREPLY=()
+        return 0
+        ;;
+    (directories:*)
+        if [[ -n ${settings[prefix]} ]]; then
+            # Filter results to add prefix
+            local -a dirs
+            while IFS= read -r dir; do
+                dirs+=( "${settings[prefix]}${dir}" )
+            done < <(compgen -d -- "${incomplete#${settings[prefix]}}")
+            COMPREPLY=( "${dirs[@]}" )
         else
-            __zshctl_debug "Listing directories in ."
-            _filedir -d
+            compgen -d -W "${completions[*]}" -- "${incomplete}"
         fi
-    else
-        __zshctl_handle_completion_types
-    fi
-
-    return
-
-    # TODO Help message.
-
-    compopt -o filenames -o noquote
-    COMPREPLY=( baz/snert/ baz/super/ )
-    return
-
-    __zshctl_handle_special_char "$cur" :
-    __zshctl_handle_special_char "$cur" =
-
-    # Print the activeHelp statements before we finish
-    if ((${#activeHelp[*]} != 0)); then
-        printf "\n";
-        printf "%s\n" "${activeHelp[@]}"
-        printf "\n"
-
-        # The prompt format is only available from bash 4.4.
-        # We test if it is available before using it.
-        if (x=${PS1@P}) 2> /dev/null; then
-            printf "%s" "${PS1@P}${COMP_LINE[@]}"
+        return 0
+        ;;
+    (files:*)
+        if [[ -n ${settings[prefix]} ]]; then
+            local -a files
+            while IFS= read -r file; do
+                files+=( "${settings[prefix]}${file}" )
+            done < <(compgen -f -- "${incomplete#${settings[prefix]}}")
+            COMPREPLY=( "${files[@]}" )
         else
-            # Can't print the prompt.  Just print the
-            # text the user had typed, it is workable enough.
-            printf "%s" "${COMP_LINE[@]}"
+            compgen -f -- "${incomplete}"
         fi
-    fi
+        return 0
+        ;;
+    esac
+
+    __zshctl_handle_completion_types
 }
 
 __zshctl_handle_completion_types() {
@@ -596,7 +530,7 @@ __zshctl_handle_standard_completion_case() {
 
     local longest=0
     local compline
-    __zshctl_debug "completions<${#completions}> incomplete<${settings[incomplete]}>"
+    __zshctl_debug "completions<${#completions[@]}> incomplete<${settings[incomplete]}>"
     for comp in "${completions[@]}"; do
         __zshctl_debug "comp<${comp}>"
         [[ "$comp" = "${settings[incomplete]}"* ]] || continue
