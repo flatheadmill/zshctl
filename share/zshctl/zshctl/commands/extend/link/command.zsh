@@ -45,3 +45,7 @@ function :execute:extend:link {
     ln -s ${found[1]:A:h} ~/.local/share/$zshctl[program]/${extend[link_as]}
     ls -la ~/.local/share/$zshctl[program]/${extend[link_as]}
 }
+
+function :completion:extend:link {
+    [[ $zshctl[args:state] = arguments ]] && completion:files
+}

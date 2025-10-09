@@ -63,6 +63,11 @@ function :args:version {
 # consistent or within the `zshctl` object as `zshctl[args:state]`, if we want
 # to have one to rule them all.
 function :complete:version {
+    # TODO We can't do this now because $o_format will be defined, but not
+    # assigned. We'd have to update the parser to only print the typedef once we
+    # were certain we had value. Not difficult. Push the lines into a typedefs
+    # array and print them when you hit the assignments.
+    # [[ -v o_format ]] && return
     case $zshctl[args:state]:$zshctl[args:matched] in
     (value:(-f|--format))
         completion terse 'display version number only'

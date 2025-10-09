@@ -199,6 +199,12 @@ function _zshctl_descend_completion {
         fi
         if [[ $zshctl[args:kind] = none ]]; then
             _zshctl_completions $sofar
+        printf '<%s> <%s>\n' $zshctl[args:kind] ${#completion_match} >> $zshctl[args:debug]
+            if (( ! ${#completion_match} )); then
+                zshctl[args:state]=nothing
+            elif [[ $zshctl[args:incomplete] != -* ]]; then
+                zshctl[args:state]='command'
+            fi
         fi
         _zshctl_completed
     fi

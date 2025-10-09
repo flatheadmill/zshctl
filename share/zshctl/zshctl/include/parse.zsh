@@ -308,7 +308,16 @@ function _zshctl_completions {
                 if [[ $key = *=* ]]; then
                     key=${key%=*}
                 fi
-                completion -- $key ${line%.}
+                case ${zshctl[args:incomplete][1]}:${key[1]} in
+                (-:-)
+                    completion -- $key ${line%.}
+                    ;;
+                (-:*|*:-)
+                    ;;
+                (*)
+                    completion -- $key ${line%.}
+                    ;;
+                esac
             done
             state=key
             ;;
@@ -514,7 +523,8 @@ function parser {
         printf '%s\n' ${(pj:\n:)typesets}
     fi
 
-    state=switch
+    state=option
+    zshctl[args:offset]=1
 
     integer last
     typeset extant key interspersed=() flag truth=1
@@ -522,11 +532,11 @@ function parser {
         popped=$stack[$top]
         last=$(( top == 1 ))
         case $state:$popped in
-        (switch:--)
+        (option:--)
             (( complete )) || ((top--))
             break
             ;;
-        (switch:--*)
+        (option:--*)
             # First determine the flag name so we can look up the options
             # definition. Note that this case statement has spaces in it
             # because the ViM Zsh syntax cannot parse it otherwise.
@@ -573,7 +583,7 @@ function parser {
                 ;;
             esac
             ;;
-        (switch:-?*)
+        (option:-?*)
             flag=${popped[2,2]}
             if (( ! ${+short[${popped[2,2]}]} )); then
                 printf '%s %s unknown %s %s\n' $error $funcstack[$depth] $popped[1,2] $last
@@ -601,7 +611,7 @@ function parser {
                 esac
             fi
             ;;
-        (switch:*)
+        (option:*)
             (( intersperse )) || break
             interspersed+=( $popped )
             ((top--))
@@ -652,7 +662,7 @@ function parser {
                 return
             fi
             truth=1
-            state=switch
+            state=option
             ((top--))
             continue
             ;;
@@ -667,11 +677,14 @@ function parser {
             ((top++))
             stack[$top]=$(( ! ${option[negate]:-0} ))
             state=value
+            zshctl[args:offset]=1
             ;;
         (map)
             state=key
+            zshctl[args:offset]=1
             ;;
         (*)
+            zshctl[args:offset]=1
             state=value
             ;;
         esac
@@ -717,6 +730,7 @@ function parser {
         done
         printf 'zshctl[args:matched]=%s\n' ${(qqq)option[matched]}
         printf 'zshctl[args:state]=%s\n' ${(qqq)zshctl[args:state]}
+        printf 'zshctl[args:offset]=%s\n' ${(qqq)zshctl[args:offset]}
         printf 'zshctl+=( args:mode inline )\n'
         printf '_zshctl_descend_completion %s "$@"\n' $funcstack[$top]
     esac

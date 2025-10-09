@@ -1,13 +1,12 @@
-# ___ execute:completion:zsh _ description ___
-# Generate Zsh completions for
-# .PG .BR __program__ .
-# ___ execute:completion:zsh _ man ___
+# ___ :execute:completion:zsh _ man ___
 # .PG __program__\ completion \- generate Zsh shell completions
 # .SH SYNOPSIS
 # .PG .SY __program__\ completion\ zsh
 # .PG .SY __program__\ completion\ zsh
 # .RB [ \-h | \-\-help ]
 # .YS
+# .DC Generate Zsh completions for
+# .PG .BR __program__ .
 # .SH DESCRIPTION
 # Generates Zsh compltions for
 # .PG .BR __program__ .

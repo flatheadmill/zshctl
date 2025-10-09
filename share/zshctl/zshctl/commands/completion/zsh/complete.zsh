@@ -31,6 +31,7 @@ function __zshctl_actual {
     # TODO What else do we get to play with.
     __zshctl_debug '========= starting completion logic =========='
     __zshctl_debug 'CURRENT: %d, words: %s, curcontext %s' $CURRENT ${(j: :)${(@qq)words}} $curcontext
+    __zshctl_debug 'curcontext <%s>' $curcontext
 
     integer ret=1
     _call_function ret _zshctl-foo
@@ -187,15 +188,38 @@ function __zshctl_actual {
         described=( "${(@)completions}" )
     fi
 
-    typeset option describe=()
+    typeset completer=${${curcontext#:}%%:*}
+    __zshctl_debug 'original curcontext <%s>' $curcontext
+    __zshctl_debug 'completer <%s>' $completer
+
+    typeset option describe=() curcontext
     case $settings[state] in
-    (switch)
+    (command)
+        describe_args+=( -t commands )
+        curcontext=":_zshctl:$completer:${settings[command]}:argument-1"
+        describe=(
+            _describe "${(@)describe_args}" 'options' described "${(@)comp_args}"
+        )
+        __zshctl_debug 'curcontext <%s>' $curcontext
+        __zshctl_debug 'Calling _describe: %s' "${(j: :)${(@qq)describe}}"
+        "${(@)describe}"
+        return
+        ;;
+    (option)
+        describe_args+=( -t options )
+        curcontext=":_zshctl:$completer:${settings[command]}:"
+        describe=(
+            _describe "${(@)describe_args}" 'options' described "${(@)comp_args}"
+        )
+        __zshctl_debug 'curcontext <%s>' $curcontext
+        __zshctl_debug 'Calling _describe: %s' "${(j: :)${(@qq)describe}}"
+        "${(@)describe}"
         return
         ;;
     (value)
         describe_args+=( -t values )
-        option=option-${settings[matched]##*-}-1
-        typeset curcontext=":completion:_zshctl::${settings[command]}:${option}"
+        option=option-${settings[matched]##*-}-${settings[offset]}
+        typeset curcontext=":_zshctl:$completer:${settings[command]}:${option}"
         __zshctl_debug 'comp_args <%s>' "${(j: :)${(@qq)comp_args}}"
         __zshctl_debug 'describe_args <%s>' "${(j: :)${(@qq)describe_args}}"
         __zshctl_debug 'curcontext <%s>' $curcontext
@@ -205,10 +229,13 @@ function __zshctl_actual {
         )
         __zshctl_debug 'Calling _describe: %s' "${(j: :)${(@qq)describe}}"
         "${(@)describe}"
+        __zshctl_debug 'curcontext <%s>' $curcontext
         return
         ;;
+    (nothing)
+        return 1
+        ;;
     esac
-
     typeset describe=(
         _describe "${(@)describe_args}" completions described "${(@)comp_args}"
     )
