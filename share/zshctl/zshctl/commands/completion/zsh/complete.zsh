@@ -236,6 +236,14 @@ function __zshctl_actual {
         __zshctl_debug 'curcontext <%s>' $curcontext
         return
         ;;
+    (completions:arguments)
+        typeset tag=${settings[tag]:-arguments}
+        describe_args+=( -t $tag )
+        curcontext=":_zshctl:$completer:${settings[command]}:argument-rest"
+        describe=( _describe "${(@)describe_args}" 'value' described "${(@)comp_args}" )
+        "${(@)describe}"
+        return
+        ;;
     (completions:nothing)
         ;;
     (directories:*)
@@ -249,8 +257,9 @@ function __zshctl_actual {
         ;;
     (files:*)
         typeset curcontext=":_zshctl:$completer:${settings[command]}:argument-rest"
+        __zshctl_debug 'files'
         __zshctl_debug 'curcontext <%s>' $curcontext
-        _files
+        _files "${(@)comp_args}"
         return
         ;;
     esac

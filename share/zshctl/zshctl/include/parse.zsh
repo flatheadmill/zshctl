@@ -163,13 +163,25 @@ function completion:files {
 }
 
 function completion {
-    eval "$(args -b o,ordered f,filenames -s k,key v,valid p,prefix s,suffix m,message -- "$@")"
+    eval "$(args -b n,nothing o,ordered f,filenames -s d,delimiter t,tag k,key v,valid p,prefix s,suffix m,message -- "$@")"
     zshctl[args:kind]=completions
+    if (( o_nothing )); then
+        zshctl[args:state]=nothing
+    fi
+    if [[ -v o_delimiter ]]; then
+        zshctl[args:delimiter]=$o_delimiter
+    fi
+    if [[ -v o_tag ]]; then
+        zshctl[args:tag]=$o_tag
+    fi
     if (( o_ordered )); then
         zshctl[args:ordered]=1
     fi
     if [[ -v o_suffix ]]; then
         zshctl[args:suffix]=$o_suffix
+    fi
+    if [[ -v o_prefix ]]; then
+        zshctl[args:prefix]=$o_prefix
     fi
     if [[ -v o_valid ]]; then
         zshctl[args:valid]=$o_valid
@@ -543,7 +555,7 @@ function parser {
         case $state:$popped in
         (option:--)
             (( complete )) || ((top--))
-            zshctl[args:state]=arguments
+            state=arguments
             break
             ;;
         (option:--*)
@@ -623,7 +635,7 @@ function parser {
             ;;
         (option:*)
             if (( ! intersperse )); then
-                zshctl[args:state]=arguments
+                state=arguments
                 break
             fi
             interspersed+=( $popped )
