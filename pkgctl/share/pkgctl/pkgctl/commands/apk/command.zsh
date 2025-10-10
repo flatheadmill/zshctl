@@ -1,6 +1,7 @@
 #!/zshctl/bin/zshctl
 
 function :execute:apk {
+    include heredoc
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'

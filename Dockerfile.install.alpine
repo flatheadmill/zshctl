@@ -1,6 +1,6 @@
 ARG ZSHCTL_PREVIOUS_VERSION
 
-FROM harbor.acreops.org/zshctl/alpine:v${ZSHCTL_PREVIOUS_VERSION} AS previous
+FROM ghcr.io/flatheadmill/zshctl-alpine:v${ZSHCTL_PREVIOUS_VERSION} AS previous
 
 ARG ZSHCTL_PREVIOUS_VERSION
 ARG ZSHCTL_VERSION

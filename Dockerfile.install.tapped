@@ -31,8 +31,7 @@ USER homebrewer
 RUN /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 WORKDIR /work
 COPY www/install/Darwin-brew.zsh /work
-RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH brew tap zshctl/zshctl https://zshctl.sh/brew.git
-RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH brew install zshctl
+RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH zsh Darwin-brew.zsh
 RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
 RUN PATH=/home/linuxbrew/.linuxbrew/bin:$PATH bash -c 'echo zshctl ${ZSHCTL_VERSION} $(zshctl version)'
 

@@ -32,7 +32,7 @@ function generate_release {
 }
 
 function :execute:apt {
-    require heredoc
+    include heredoc
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'

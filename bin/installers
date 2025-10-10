@@ -1,0 +1,36 @@
+#!/usr/bin/env zshctl
+
+function :args {
+    integer o_cache=1 o_push=1
+    eval "$(args -db!P p,push -db!C c,cache -- "$@")"
+}
+
+function :execute {
+    if (( ! $# )); then
+        set -- alpine archlinux fedora gentoo homebrew ubuntu
+    fi
+    typeset root=${functions_source[:execute]:A:h:h}
+    typeset -A version=( "${(@QA)${(z)$(
+        jq -r '[ "previous", .previous, "next", .next ] | @sh' < $root/versions.json
+    )}}" )
+    if false && (( $o_uncache )); then
+        for distro in "$@"; do
+            docker rmi ghcr.io/flatheadmill/zshctl-$distro:v$version[next] 2>/dev/null
+        done
+        docker image prune --force -a
+    fi
+    typeset args=()
+    (( ! o_cache )) && args+=( --no-cache )
+    for distro in "$@"; do
+        docker build \
+            "${(@)args}" \
+            --progress plain \
+            --build-arg ZSHCTL_VERSION=$version[next] \
+            --build-arg ZSHCTL_PREVIOUS_VERSION=$version[previous] \
+            -t ghcr.io/flatheadmill/zshctl-$distro:v$version[next] \
+            -f Dockerfile.install.$distro . || exit 1
+        (( o_push )) && docker push ghcr.io/flatheadmill/zshctl-$distro:v$version[next]
+    done
+}
+
+# vim: ft=zsh :
