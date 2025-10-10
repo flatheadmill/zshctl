@@ -31,7 +31,8 @@ function generate_release {
     do_hash "SHA256" "sha256sum"
 }
 
-function execute:apt {
+function :execute:apt {
+    include heredoc
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'

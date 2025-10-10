@@ -1,6 +1,6 @@
 ARG ZSHCTL_PREVIOUS_VERSION
 
-FROM harbor.acreops.org/zshctl/ubuntu:v${ZSHCTL_PREVIOUS_VERSION} AS previous
+FROM ghcr.io/flatheadmill/zshctl-ubuntu:v${ZSHCTL_PREVIOUS_VERSION} AS previous
 
 ARG ZSHCTL_VERSION
 

@@ -1,10 +1,12 @@
 #!/zshctl/bin/zshctl
 
-function execute:yum {
+function :execute:yum {
+    include heredoc
     export GPG_TTY=$(tty)
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'
+    [[ -z $version ]] && abend 'no version'
     mkdir -p /html
     if [[ -d previous/yum ]]; then
         mv previous/yum /html/yum

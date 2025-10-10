@@ -1,6 +1,6 @@
 ARG ZSHCTL_PREVIOUS_VERSION
 
-FROM harbor.acreops.org/zshctl/fedora:v${ZSHCTL_PREVIOUS_VERSION} AS previous
+FROM ghcr.io/flatheadmill/zshctl-fedora:v${ZSHCTL_PREVIOUS_VERSION} AS previous
 
 ARG ZSHCTL_PREVIOUS_VERSION
 ARG ZSHCTL_VERSION

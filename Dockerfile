@@ -4,7 +4,7 @@ FROM ghcr.io/flatheadmill/zshctl:v${PREVIOUS_VERSION} AS fetched
 
 FROM fetched AS previous
 
-COPY --from=fetched /usr/share/nginx/html/  /html/
+COPY --from=fetched /var/zshctl.github.io/ /html/
 
 FROM alpine AS compiled
 
@@ -13,6 +13,7 @@ RUN apk update
 RUN apk add zsh git gpg gpg-agent openssl
 COPY ./ /zshctl/
 WORKDIR /work
+RUN echo 1
 RUN --mount=type=secret,id=rsa --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/pkgctl/bin/pkgctl compile
 RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 

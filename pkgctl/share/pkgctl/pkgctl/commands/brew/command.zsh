@@ -1,4 +1,5 @@
-function execute:brew {
+function :execute:brew {
+    include heredoc
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'
@@ -17,7 +18,8 @@ function execute:brew {
         git clone brew.git brew
         mkdir -p /html/downloads
     else
-        git clone /work/previous/brew.git brew
+        # git clone /work/previous/brew.git brew
+        git clone https://github.com/zshctl/homebrew-zshctl.git brew
         mv /work/previous/downloads /html/downloads
     fi
     if [[ -e brew/formula ]]; then

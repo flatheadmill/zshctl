@@ -1,6 +1,7 @@
 #!/zshctl/bin/zshctl
 
-function execute:aur {
+function :execute:aur {
+    include heredoc
     typeset version
     version=$(zsh compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'
