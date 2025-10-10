@@ -33,9 +33,15 @@ function _zshctl_options {
 #
 function usage {
     setopt localoptions extendedglob
-    typeset usage=${1:-$funcstack[2]} man=${2:-0} cols="$(echoti cols)"
+    integer top=2
+    while [[ $funcstack[$top] != (:execute:*|:execute|:args:*|:args)  ]]; do
+        ((top++))
+        (( top <= ${#funcstack} )) || abend 'must be called from an :execute or :args function'
+    done
+    typeset usage=${funcstack[$top]} man=${2:-0} cols="$(echoti cols)"
+    usage=${usage//#:args/:execute}
     typeset release_date=$(strftime '%B %-d, %Y' $zshctl[release_date])
-    typeset capitalized=$zshctl[program]:${usage#*:} state=copy
+    typeset capitalized=$zshctl[program]${usage#:execute} state=copy
     capitalized=${${capitalized//:/-}:u}
     typeset mandoc=() lines=() split=() line cmd src=()
     integer dirty=1

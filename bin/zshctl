@@ -131,10 +131,6 @@ function delegate {
 # about the each resource with the .BR --help option.
 # .ZC commands
 # ___
-function :args {
-    eval "$(args -UD -bx h,help -- "$@")"
-}
-
 function :execute {
     delegate "$@"
 }
@@ -399,7 +395,9 @@ function {
     done
     # Create a stub `:complete` function if we were not invoked by shebang.
     if (( is_zshctl )); then
-        : ${functions[:complete]::=true}
+        function :args {
+            eval "$(args -UD -bx h,help -- "$@")"
+        }
     fi
     # `__complete` is a special argument passed by completions, so we follow
     # the completion path for it, otherwise the execute path.
