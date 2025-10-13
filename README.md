@@ -19,6 +19,75 @@ Second, for autoloading, we have the ability to auto-generate your commands
 section. It will be a sorted list of commands that are available according to
 the command discovery mechanism, which is still in flux.
 
+## Utilities
+
+### `heredoc`
+
+The `heredoc` function solves the spaces vs tabs problem with multi-line strings in shell scripts. While Zsh's built-in `<<-` heredoc only strips leading tabs, `heredoc` strips common leading spaces, working with how modern editors actually indent.
+
+**Basic usage:**
+```zsh
+include heredoc
+
+# Assign clean YAML to variable
+typeset config
+heredoc -v config <<'    EOF'
+    apiVersion: v1
+    kind: ConfigMap
+    data:
+      key: value
+EOF
+# $config now has the YAML without leading spaces
+```
+
+**Modes:**
+- `heredoc` - Read from stdin, strip indentation, print to stdout
+- `heredoc -v varname` - Assign de-indented content to variable
+- `heredoc -q` - Quote mode, preserve literally (for templates with `$vars`)
+- `heredoc -f format args...` - Use as printf format string
+
+**Real-world examples:**
+
+YAML template for Kubernetes:
+```zsh
+typeset template
+heredoc -v template <<'    EOF'
+    apiVersion: isindir.github.com/v1alpha3
+    kind: SopsSecret
+    metadata: {}
+    spec:
+      secretTemplates: {}
+EOF
+```
+
+Git commit message template with quote mode:
+```zsh
+typeset message
+heredoc -q -v message <<'    EOF'
+    ### Description
+    ${blocks[description]}
+    ### Risk Assessment
+    ${blocks[risk_assessment]}
+EOF
+# Variables like ${blocks[description]} are preserved for later expansion
+```
+
+JSON configuration:
+```zsh
+typeset json_config
+heredoc -v json_config <<'    EOF'
+    {
+      "name": "example",
+      "settings": {
+        "enabled": true,
+        "timeout": 30
+      }
+    }
+EOF
+```
+
+This allows natural indentation in your code while producing clean output - pragmatic tooling that works with what developers actually type, not what the tabs vs spaces war says they should type.
+
 ## Checklist
 
 - [ ] Documentation.

@@ -26,8 +26,8 @@ if ! whence brew > /dev/null; then
 fi
 
 # tap and install zshctl.
-brew tap zshctl/zshctl https://zshctl.sh/brew.git
-brew install zshctl
+brew install zshctl/zshctl/zshctl
+#brew install zshctl
 
 type zshctl
 "$(brew --prefix)/bin/zshctl" version

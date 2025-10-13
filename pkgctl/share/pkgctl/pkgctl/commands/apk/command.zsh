@@ -1,6 +1,7 @@
 #!/zshctl/bin/zshctl
 
-function execute:apk {
+function :execute:apk {
+    include heredoc
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'
@@ -71,7 +72,7 @@ function execute:apk {
     abuild -r || abend '`abuild -r` failed'
     # TODO Can I make this a no-arch package?
     mkdir -p /html/apk/x86_64
-    if [[ ! -e /work/previous/zero ]]; then
+    if [[ ! -e previous/zero ]]; then
         cp /work/previous/apk/x86_64/*.apk /html/apk/x86_64
     fi
     find /home/build/packages

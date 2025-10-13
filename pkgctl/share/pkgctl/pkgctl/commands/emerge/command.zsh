@@ -31,7 +31,8 @@ function ebuild_conf {
     EOF
 }
 
-function execute:emerge {
+function :execute:emerge {
+    include heredoc
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'

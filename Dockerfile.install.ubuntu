@@ -1,0 +1,27 @@
+ARG ZSHCTL_PREVIOUS_VERSION
+
+FROM ghcr.io/flatheadmill/zshctl-ubuntu:v${ZSHCTL_PREVIOUS_VERSION} AS previous
+
+ARG ZSHCTL_VERSION
+
+RUN apt-get update
+RUN apt-get -y upgrade
+RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+RUN bash -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
+RUN touch /monkey
+
+FROM ubuntu:noble AS apt
+
+ARG ZSHCTL_VERSION
+
+RUN apt-get update
+RUN apt-get -y upgrade
+RUN apt-get install -y sudo wget
+WORKDIR /work
+
+COPY www/install/Linux-ubuntu.bash /work
+RUN bash Linux-ubuntu.bash
+RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+RUN bash -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
+
+#COPY --from=previous /monkey /monkey

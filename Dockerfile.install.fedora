@@ -1,0 +1,27 @@
+ARG ZSHCTL_PREVIOUS_VERSION
+
+FROM ghcr.io/flatheadmill/zshctl-fedora:v${ZSHCTL_PREVIOUS_VERSION} AS previous
+
+ARG ZSHCTL_PREVIOUS_VERSION
+ARG ZSHCTL_VERSION
+
+RUN sh -c 'echo update ${ZSHCTL_PREVIOUS_VERSION} to ${ZSHCTL_VERSION}'
+RUN dnf clean all && dnf makecache
+RUN dnf -y upgrade
+RUN bash -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
+RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+
+RUN touch /monkey
+
+FROM fedora
+
+ARG ZSHCTL_VERSION
+
+RUN dnf -y upgrade
+WORKDIR /work
+COPY www/install/Linux-fedora.bash /work
+RUN bash Linux-fedora.bash
+RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+RUN bash -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
+
+COPY --from=previous /monkey /monkey

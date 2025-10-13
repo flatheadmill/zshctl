@@ -1,4 +1,5 @@
-function execute:compile {
+function :execute:compile {
+    include heredoc
     typeset version=$NEXT_VERSION
     # Get the seconds since the epoch of the commit.
     date=$(git -C /zshctl show --no-patch --format=%ct)
@@ -21,5 +22,5 @@ function execute:compile {
     gpg --import /run/secrets/gpg
     gpg --list-secret-keys --keyid-format=long
     openssl rsa -in /run/secrets/rsa -pubout -out /work/html/keys/$conf[apk.key.name].rsa.pub
-    gpg --armor --export 'Package Signing' > /work/html/keys/gpg
+    gpg --armor --export $conf[gpg.key.name] > /work/html/keys/gpg
 }

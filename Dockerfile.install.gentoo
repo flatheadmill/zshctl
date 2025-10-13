@@ -1,0 +1,31 @@
+ARG ZSHCTL_PREVIOUS_VERSION
+
+FROM ghcr.io/flatheadmill/zshctl-gentoo:v${ZSHCTL_PREVIOUS_VERSION} AS previous
+
+ARG ZSHCTL_PREVIOUS_VERSION
+ARG ZSHCTL_VERSION
+
+RUN sh -c 'echo update ${ZSHCTL_PREVIOUS_VERSION} to ${ZSHCTL_VERSION}'
+RUN emaint sync --repo zshctl >/dev/null
+RUN emerge -qDuN world
+RUN bash -c 'echo zshctl ${ZSHCTL_VERSION} = $(zshctl version)'
+RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+
+RUN touch /monkey
+
+FROM gentoo/portage AS portage
+FROM gentoo/stage3:latest AS gentoo
+
+ARG ZSHCTL_VERSION
+
+COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
+
+#RUN emaint --all sync >/dev/null
+RUN emerge -qDuN world
+WORKDIR /work
+COPY www/install/Linux-gentoo.bash /work
+RUN bash Linux-gentoo.bash
+RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+RUN bash -c 'echo zshctl ${ZSHCTL_VERSION} = $(zshctl version)'
+
+COPY --from=previous /monkey /monkey

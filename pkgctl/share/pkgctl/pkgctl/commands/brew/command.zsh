@@ -1,14 +1,15 @@
-function execute:brew {
+function :execute:brew {
+    include heredoc
     typeset version
-    version=$(zsh compiled/$conf[program]/bin/$conf[program] version) ||
+    version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'
-    typeset forumula=${functions_source[execute:brew]:h}/formula.rb
     # Configure `git`.
     git config --global user.email $conf[user.email]
     git config --global user.name $conf[user.name]
     git config --global init.defaultBranch main
     # If we have never been run before, create a new repo and directory
     # structure, otherwise copy over the previous directory structure.
+    mkdir -p /html
     if [[ -e previous/zero ]]; then
         mkdir brew.git
         git -C brew.git init
@@ -17,9 +18,12 @@ function execute:brew {
         git clone brew.git brew
         mkdir -p /html/downloads
     else
-        mkdir -p /html
+        # git clone /work/previous/brew.git brew
+        git clone https://github.com/zshctl/homebrew-zshctl.git brew
         mv /work/previous/downloads /html/downloads
-        git clone /work/previous/brew.git
+    fi
+    if [[ -e brew/formula ]]; then
+        mv brew/formula brew/Formula
     fi
     # Create a tarball containing the program.
     mv compiled/$conf[program]-$version.tar.gz /html/downloads/

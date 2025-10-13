@@ -1,8 +1,4 @@
-# ___ execute:completion _ description ___
-# Install
-# .PG .B __program__
-# shell completions for Zsh or Bash.
-# ___ execute:completion _ man ___
+# ___ :execute:completion _ man ___
 # .SH NAME
 # .PG __program__\ completion \- generate shell completions
 # .SH SYNOPSIS
@@ -12,6 +8,9 @@
 # .PG .SY __program__\ completion
 # .RB [ \-h | \-\-help ]
 # .YS
+# .DC Install
+# .PG .B __program__
+# shell completions for Zsh or Bash.
 # .SH DESCRIPTION
 # Generates completions for Zsh and Bash.
 # .SH OPTIONS
@@ -22,8 +21,11 @@
 # .SH COMMANDS
 # .ZC commands
 # ___
-function execute:completion {
-    eval "$(args -UC -bx h,help -- "$@")"
+function :execute:completion {
     (( $# || parse[complete] )) || usage
     delegate "$@"
+}
+
+function :args:completion {
+    eval "$(args -UC -bx h,help -- "$@")"
 }

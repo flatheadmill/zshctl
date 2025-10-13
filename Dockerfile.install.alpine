@@ -1,0 +1,33 @@
+ARG ZSHCTL_PREVIOUS_VERSION
+
+FROM ghcr.io/flatheadmill/zshctl-alpine:v${ZSHCTL_PREVIOUS_VERSION} AS previous
+
+ARG ZSHCTL_PREVIOUS_VERSION
+ARG ZSHCTL_VERSION
+
+RUN sh -c 'echo update ${ZSHCTL_PREVIOUS_VERSION} to ${ZSHCTL_VERSION}'
+RUN apk --no-cache --repository https://zshctl.sh/apk search zshctl
+RUN rm -rf /var/cache/apk/* && apk --no-progress update
+RUN apk --no-progress upgrade
+
+RUN sh -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
+RUN sh -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+
+RUN touch /monkey
+
+FROM alpine AS apk
+
+ARG ZSHCTL_VERSION
+
+RUN echo ${ZSHCTL_VERSION} ${ZSHCTL_VERSION}
+RUN apk --no-progress update
+RUN apk --no-progress upgrade
+RUN apk --no-progress add sudo
+WORKDIR /work
+COPY www/install/Linux-alpine.sh /work
+RUN echo https://zshctl.sh/apk >> /etc/apk/repositories
+RUN sh Linux-alpine.sh
+RUN sh -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
+RUN sh -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+
+COPY --from=previous /monkey /monkey

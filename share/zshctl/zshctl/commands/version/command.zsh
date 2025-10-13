@@ -1,10 +1,7 @@
 zmodload zsh/datetime
 
 # TODO Make the format options a bullet list under it's entry in OPTIONS.
-# ___ execute:version _ description ___
-# Display the current version of
-# .PG .BR __program__ .
-# ___ execute:version _ man ___
+# ___ :execute:version _ man ___
 # .SH NAME
 # .PG __program__\ version \- display version
 # .SH SYNOPSIS
@@ -13,12 +10,16 @@ zmodload zsh/datetime
 # .PG .SY __program__\ version
 # .RB [ \-h | \-\-help ]
 # .YS
+# .DC Display the current version of
+# .PG .BR __program__ .
 # .SH DESCRIPTION
 # Displays the current version of
 # .PG .BR __program__ .
 # .SH OPTIONS
 # .TP
 # .BR \-f ,\  \-\-format =[ \fIterse\fR | \fIverbose\fR | \fIshell\fR | \fIjson\fR ]
+# .DC Display a verbose version as test, JSON, or shell escaped.
+#
 # Display one of
 # .I terse
 # for just the version number,
@@ -30,30 +31,44 @@ zmodload zsh/datetime
 # for the version number and release date as UNIX epoch as JSON.
 # .TP
 # .BR \-h ,\  \-\-help
-# Help for
+# .DC Help for
 # .PG .BR __program__\ version .
 # ___
-function execute:version {
-    typeset o_format=terse
-    eval "$(args -C -d f,format -bx h,help -- "$@")"
+function :execute:version {
     case $o_format in
-        terse )
-            print $zshctl[version]
-            ;;
-        verbose )
-            print "Version: $zshctl[version]\nRelease Date: $(strftime "%Y-%m-%dT%H:%M:%S:%z" $zshctl[release_date])"
-            ;;
-        shell )
-            print "${(qq)zshctl[version]} ${(qq)zshctl[release_date]}"
-            ;;
-        json )
-            printf '{"version":"%s","release_date":"%s"}\n' $zshctl[version] $zshctl[release_date]
-            ;;
+    (terse)
+        print $zshctl[version]
+        ;;
+    (verbose)
+        print "Version: $zshctl[version]\nRelease Date: $(strftime "%Y-%m-%dT%H:%M:%S:%z" $zshctl[release_date])"
+        ;;
+    (shell)
+        print "${(qq)zshctl[version]} ${(qq)zshctl[release_date]}"
+        ;;
+    (json)
+        printf '{"version":"%s","release_date":"%s"}\n' $zshctl[version] $zshctl[release_date]
+        ;;
     esac
 }
 
-function complete:version {
-    case $parse[state]:$parse[matched] in
+function :args:version {
+    typeset o_format=terse
+    eval "$(args -C -d f,format -bx h,help -- "$@")"
+}
+
+# TODO Want to organize the names for all these different objects used in the
+# system. We have `INCLUDES` and `COMMANDS` all caps which are system
+# variables, perhaps better expressed with a `_zshctl_` prefix, and we have this
+# parse object, here which might be better expressed as `args` to be
+# consistent or within the `zshctl` object as `zshctl[args:state]`, if we want
+# to have one to rule them all.
+function :complete:version {
+    # TODO We can't do this now because $o_format will be defined, but not
+    # assigned. We'd have to update the parser to only print the typedef once we
+    # were certain we had value. Not difficult. Push the lines into a typedefs
+    # array and print them when you hit the assignments.
+    # [[ -v o_format ]] && return
+    case $zshctl[args:state]:$zshctl[args:matched] in
     (value:(-f|--format))
         completion terse 'display version number only'
         completion verbose 'display version number and release date'

@@ -13,6 +13,7 @@ RUN apk update
 RUN apk add zsh git gpg gpg-agent openssl
 COPY ./ /zshctl/
 WORKDIR /work
+RUN echo 1
 RUN --mount=type=secret,id=rsa --mount=type=secret,id=gpg --mount=type=tmpfs,dst=/root/.gnupg /zshctl/pkgctl/bin/pkgctl compile
 RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
@@ -26,7 +27,7 @@ COPY ./ /zshctl/
 WORKDIR /work
 RUN /zshctl/pkgctl/bin/pkgctl brew
 
-FROM ubuntu:noble AS apt
+FROM ubuntu:24.04 AS apt
 
 RUN apt-get update
 RUN apt-get install -y make dpkg-dev git wget zsh
@@ -114,3 +115,4 @@ RUN find /html/ | sort
 FROM alpine
 
 COPY --from=index /html/ /var/zshctl.github.io/
+RUN find /var/zshctl.github.io | sort
