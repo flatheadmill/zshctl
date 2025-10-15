@@ -76,7 +76,7 @@ function _zshctl_mandown {
                     line="$match[4]"
                     continue
                 elif [[ $line =~ $regex[list] ]]; then
-                    if [[ is_list -eq 0 && ${#${match[1]}} > 1 ]]; then
+                    if [[ is_list -eq 0 && ${#match[1]} > 1 ]]; then
                         is_list=1
                         $pushf $array '.RS\n'
                     fi
@@ -152,6 +152,7 @@ function _zshctl_options {
         pair '^[[:space:]]+--[[:space:]]+([^=]+=.*)$'
         single '^[[:space:]]+--[[:space:]]+(.*)'
         escaped '^\\.'
+        list '^([[:space:]]+)\*[[:space:]]+(.*)[[:space:]]+--(.*)'
     )
     # TODO Must fix.
     typeset split=() match=() markup=() joined=() boolean=() markup=()
@@ -263,6 +264,55 @@ function _zshctl_options {
                     fi
                 fi
                 _zshctl_mandown options "$joined"
+                if [[ $zshctl[args:state] = value && $zshctl[args:long] = $long ]]; then
+                    function {
+                        setopt localoptions extendedglob
+                        integer is_list
+                        typeset line mode=scan body=() term joined action
+                        for line in "${(@)markup}" stop; do
+                            [[ -z $line ]] && continue
+                            if [[ $line =~ $regex[list] && ${#match[1]} > 1 ]]; then
+                                if (( is_list )); then
+                                    action=stop:start
+                                else
+                                    action=:start
+                                fi
+                            elif (( is_list )); then
+                                if [[ $line[1] = ' ' ]]; then
+                                    action=:append
+                                else
+                                    action=stop:
+                                fi
+                            fi
+                            while
+                                case $action in
+                                (stop:*)
+                                    joined="${(j::)body}"
+                                    if [[ $joined =~ $regex[escaped] ]]; then
+                                        joined=${joined#\\}
+                                    else
+                                        joined=${joined[1]:l}${joined[2,-1]}
+                                    fi
+                                    joined=${joined%.}
+                                    completion $term "$joined"
+                                    action=:${action#*:}
+                                    continue
+                                    ;;
+                                (*:start)
+                                    is_list=1
+                                    term=$match[2]
+                                    body=( "${match[3]##[[:space:]]##}" )
+                                    ;;
+                                (:append)
+                                    body+=( "${line##[[:space:]]##}" )
+                                    ;;
+                                esac
+                                action=
+                                false
+                            do; :; done
+                        done
+                    }
+                fi
                 mode=scan
                 continue
                 ;;
@@ -500,6 +550,7 @@ function _zshctl_completions {
     include heredoc
     typeset execute=${usage//#:help/:execute}
     function {
+        [[ $zshctl[args:state] = arguments ]] || return
         setopt localoptions extendedglob
         [[ $zshctl[args:incomplete] = -* ]] && return
         typeset sub=() lines=() verbose=() help usage joined
@@ -948,9 +999,10 @@ function parser {
         # Your set of provisional switches for your completions. We need to
         # rundown all the values used in the completions and all the values used
         # in our completion functions and determine a useful set.
-        printf 'zshctl[args:matched]=%s\n' ${(qqq)option[matched]}
-        printf 'zshctl[args:state]=%s\n' ${(qqq)zshctl[args:state]}
-        printf 'zshctl[args:offset]=%s\n' ${(qqq)zshctl[args:offset]}
+        printf 'zshctl[args:matched]=%s\n' ${(qq)option[matched]}
+        printf 'zshctl[args:long]=%s\n' ${(qq)option[long]}
+        printf 'zshctl[args:state]=%s\n' ${(qq)zshctl[args:state]}
+        printf 'zshctl[args:offset]=%s\n' ${(qq)zshctl[args:offset]}
         printf 'zshctl+=( args:mode inline )\n'
         printf '_zshctl_descend_completion %s "$@"\n' $funcstack[$top]
     esac

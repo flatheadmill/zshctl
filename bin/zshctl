@@ -186,7 +186,6 @@ function _zshctl_descend_completion {
         include parse
         $args "$@"
     else
-        include completions
         typeset -A completions=()
         typeset completion_match=()
         [[ $sofar != :args ]] && zshctl[args:command]=${zshctl[args:command]}${${sofar#:args}//:/-}
