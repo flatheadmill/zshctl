@@ -1,39 +1,27 @@
 zmodload zsh/datetime
 
-# TODO Make the format options a bullet list under it's entry in OPTIONS.
-# ___ :execute:version _ man ___
-# .SH NAME
-# .PG __program__\ version \- display version
-# .SH SYNOPSIS
-# .PG .SY __program__\ version
-# .RB [ \-f | \-\-format = \fIterse\fR | \fIverbose\fR | \fIshell\fR | \fIjson\fR ]
-# .PG .SY __program__\ version
-# .RB [ \-h | \-\-help ]
-# .YS
-# .DC Display the current version of
-# .PG .BR __program__ .
-# .SH DESCRIPTION
-# Displays the current version of
-# .PG .BR __program__ .
-# .SH OPTIONS
-# .TP
-# .BR \-f ,\  \-\-format =[ \fIterse\fR | \fIverbose\fR | \fIshell\fR | \fIjson\fR ]
-# .DC Display a verbose version as test, JSON, or shell escaped.
-#
-# Display one of
-# .I terse
-# for just the version number,
-# .I verbose
-# for the version number and release date,
-# .I shell
-# for the version number and release date as UNIX epoch shell quoted, or
-# .I json
-# for the version number and release date as UNIX epoch as JSON.
-# .TP
-# .BR \-h ,\  \-\-help
-# .DC Help for
-# .PG .BR __program__\ version .
-# ___
+function :help:version {
+    heredoc -v help -q <<'    EOF'
+    # terse
+    display version
+    # verbose
+    Display the current version of \`${zshctl[program]}\`.
+    # arg format -- < terse | verbose | shell | json >
+    Display a verbose version as test, JSON, or shell escaped.
+        * terse -- Display version number only.
+        * verbose -- Display version number and release date.
+        * shell -- Display shell esacped version number and release date as UNIX epoch.
+        * json -- Display version number and release date as UNIX epoch as JSON.
+    # arg help
+    Help for \`${zshctl[program]} version\`.
+    # man
+    ## DESCRIPTION
+    Displays the current version of \`${zshctl[program]}\`.
+    ## OPTIONS
+    ### options
+    EOF
+}
+
 function :execute:version {
     case $o_format in
     (terse)
@@ -77,3 +65,10 @@ function :complete:version {
         ;;
     esac
 }
+
+<<EOF > /dev/null
+    Display one of _terse_ for just the version number, _verbose_ for the
+    version number and release date, _shell_ for the version number and release
+    date as UNIX epoch shell quoted, or _json_ for the version number and
+    release date as UNIX epoch as JSON.
+EOF

@@ -1,6 +1,300 @@
 zmodload zsh/terminfo
 zmodload zsh/datetime
 
+function _zshctl_pushf {
+    typeset array=${1:-} string
+    shift
+    printf -v string -- "$@"
+    set -A $array "${(@P)array}" "$string"
+}
+
+function _zshctl_mandown {
+    typeset array=${1:-} lines=( "${(@Af)2}" )
+    shift 2
+    if [[ -z $lines[-1] ]]; then
+        lines=( "${(@)lines[1,-2]}" )
+    fi
+    setopt localoptions extendedglob
+    typeset line mode=scan match=() pushf=_zshctl_pushf
+    typeset -A regex=(
+        quotes '^(([^`_]|\\`)*)([`_])(.*)$'
+        backtick '^(([^`]|\\`)*)([`])(.*)$'
+        underbar '^(([^_]|\\`)*)([_])(.*)$'
+        list '^([[:space:]]+)\*[[:space:]]+(.*)[[:space:]]+--(.*)'
+    )
+    integer count=0 is_list=0
+    typeset quoted=() list=() quote unquote font outer
+    function _zshctl_markdown_debug {
+        if (( count == 1 )) && [[ $array = man ]]; then
+            printf 'mode >>%s<<\nline >>%s<<\nouter >>%s<<\n' $mode "$line" $outer
+            printf '>>%s<<\n' "${(j::)${(@P)array}}"
+            exit
+        fi
+    }
+    for line in "${(@)lines}"; do
+        outer=$line
+        while
+            (( count++ ))
+            # _zshctl_markdown_debug
+            case $mode:$line in
+            (scan:\#\#\# *)
+                [[ $line = (#b)\#\#\#\ #(*) ]]
+                $pushf $array '%s' "${(j::)${(@P)match[1]}}"
+                ;;
+            (scan:\#\# *)
+                [[ $line = (#b)\#\#\ #(*) ]]
+                $pushf $array '.SH %s\n' ${match[1]:u}
+                ;;
+            (scan:\`\`\`*)
+                mode=block
+                $pushf $array '.EX\n'
+                ;;
+            (block:\`\`\`)
+                mode=scan
+                $pushf $array '.EE\n'
+                ;;
+            (block:*)
+                if [[ -z $line ]]; then
+                    $pushf $array '%s\n' "$line"
+                else
+                    $pushf $array '%s\n' "    $line"
+                fi
+                ;;
+            (scan:*)
+                if [[ is_list -eq 1 && $outer != '  '* ]]; then
+                    is_list=0
+                    $pushf $array '.RE\n'
+                fi
+                if [[ $line =~ $regex[quotes] ]]; then
+                    quote="$match[1]"
+                    quoted=()
+                    mode=quoted
+                    case $match[3] in
+                    (\`) unquote=backtick font=B ;;
+                    (_) unquote=underbar font=I ;;
+                    esac
+                    line="$match[4]"
+                    continue
+                elif [[ $line =~ $regex[list] ]]; then
+                    if [[ is_list -eq 0 && ${#${match[1]}} > 1 ]]; then
+                        is_list=1
+                        $pushf $array '.RS\n'
+                    fi
+                    $pushf $array '.HP\n.B %s\n.br\n' $match[2]
+                    line=$match[3]
+                    continue
+                else
+                    $pushf $array '%s\n' "${line##[[:space:]]##}"
+                fi
+                ;;
+            (quoted:*)
+                if [[ $line =~ $regex[quotes] ]]; then
+                    quoted+=( "$match[1]" )
+                    line=$match[4]
+                    mode=unquote
+                    continue
+                else
+                    quoted+=( "$line" )
+                fi
+                ;;
+            (unquote:*)
+                if [[ -n $quote ]]; then
+                    $pushf $array '%s\n' $quote
+                fi
+                if [[ "$line" =~ ^([^[:space:]])(.*) ]]; then
+                    $pushf $array '.%sR %s %s\n' $font "${${(j: :)quoted}// /\\ }" "$line[1]"
+                    line=${line##$line[1]}
+                else
+                    $pushf $array '.%s %s\n' $font "${(j: :)quoted}"
+                fi
+                line=${line##[[:space:]]##}
+                mode=scan
+                if [[ -n "$line" ]]; then
+                    continue
+                fi
+                ;;
+            esac
+            false
+        do; :; done;
+    done
+    if (( is_list )); then
+        $pushf $array '.RE\n'
+    fi
+}
+
+# One function to pretty much gather up everything needed to create a man page,
+# to include commands from sub-commands, format a synopsis, format an options
+# section, and gather up completions.
+#
+# Caller defines the following.
+#
+# lines=() - help definition split as lines with no newline
+#
+# Caller can opt-in to particular collection by defining one of the following.
+#
+# terse=() - array of terse description lines without newlines
+# verbose=() - array of verbose description lines without newlines
+# mandown=() - array of man page lines without newlines
+# completions=() - gather completions as name and description pairs
+# synopsis=() - array of synopsis section man with newlines
+# options=() - array of options section man with newlines
+function _zshctl_options {
+    [[ -v mandown ]]     || typeset mandown=()
+    [[ -v synopsis ]]    || typeset synopsis=()
+    [[ -v commands ]]    || typeset commands=()
+    [[ ${(t)options} == array-local ]]     || typeset options=()
+    [[ -v completions ]] || typeset -A completions=()
+    [[ -v completion_match ]] || typeset completion_match=()
+    [[ -v terse ]]       || typeset terse=()
+    [[ -v verbose ]]     || typeset verbose=()
+    typeset -A option regex=(
+        arg '^#[[:space:]]+arg[[:space:]]+([^[:space:]]+)(.*)'
+        pair '^[[:space:]]+--[[:space:]]+([^=]+=.*)$'
+        single '^[[:space:]]+--[[:space:]]+(.*)'
+        escaped '^\\.'
+    )
+    # TODO Must fix.
+    typeset split=() match=() markup=() joined=() boolean=() markup=()
+    typeset pushf=_zshctl_pushf long mode=scan help trim
+    $pushf synopsis '.SH SYNOPSIS\n'
+    $pushf synopsis '.SY %s\n' "${(j:\ :)${(@)program_path}}"
+    for line in "${(@)lines}"; do
+        while
+            case $mode:$line in
+            (scan:\# terse)
+                mode=terse
+                ;;
+            (terse:\# *)
+                mode=scan
+                continue
+                ;;
+            (terse:*)
+                terse+=( "$line" )
+                ;;
+            (scan:\# verbose)
+                mode=verbose
+                ;;
+            (verbose:\# *)
+                mode=scan
+                continue
+                ;;
+            (verbose:*)
+                verbose+=( "$line" )
+                ;;
+            (scan:\# man)
+                mode=mandown
+                ;;
+            (scan:\# arg *)
+                [[ $line =~ $regex[arg] ]]
+                long=$match[1]
+                if [[ $match[2] =~ $regex[pair] ]]; then
+                    option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
+                    $pushf options '.HP\n'
+                    if [[ -n $option[short] ]]; then
+                        $pushf options '.B \-%s\n' $option[short]
+                        $pushf options '.RI %s,\n' $match[1]
+                    fi
+                    $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
+                    $pushf options '.RI %s\n' $match[1]
+                    $pushf options '.br\n'
+                    $pushf synopsis '.RB [ '
+                    if [[ -n $option[short] ]]; then
+                        $pushf synopsis '\-%s | ' $option[short]
+                    fi
+                    $pushf synopsis '%s\n' '\-\-'$long # must put a backslash in front of
+                    $pushf synopsis '.RI %s]\n' $match[1]
+                    mode=argdown
+                    markup=()
+                elif [[ $match[2] =~ $regex[single] ]]; then
+                    option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
+                    match=( "${(@)${(@)match##[[:space:]]##}%%[[:space:]]##}" )
+                    $pushf options '.HP\n'
+                    if [[ -n $option[short] ]]; then
+                        $pushf options '.BR \-%s ,\n' $option[short]
+                    fi
+                    $pushf options '.B \-\-%s\n' $long
+                    $pushf options '.RI %s\n' $match[1]
+                    $pushf options '.br\n'
+                    $pushf synopsis '.RB [ '
+                    if [[ -n $option[short] ]]; then
+                        $pushf synopsis '\-%s | ' $option[short]
+                    fi
+                    $pushf synopsis '\-\-%s\n' $long
+                    $pushf synopsis '.RI %s]\n' $match[1]
+                    mode=argdown
+                    markup=()
+                else
+                    option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
+                    $pushf options '.HP\n'
+                    if [[ -n $option[short] ]]; then
+                        $pushf options '.BR \-%s ,\n' $option[short]
+                    fi
+                    $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
+                    $pushf options '.br\n'
+                    boolean=()
+                    $pushf boolean '.RB [ '
+                    if [[ -n $option[short] ]]; then
+                        $pushf boolean '\-%s | ' $option[short]
+                    fi
+                    $pushf boolean '\-\-%s ]\n' $long
+                    if [[ $long = help ]]; then
+                        help=${(j::)boolean}
+                    else
+                        $pushf synopsis '%s\n' "${(j::)boolean}"
+                    fi
+                    mode=argdown
+                    markup=()
+                fi
+                ;;
+            (argdown:\# *)
+                first=${markup[1]}
+                joined="${(pj:\n:)markup}"
+                if [[ $joined =~ $regex[escaped] ]]; then
+                    joined=${joined#\\}
+                    first=${first#\\}
+                else
+                    first=${first[1]:l}${first[2,-1]}
+                fi
+                first=${first%.}
+                if [[ $zshctl[args:incomplete] = -* ]]; then
+                    completion -- --$long $first
+                    if [[ -n $option[short] ]]; then
+                        completion -- -$option[short] $first
+                    fi
+                fi
+                _zshctl_mandown options "$joined"
+                mode=scan
+                continue
+                ;;
+            (argdown:*)
+                markup+=( "$line" )
+                ;;
+            (mandown:\# *)
+                mode=scan
+                continue
+                ;;
+            (mandown:*)
+                mandown+=( "$line" )
+                ;;
+            (scan:*)
+                ;;
+            esac
+            false
+        do; :; done
+    done
+    if (( ${#commands} )); then
+        $pushf synopsis '.I command\n.RI [ arguments ]\n'
+    fi
+    if [[ -n $help ]]; then
+        $pushf synopsis '.SY %s\n' "${(j:\ :)${(@)program_path}}"
+        $pushf synopsis '%s' $help
+    fi
+    $pushf synopsis '.YS\n'
+}
+
+# No longer used directly, and would probably now use function bodies for Zsh
+# source and heredocs in functions for other nested files.
+#
 # https://github.com/jarro2783/cxxopts/issues/120#issuecomment-437709167
 function resource {
     typeset name=${1:-} file=${2:-${ZSHCTL_ARGZERO:A}}
@@ -13,11 +307,6 @@ function resource {
     ' $file
 }
 
-# Extracts a string using `resource` and runs it through `groff` on Linux or
-# `mandoc` on OS X to create a man page when the user requests help.
-#
-# `usage` -- underbar delimited name of command.
-
 # I'm trying to find a way to edit and preview with the formatting which leads
 # me to comment out `| less` and run
 #
@@ -27,10 +316,6 @@ function resource {
 #
 # Perhaps an enviroment variable?
 
-function _zshctl_options {
-}
-
-#
 function usage {
     setopt localoptions extendedglob
     integer top=2
@@ -38,7 +323,114 @@ function usage {
         ((top++))
         (( top <= ${#funcstack} )) || abend 'must be called from an :execute or :args function'
     done
-    typeset usage=${funcstack[$top]} man=${2:-0} cols="$(echoti cols)"
+    typeset usage=${funcstack[$top]} cols="$(echoti cols)" pushf=_zshctl_pushf
+    typeset release_date=$(strftime '%B %-d, %Y' $zshctl[release_date])
+    usage=${usage//#:args/:help}
+    usage=${usage//#:execute/:help}
+    if (( ! ${+functions[$usage]} )); then
+        return
+    fi
+    include heredoc
+    typeset execute=${usage//#:help/:execute}
+    typeset commands=()
+    function {
+        typeset sub=() lines=() verbose=() help usage
+        typeset -A regex=( escaped '^\\.')
+        for cmd in "${(@o)${(@k)_zshctl_commands}}"; do
+            [[ $cmd = $execute:[^:]## ]] || continue
+            if [[ $_zshctl_commands[$cmd] != ':' ]]; then
+                source $_zshctl_commands[$cmd]
+            fi
+            usage=${cmd//#:execute/:help}
+            (( ${+functions[$usage]} )) || continue
+            $usage
+            lines=( "${(@Af)help}" ) verbose=()
+            _zshctl_options
+            (( ${#verbose} )) || continue
+            if [[ $verbose[1] =~ $regex[escaped] ]]; then
+                verbose[1]=${verbose[1]#\\}
+            fi
+            _zshctl_mandown sub "${(j::)verbose}"
+            $pushf commands '.HP\n.B %s\n.br\n%s' ${usage##*:} "${(j::)sub}"
+        done
+    }
+    typeset capitalized=$zshctl[program]${usage#:help}
+    typeset program_path=( "${(@As,:,)capitalized}" )
+    capitalized=${${capitalized//:/-}:u}
+    typeset synopsis=() options=() mandown=() man=() mode=scan terse=() verbose=()
+    typeset help joined
+    $usage
+    typeset lines=( "${(@Af)help}" )
+    typeset -A _zshctl_options
+    zshctl+=( args:mode help )
+    ${usage//#:help/:args}
+    zshctl+=( args:mode inline )
+    _zshctl_options
+    typeset -A regex=( escaped '^\\.')
+    if (( ! ${#terse} && ${#verbose} )); then
+        joined="${(j::)verbose}"
+        if [[ $verbose[1] =~ $regex[escaped] ]]; then
+            joined=${joined#\\}
+        else
+            joined=${joined[1]:l}${joined[2,-1]}
+        fi
+        joined=${joined%.}
+        _zshctl_mandown terse "$joined"
+    fi
+    if false; then
+        printf '.TH %s 1 %s %s %s\n' \
+            ${(qqq)capitalized} \
+            ${(qqq)release_date} \
+            ${(qqq)zshctl[version]} \
+            ${(qqq)zshctl[man_title]}
+        printf '.SH NAME\n'
+        printf '%s \- ' "${(j:\ :)program_path}"
+        printf '%s' "${(j::)terse}"
+        printf '\n'
+        printf '%s' "${(j::)synopsis}"
+        printf '>>%s<<\n' "${(pj:\n:)mandown}"
+        _zshctl_mandown man "${(pj:\n:)mandown}"
+        #printf '>>%s<<\n' "${(j:---:)man}"
+        printf '%s' "${(j::)man}"
+        exit
+    fi
+    function {
+        if (( cols > 120 )); then
+            cols=120
+        else
+            cols=$(( cols - 7 ))
+        fi
+        if [[ $(uname) = Darwin ]]; then
+            mandoc -O width=${cols}  -T utf8 $1
+        else
+            GROFF_NO_SGR=1 groff -rLL=${cols}n -rLT=${cols}n -Wall -mtty-char -Tutf8 -man -c "$1"
+        fi
+    } =(
+        printf '.TH %s 1 %s %s %s\n' \
+            ${(qqq)capitalized} \
+            ${(qqq)release_date} \
+            ${(qqq)zshctl[version]} \
+            ${(qqq)zshctl[man_title]}
+        printf '.SH NAME\n'
+        printf '%s \- ' "${(j:\ :)program_path}"
+        printf '%s' "${(j::)terse}"
+        printf '\n'
+        printf '%s' "${(j::)synopsis}"
+        _zshctl_mandown man "${(pj:\n:)mandown}"
+        printf '%s' ${(j::)man}
+    ) | less
+    exit
+}
+
+#
+function _usage {
+    setopt localoptions extendedglob
+    integer top=2
+    while [[ $funcstack[$top] != (:execute:*|:execute|:args:*|:args)  ]]; do
+        ((top++))
+        (( top <= ${#funcstack} )) || abend 'must be called from an :execute or :args function'
+    done
+    typeset usage=${funcstack[$top]} man=${1:-0} cols="$(echoti cols)"
     usage=${usage//#:args/:execute}
     typeset release_date=$(strftime '%B %-d, %Y' $zshctl[release_date])
     typeset capitalized=$zshctl[program]${usage#:execute} state=copy
@@ -120,7 +512,7 @@ function usage {
         done
     done
     if (( man )); then
-        print -rl "${(@)mandoc}"
+        printf '%s\n' ${(pj:\n:)mandoc}
         return
     fi
     function {
@@ -208,10 +600,60 @@ function completion {
 }
 
 function _zshctl_completions {
+    integer top=2
+    while [[ $funcstack[$top] != (:execute:*|:execute|:args:*|:args)  ]]; do
+        ((top++))
+        (( top <= ${#funcstack} )) || abend 'must be called from an :execute or :args function'
+    done
+    typeset usage=${funcstack[$top]} cols="$(echoti cols)"
+    typeset release_date=$(strftime '%B %-d, %Y' $zshctl[release_date])
+    usage=${usage//#:args/:help}
+    usage=${usage//#:execute/:help}
+    if (( ! ${+functions[$usage]} )); then
+        return
+    fi
+    include heredoc
+    typeset execute=${usage//#:help/:execute}
+    function {
+        setopt localoptions extendedglob
+        [[ $zshctl[args:incomplete] = -* ]] && return
+        typeset sub=() lines=() verbose=() help usage joined
+        typeset -A regex=( escaped '^\\.')
+        for cmd in "${(@o)${(@k)_zshctl_commands}}"; do
+            [[ $cmd = ${execute}:[^:]## ]] || continue
+            if [[ $_zshctl_commands[$cmd] != ':' ]]; then
+                source $_zshctl_commands[$cmd]
+            fi
+            usage=${cmd//#:execute/:help}
+            (( ${+functions[$usage]} )) || continue
+            $usage
+            lines=( "${(@Af)help}" ) verbose=()
+            _zshctl_options
+            (( ${#verbose} )) || continue
+            joined="${(j::)verbose}"
+            if [[ $verbose[1] =~ $regex[escaped] ]]; then
+                joined=${joined#\\}
+            else
+                joined=${joined[1]:l}${joined[2,-1]}
+            fi
+            joined=${joined%.}
+            completion ${cmd##*:} $joined
+        done
+    }
+    $usage
+    typeset lines=( "${(@Af)help}" ) flag description
+    typeset -A _zshctl_options
+    zshctl+=( args:mode help )
+    ${usage//#:help/:args}
+    zshctl+=( args:mode inline )
+    _zshctl_options
+}
+
+function __zshctl_completions {
     typeset func=${1:-}
     shift
     typeset lines=() line
-    lines=( "${(@Af)$(usage $func 1)}" )
+    lines=( "${(@Af)$(usage 1)}" )
     typeset state=seek mandoc=( '.TH Ignore 1 "Manuals" "STOP" "Manuals"' )
     for line in "${(@Af)lines}"; do
         case $state:$line in
@@ -377,7 +819,7 @@ function args:error {
         ;;
     (execute)
         if [[ $flag = --help ]]; then
-            usage $func
+            usage
         else
             abend 'unknown execute directive on `%s` flag `%s`.' $func $flag
         fi
@@ -541,6 +983,11 @@ function parser {
             ;;
         esac
     done
+
+    if [[ $zshctl[args:mode] = help ]]; then
+        printf '_zshctl_options=( %s )\n' "${(j: :)${(@qqkv)options}}"
+        return
+    fi
 
     if [[ -n $typesets ]]; then
         printf '%s\n' ${(pj:\n:)typesets}
@@ -747,7 +1194,7 @@ function parser {
     case $zshctl[args:mode] in
     (execute)
         if (( usage && ! ${#combined} )); then
-            printf 'usage %s\n' $funcstack[$depth]
+            printf 'usage\n'
         else
             printf 'zshctl[args:mode]=inline\n'
             printf '%s "$@"\n' $zshctl[args:func]
@@ -759,6 +1206,9 @@ function parser {
             ((top++))
             (( top <= ${#funcstack} )) || abend 'must be called from an args function'
         done
+        # Your set of provisional switches for your completions. We need to
+        # rundown all the values used in the completions and all the values used
+        # in our completion functions and determine a useful set.
         printf 'zshctl[args:matched]=%s\n' ${(qqq)option[matched]}
         printf 'zshctl[args:state]=%s\n' ${(qqq)zshctl[args:state]}
         printf 'zshctl[args:offset]=%s\n' ${(qqq)zshctl[args:offset]}

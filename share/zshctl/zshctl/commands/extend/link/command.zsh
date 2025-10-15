@@ -1,25 +1,17 @@
-# ___ :execute:extend:link _ man ___
-# .SH NAME
-# .PB __program__\ extend \link \- install a
-# .PG __program__
-# extension.
-# .SH SYNOPSIS
-# .PG .SY __program__\ extend\ link
-# .I extension-path
-# .PG .SY __program__\ extend\ link
-# .RB [ \-h | \-\-help ]
-# .YS
-# .DC Install an extension.
-# .SH DESCRIPTION
-# Installs a
-# .PG __program__
-# extension.
-# .SH OPTIONS
-# .TP
-# .BR \-h ,\  \-\-help
-# .DC Help for
-# .BR zshctl\ extend\ link .
-# ___
+function :help:extend:link {
+    heredoc -v help -q <<'    EOF'
+        # verbose
+        Install a \`${zshctl[program]}\` extension.
+        # arg help
+        Display help for \`${zshctl[program]} extend link\`.
+        # man
+        ## DESCRIPTION
+        Installs a \`${zshctl[program]}\` extension.
+        ## OPTIONS
+        ### options
+    EOF
+}
+
 function :args:extend:link {
     eval "$(args -U -bx h,help -- "$@")"
 }
@@ -47,5 +39,6 @@ function :execute:extend:link {
 }
 
 function :complete:extend:link {
+    [[ $zshctl[args:incomplete] = -* ]] && return
     [[ $zshctl[args:state] = arguments ]] && completion:directories
 }

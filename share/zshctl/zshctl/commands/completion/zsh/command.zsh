@@ -1,21 +1,19 @@
-# ___ :execute:completion:zsh _ man ___
-# .PG __program__\ completion \- generate Zsh shell completions
-# .SH SYNOPSIS
-# .PG .SY __program__\ completion\ zsh
-# .PG .SY __program__\ completion\ zsh
-# .RB [ \-h | \-\-help ]
-# .YS
-# .DC Generate Zsh completions for
-# .PG .BR __program__ .
-# .SH DESCRIPTION
-# Generates Zsh compltions for
-# .PG .BR __program__ .
-# .SH OPTIONS
-# .TP
-# .BR \-h ,\  \-\-help
-# Help for
-# .PG .BR __program__\ completions\ zsh .
-# ___
+function :help:completion:zsh {
+    heredoc -v help -q <<'    EOF'
+        # terse
+        generate Zsh shell completions
+        # verbose
+        Generate Zsh completions for \`${zshctl[program]}\`.
+        # arg help
+        Display help for \`${zshctl[program]} completions bash\`.
+        # man
+        ## DESCRIPTION
+        Generates Zsh completions for \`${zshctl[program]}\`.
+        ## OPTIONS
+        ### options
+    EOF
+}
+
 function :args:completion:zsh {
     eval "$(args -bx h,help -- "$@")"
 }

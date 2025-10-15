@@ -186,6 +186,7 @@ function _zshctl_descend_completion {
         include parse
         $args "$@"
     else
+        include completions
         typeset -A completions=()
         typeset completion_match=()
         [[ $sofar != :args ]] && zshctl[args:command]=${zshctl[args:command]}${${sofar#:args}//:/-}
@@ -397,6 +398,26 @@ function {
     if (( is_zshctl )); then
         function :args {
             eval "$(args -UD -bx h,help -- "$@")"
+        }
+        function :help {
+            heredoc -v help <<'            EOF'
+                # terse
+                a structure for Zsh programs
+                # arg help
+                Display help for `zshctl`.
+                # man
+                ## DESCRIPTION
+                a structure for the creation of Zsh programs.
+
+                `zshctl` provides underlying structure for Zsh programs with an argument parser,
+                a system for nested commands, a system for includes, and some libraries.
+                ## OPTIONS
+                ### options
+                ## COMMANDS
+                The commands can be invoked to manage `zshctl` resources. You can learn more
+                about the each resource with the `--help` option.
+                ### commands
+            EOF
         }
     fi
     # `__complete` is a special argument passed by completions, so we follow
