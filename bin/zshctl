@@ -243,55 +243,6 @@ function _zshctl_completion_arguments {
 # as of yet.
 function _zshctl_complete {
     zshctl+=( args:kind none args:mode completion 'args:command' ${zshctl[argzero]:A:t} )
-    # Purposfully skip the program name in position 5, we are not going to use
-    # it.
-    typeset _zshctl_bash_words=() func=:execute args=:args
-    # No completion function, return. We really need to follow structure on
-    # behalf of the user, not guess the intent.
-    case x:$shell in
-    (zsh)
-        ;;
-    (bash)
-        line=${1:-}             # COMP_LINE
-        point=${2:-}            # COMP_POINT (Point in line.)
-        # wordbreaks=${3:-}     # COMP_WORDBREAKS
-        # kind=${4:-}           # COMP_TYPE
-        # key=${5:-}            # COMP_KEY (ASCII last keystroke?)
-        cword=${6:-}
-        shift 6
-        ((cword++))     # Bash is zero indexed.
-        print -l -- "CWORD: $cword" >> $zshctl[args:debug]
-        print -l -- "$@" >> $zshctl[args:debug]
-        # We preserve this for inspection at the end of completion.
-        _zshctl_bash_words=( "$@[1,$cword]" )
-        # I've preserved this comment even though I don't know what it means.
-        #
-        # We clip for Bash. It doesn't seem to do mid-word completion
-        # anywhere. Not even `ls` can run with a file name that actually
-        # exists. We can be just as brutal.
-        words=( "${(z)${line[1,$point]}}" )
-        print ">>>>" ${#words} ${line[1,$point]} >> $zshctl[args:debug]
-        # But, I can see that we don't trust Bash's words for some long lost
-        # reason, and I'm not sure where it has been recorded. I do know that
-        # Bash doesn't do nested completions, so perhaps I meant that
-        # `echo $(ls REA<TAB>` will not complete to `ls README.md` in the
-        # process substitution.
-        #
-        # Observe debugging output would be for `print $(zshctl v<TAB>` to see
-        # how simple process substitution completion is with Zsh.
-        #
-        # We want to know if we are at the end of a complete word. We are
-        # going to add a character to the end and see if we get a new word.
-        if (( ${#words} != ${#${(z)${:-${line[1,$point]}x}}} )); then
-            zshctl[args:incomplete]=''
-            words=( "${(@)words[2,-1]}" )
-        else
-            zshctl[args:incomplete]=$words[-1]
-            words=( "${(@)words[2,-2]}" )
-        fi
-        print "<$line> <${line[1,$point]}> <$point>" >> $zshctl[args:debug]
-        ;;
-    esac
     _zshctl_descend_completion '' args "${(@)words}"
 }
 
