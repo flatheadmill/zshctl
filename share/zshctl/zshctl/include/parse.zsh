@@ -53,7 +53,7 @@ function _zshctl_mandown {
             ;;
         esac
         outer=$line
-        while
+        while true; do
             (( count++ ))
             # _zshctl_markdown_debug
             case $mode:$line in
@@ -150,8 +150,8 @@ function _zshctl_mandown {
                 fi
                 ;;
             esac
-            false
-        do; :; done;
+            break
+        done
     done
     if (( is_list )); then
         $pushf $array '.RE\n'
@@ -200,7 +200,7 @@ function _zshctl_help {
     $pushf synopsis '.SH SYNOPSIS\n'
     $pushf synopsis '.SY %s\n' "${(j:\ :)${(@)program_path}}"
     for line in "${(@)lines}"; do
-        while
+        while true; do
             case $mode:$line in
             (scan:\# terse)
                 mode=terse
@@ -328,7 +328,7 @@ function _zshctl_help {
                                     action=stop:
                                 fi
                             fi
-                            while
+                            while true; do
                                 case $action in
                                 (stop:*)
                                     joined="${(j::)body}"
@@ -352,8 +352,8 @@ function _zshctl_help {
                                     ;;
                                 esac
                                 action=
-                                false
-                            do; :; done
+                                break
+                            done
                         done
                     }
                 fi
@@ -373,8 +373,8 @@ function _zshctl_help {
             (scan:*)
                 ;;
             esac
-            false
-        do; :; done
+            break
+        done
     done
     if (( ${#args} )); then
         for arg in "${(@)args}"; do
