@@ -337,6 +337,10 @@ function {
         shift
         _zshctl_encache "$@"
         ;;
+    (__mandown|__man)
+        zshctl+=( help:mode ${1:-} )
+        shift
+        ;&
     (*)
         _zshctl_execute :execute "$@"
         ;;

@@ -429,6 +429,10 @@ function usage {
     typeset synopsis=() options=() mandown=() man=() mode=scan terse=() verbose=()
     typeset help joined
     $usage
+    if [[ $zshctl[help:mode] == __mandown ]]; then
+        printf '%s' $help
+        return
+    fi
     typeset lines=( "${(@Af)help}" )
     typeset -A _zshctl_options
     zshctl+=( args:mode help )
@@ -437,7 +441,6 @@ function usage {
     _zshctl_help
     typeset -A regex=( escaped '^\\.')
     if (( ! ${#terse} && ${#verbose} )); then
-        print "${(pj:\n:)verbose}"
         joined="${verbose[1]}"
         if [[ $verbose[1] =~ $regex[escaped] ]]; then
             joined=${joined#\\}
@@ -447,24 +450,11 @@ function usage {
         joined=${joined%.}
         terse=( "$joined" )
     fi
-    if false; then
-        printf '.TH %s 1 %s %s %s\n' \
-            ${(qqq)capitalized} \
-            ${(qqq)release_date} \
-            ${(qqq)zshctl[version]} \
-            ${(qqq)zshctl[man_title]}
-        printf '.SH NAME\n'
-        printf '%s \- ' "${(j:\ :)program_path}"
-        _zshctl_mandown man "${(pj:\n:)terse}"
-        printf '%s' "${(j::)man}"
-        printf '%s' "${(j::)synopsis}"
-        #printf '>>%s<<\n' "${(pj:\n:)mandown}"
-        _zshctl_mandown man "${(pj:\n:)mandown}"
-        printf '>>%s<<\n' "${(j:---:)man}"
-        #printf '%s' "${(j::)man}"
-        exit
-    fi
     function {
+        if [[ $zshctl[help:mode] == __man ]]; then
+            cat $1
+            return
+        fi
         if (( cols > 120 )); then
             cols=120
         else
