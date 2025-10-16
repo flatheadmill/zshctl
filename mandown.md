@@ -19,7 +19,7 @@ without nesting. But, why not support nesting?
 
 What follows is a complete MAN DOWN! file definition.
 
-```markdown
+````markdown
 # terse
 display version
 # verbose
@@ -35,6 +35,22 @@ Help for `zshctl`.
 # man
 ## DESCRIPTION
 Displays the current version of `zshctl`.
+
+The version can be formatted for programmatic consumption from shell or a JSON
+parser like `jq`.
+
+Consuming the version as JSON.
+
+```shell
+acrectl version --format json | jq -r '.release_date'
+```
+
+Consuming the version as shell escaped variables in Zsh.
+
+```
+typeset -A version=( "${(@QA)${(z)$(acrectl version --format shell)}}" )
+print $version[release_date]
+```
 ## OPTIONS
 ### options
-```
+````

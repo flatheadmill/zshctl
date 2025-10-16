@@ -4,7 +4,7 @@ function :help:completion {
         generate shell completions
         # verbose
         Install \`${zshctl[program]}\` shell completions for Zsh or Bash.
-        # arg help
+        # opt help
         Display help for \`${zshctl[program]} completions\`.
         # man
         ## Description

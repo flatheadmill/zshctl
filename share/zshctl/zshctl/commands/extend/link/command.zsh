@@ -2,7 +2,8 @@ function :help:extend:link {
     heredoc -v help -q <<'    EOF'
         # verbose
         Install a \`${zshctl[program]}\` extension.
-        # arg help
+        # arg -- < directory >
+        # opt help
         Display help for \`${zshctl[program]} extend link\`.
         # man
         ## DESCRIPTION

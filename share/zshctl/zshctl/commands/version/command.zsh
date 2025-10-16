@@ -6,13 +6,13 @@ function :help:version {
         display version
         # verbose
         Display the current version of \`${zshctl[program]}\`.
-        # arg format -- < terse | verbose | shell | json >
+        # opt format -- < terse | verbose | shell | json >
         Display a verbose version as test, JSON, or shell escaped.
             * terse -- Display version number only.
             * verbose -- Display version number and release date.
             * shell -- Display shell escaped version number and release date as UNIX epoch.
             * json -- Display version number and release date as UNIX epoch as JSON.
-        # arg help
+        # opt help
         Help for \`${zshctl[program]} version\`.
         # man
         ## DESCRIPTION

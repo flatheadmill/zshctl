@@ -2,7 +2,7 @@ function :help:extend {
     heredoc -v help -q <<'    EOF'
         # verbose
         Extend \`${zshctl[program]}\` with additional commands.
-        # arg help
+        # opt help
         Display help for \`${zshctl[program]} extend\`.
         # man
         ## DESCRIPTION

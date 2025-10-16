@@ -4,7 +4,7 @@ function :help:completion:bash {
         generate Bash shell completions
         # verbose
         Generate Bash completions for \`${zshctl[program]}\`.
-        # arg help
+        # opt help
         Display help for \`${zshctl[program]} completions bash\`.
         # man
         ## DESCRIPTION

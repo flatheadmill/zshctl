@@ -1,6 +1,7 @@
 zmodload zsh/terminfo
 zmodload zsh/datetime
 
+# Pushes formatted strings onto an array by reference.
 function _zshctl_pushf {
     typeset array=${1:-} string
     shift
@@ -8,6 +9,7 @@ function _zshctl_pushf {
     set -A $array "${(@P)array}" "$string"
 }
 
+# Our MAN DOWN! parser.
 function _zshctl_mandown {
     typeset array=${1:-} lines=( "${(@Af)2}" )
     shift 2
@@ -23,9 +25,9 @@ function _zshctl_mandown {
         list '^([[:space:]]+)\*[[:space:]]+(.*)[[:space:]]+--(.*)'
     )
     integer count=0 is_list=0
-    typeset quoted=() list=() quote unquote font outer
+    typeset quoted=() list=() quote font outer
     function _zshctl_markdown_debug {
-        if (( count == 1 )) && [[ $array = man ]]; then
+        if (( count == 3 )) && [[ $array = terse ]]; then
             printf 'mode >>%s<<\nline >>%s<<\nouter >>%s<<\n' $mode "$line" $outer
             printf '>>%s<<\n' "${(j::)${(@P)array}}"
             exit
@@ -70,8 +72,8 @@ function _zshctl_mandown {
                     quoted=()
                     mode=quoted
                     case $match[3] in
-                    (\`) unquote=backtick font=B ;;
-                    (_) unquote=underbar font=I ;;
+                    (\`) font=B ;;
+                    (_) font=I ;;
                     esac
                     line="$match[4]"
                     continue
@@ -138,7 +140,7 @@ function _zshctl_mandown {
 # completions=() - gather completions as name and description pairs
 # synopsis=() - array of synopsis section man with newlines
 # options=() - array of options section man with newlines
-function _zshctl_options {
+function _zshctl_help {
     [[ -v mandown ]]     || typeset mandown=()
     [[ -v synopsis ]]    || typeset synopsis=()
     [[ -v commands ]]    || typeset commands=()
@@ -148,14 +150,15 @@ function _zshctl_options {
     [[ -v terse ]]       || typeset terse=()
     [[ -v verbose ]]     || typeset verbose=()
     typeset -A option regex=(
-        arg '^#[[:space:]]+arg[[:space:]]+([^[:space:]]+)(.*)'
+        opt '^#[[:space:]]+opt[[:space:]]+([^[:space:]]+)(.*)'
         pair '^[[:space:]]+--[[:space:]]+([^=]+=.*)$'
         single '^[[:space:]]+--[[:space:]]+(.*)'
+        arg '^#[[:space:]]+arg[[:space:]]+--(.*)'
         escaped '^\\.'
         list '^([[:space:]]+)\*[[:space:]]+(.*)[[:space:]]+--(.*)'
     )
     # TODO Must fix.
-    typeset split=() match=() markup=() joined=() boolean=() markup=()
+    typeset split=() match=() markup=() joined=() boolean=() markup=() args=()
     typeset pushf=_zshctl_pushf long mode=scan help trim
     $pushf synopsis '.SH SYNOPSIS\n'
     $pushf synopsis '.SY %s\n' "${(j:\ :)${(@)program_path}}"
@@ -186,7 +189,11 @@ function _zshctl_options {
                 mode=mandown
                 ;;
             (scan:\# arg *)
-                [[ $line =~ $regex[arg] ]]
+                [[ $line =~ $regex[arg] ]] || print bummer
+                args+=( "${${match[1]##[[:space:]]##}%%[[:space:]]##}" )
+                ;;
+            (scan:\# opt *)
+                [[ $line =~ $regex[opt] ]]
                 long=$match[1]
                 if [[ $match[2] =~ $regex[pair] ]]; then
                     option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
@@ -332,7 +339,11 @@ function _zshctl_options {
             false
         do; :; done
     done
-    if (( ${#commands} )); then
+    if (( ${#args} )); then
+        for arg in "${(@)args}"; do
+            $pushf synopsis '.RI %s\n' $arg
+        done
+    elif (( ${#commands} )); then
         $pushf synopsis '.I command\n.RI [ arguments ]\n'
     fi
     if [[ -n $help ]]; then
@@ -341,6 +352,14 @@ function _zshctl_options {
     fi
     $pushf synopsis '.YS\n'
 }
+
+# Extract a string resource from a source file. String resources are within
+# comments. They begin with a resource name surrounded by three underbars. We're
+# rather particular about white space, there should be only one space separating
+# the comment the underbars and the resource name. Furthermore, the comment must
+# begin on the first column. The string resource is terminated by a line that
+# has a comment followed by three underbars, so either the next string resource
+# or a sole three underbar terminator.
 
 # No longer used directly, and would probably now use function bodies for Zsh
 # source and heredocs in functions for other nested files.
@@ -395,12 +414,12 @@ function usage {
             (( ${+functions[$usage]} )) || continue
             $usage
             lines=( "${(@Af)help}" ) verbose=()
-            _zshctl_options
+            _zshctl_help
             (( ${#verbose} )) || continue
             if [[ $verbose[1] =~ $regex[escaped] ]]; then
                 verbose[1]=${verbose[1]#\\}
             fi
-            _zshctl_mandown sub "${(j::)verbose}"
+            _zshctl_mandown sub "${(pj:\n:)verbose}"
             $pushf commands '.HP\n.B %s\n.br\n%s' ${usage##*:} "${(j::)sub}"
         done
     }
@@ -415,17 +434,18 @@ function usage {
     zshctl+=( args:mode help )
     ${usage//#:help/:args}
     zshctl+=( args:mode inline )
-    _zshctl_options
+    _zshctl_help
     typeset -A regex=( escaped '^\\.')
     if (( ! ${#terse} && ${#verbose} )); then
-        joined="${(j::)verbose}"
+        print "${(pj:\n:)verbose}"
+        joined="${verbose[1]}"
         if [[ $verbose[1] =~ $regex[escaped] ]]; then
             joined=${joined#\\}
         else
             joined=${joined[1]:l}${joined[2,-1]}
         fi
         joined=${joined%.}
-        _zshctl_mandown terse "$joined"
+        terse=( "$joined" )
     fi
     if false; then
         printf '.TH %s 1 %s %s %s\n' \
@@ -435,13 +455,13 @@ function usage {
             ${(qqq)zshctl[man_title]}
         printf '.SH NAME\n'
         printf '%s \- ' "${(j:\ :)program_path}"
-        printf '%s' "${(j::)terse}"
-        printf '\n'
-        printf '%s' "${(j::)synopsis}"
-        printf '>>%s<<\n' "${(pj:\n:)mandown}"
-        _zshctl_mandown man "${(pj:\n:)mandown}"
-        #printf '>>%s<<\n' "${(j:---:)man}"
+        _zshctl_mandown man "${(pj:\n:)terse}"
         printf '%s' "${(j::)man}"
+        printf '%s' "${(j::)synopsis}"
+        #printf '>>%s<<\n' "${(pj:\n:)mandown}"
+        _zshctl_mandown man "${(pj:\n:)mandown}"
+        printf '>>%s<<\n' "${(j:---:)man}"
+        #printf '%s' "${(j::)man}"
         exit
     fi
     function {
@@ -463,9 +483,10 @@ function usage {
             ${(qqq)zshctl[man_title]}
         printf '.SH NAME\n'
         printf '%s \- ' "${(j:\ :)program_path}"
-        printf '%s' "${(j::)terse}"
-        printf '\n'
+        _zshctl_mandown man "${(pj:\n:)terse}"
+        printf '%s' "${(j::)man}"
         printf '%s' "${(j::)synopsis}"
+        man=()
         _zshctl_mandown man "${(pj:\n:)mandown}"
         printf '%s' ${(j::)man}
     ) | less
@@ -564,7 +585,7 @@ function _zshctl_completions {
             (( ${+functions[$usage]} )) || continue
             $usage
             lines=( "${(@Af)help}" ) verbose=()
-            _zshctl_options
+            _zshctl_help
             (( ${#verbose} )) || continue
             joined="${(j::)verbose}"
             if [[ $verbose[1] =~ $regex[escaped] ]]; then
@@ -582,7 +603,7 @@ function _zshctl_completions {
     zshctl+=( args:mode help )
     ${usage//#:help/:args}
     zshctl+=( args:mode inline )
-    _zshctl_options
+    _zshctl_help
 }
 
 # What if we called this something other than error, something like helper,
