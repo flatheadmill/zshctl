@@ -9,7 +9,7 @@ function :help:extend:link {
         ## DESCRIPTION
         Installs a \`${zshctl[program]}\` extension.
         ## OPTIONS
-        ### options
+        > options
     EOF
 }
 

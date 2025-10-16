@@ -318,11 +318,11 @@ function {
                 `zshctl` provides underlying structure for Zsh programs with an argument parser,
                 a system for nested commands, a system for includes, and some libraries.
                 ## OPTIONS
-                ### options
+                > options
                 ## COMMANDS
                 The following commands can be invoked to manage `zshctl` resources.
                 You can learn more about the each command with the `--help` option.
-                ### commands
+                > commands
             EOF
         }
     fi

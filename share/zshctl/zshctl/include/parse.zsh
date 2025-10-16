@@ -23,9 +23,10 @@ function _zshctl_mandown {
         backtick '^(([^`]|\\`)*)([`])(.*)$'
         underbar '^(([^_]|\\`)*)([_])(.*)$'
         list '^([[:space:]]+)\*[[:space:]]+(.*)[[:space:]]+--(.*)'
+        include '^> (.*)'
     )
     integer count=0 is_list=0
-    typeset quoted=() list=() quote font outer
+    typeset quoted=() list=() quote font outer kind include=()
     function _zshctl_markdown_debug {
         if (( count == 3 )) && [[ $array = terse ]]; then
             printf 'mode >>%s<<\nline >>%s<<\nouter >>%s<<\n' $mode "$line" $outer
@@ -39,9 +40,24 @@ function _zshctl_mandown {
             (( count++ ))
             # _zshctl_markdown_debug
             case $mode:$line in
+            (scan:\> *)
+                [[ $line =~ $regex[include] ]]
+                case ${(P)match[1]} in
+                (mandown)
+                    _zshctl_mandown include "${(P)match[2]}"
+                    $pushf $array '%s' "${(j::)include}"
+                    ;;
+                (man)
+                    $pushf $array '%s' "${(j::)${(@P)match[2,-1]}}"
+                    ;;
+                (*)
+                    $pushf $array '%s' "${(j::)${(@P)match}}"
+                    ;;
+                esac
+                ;;
             (scan:\#\#\# *)
                 [[ $line = (#b)\#\#\#\ #(*) ]]
-                $pushf $array '%s' "${(j::)${(@P)match[1]}}"
+                $pushf $array '.SS %s\n' $match[1]
                 ;;
             (scan:\#\# *)
                 [[ $line = (#b)\#\#\ #(*) ]]

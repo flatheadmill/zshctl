@@ -10,7 +10,7 @@ function :help:completion:bash {
         ## DESCRIPTION
         Generates Bash completions for \`${zshctl[program]}\`.
         ## OPTIONS
-        ### options
+        > options
     EOF
 }
 

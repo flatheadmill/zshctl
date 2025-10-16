@@ -10,9 +10,9 @@ function :help:completion {
         ## Description
         Generates completions for Zsh and Bash.
         ## OPTIONS
-        ### options
+        > options
         ## COMMANDS
-        ### commands
+        > commands
     EOF
 }
 

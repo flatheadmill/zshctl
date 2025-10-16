@@ -18,7 +18,7 @@ function :help:version {
         ## DESCRIPTION
         Displays the current version of \`${zshctl[program]}\`.
         ## OPTIONS
-        ### options
+        > options
     EOF
 }
 

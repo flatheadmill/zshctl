@@ -8,12 +8,12 @@ function :help:extend {
         ## DESCRIPTION
         Extends \`${zshctl[program]}\` with additional commands.
         ## OPTIONS
-        ### options
+        > options
         ## COMMANDS
         The following command can be invoked to extend \`${zshctl[program]}\`
         with additional commands. You can learn more about the each command by
         invoking the command with the \`--help\` option.
-        ### commands
+        > commands
     EOF
 }
 
