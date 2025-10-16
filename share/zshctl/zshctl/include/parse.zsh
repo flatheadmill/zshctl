@@ -587,7 +587,7 @@ function _zshctl_completions {
             lines=( "${(@Af)help}" ) verbose=()
             _zshctl_help
             (( ${#verbose} )) || continue
-            joined="${(j::)verbose}"
+            joined="${verbose[1]}"
             if [[ $verbose[1] =~ $regex[escaped] ]]; then
                 joined=${joined#\\}
             else
