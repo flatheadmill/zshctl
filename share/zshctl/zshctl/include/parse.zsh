@@ -429,7 +429,7 @@ function usage {
             usage=${cmd//#:execute/:help}
             (( ${+functions[$usage]} )) || continue
             $usage
-            lines=( "${(@Af)help}" ) verbose=()
+            lines=( "${(@Af)help}" ) verbose=() sub=()
             _zshctl_help
             (( ${#verbose} )) || continue
             if [[ $verbose[1] =~ $regex[escaped] ]]; then
