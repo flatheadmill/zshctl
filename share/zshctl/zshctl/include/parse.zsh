@@ -34,7 +34,24 @@ function _zshctl_mandown {
             exit
         fi
     }
+    integer is_indented=0
     for line in "${(@)lines}"; do
+        case $line in
+        ('')
+            ;;
+        ('    '[^ ]*)
+            if (( ! is_indented )); then
+                $pushf $array '.RS 4\n'
+                is_indented=1
+            fi
+            ;;
+        (*)
+            if (( is_indented )); then
+                $pushf $array '.RE\n'
+                is_indented=0
+            fi
+            ;;
+        esac
         outer=$line
         while
             (( count++ ))
@@ -117,8 +134,9 @@ function _zshctl_mandown {
                 ;;
             (unquote:*)
                 if [[ -n $quote ]]; then
-                    $pushf $array '%s\n' $quote
+                    $pushf $array '%s\n' ${quote##[[:space:]]##}
                 fi
+                # Assuming a single character punctuation, and not a big snuggle.
                 if [[ "$line" =~ ^([^[:space:]])(.*) ]]; then
                     $pushf $array '.%sR %s %s\n' $font "${${(j: :)quoted}// /\\ }" "$line[1]"
                     line=${line##$line[1]}
@@ -136,6 +154,9 @@ function _zshctl_mandown {
         do; :; done;
     done
     if (( is_list )); then
+        $pushf $array '.RE\n'
+    fi
+    if (( is_indented )); then
         $pushf $array '.RE\n'
     fi
 }
