@@ -285,7 +285,7 @@ function _zshctl_help {
                     if [[ $long = help ]]; then
                         help=${(j::)boolean}
                     else
-                        $pushf synopsis '%s\n' "${(j::)boolean}"
+                        $pushf synopsis '%s' "${(j::)boolean}"
                     fi
                     mode=argdown
                     markup=()
