@@ -17,6 +17,7 @@ function :help:version {
         # man
         ## DESCRIPTION
         Displays the current version of \`${zshctl[program]}\`.
+        This is an \`acre\`<_project_>\_<_environment_> example.
         ## OPTIONS
         > options
     EOF
