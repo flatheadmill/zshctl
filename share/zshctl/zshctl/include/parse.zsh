@@ -6,6 +6,8 @@ function _zshctl_pushf {
     typeset array=${1:-} string
     shift
     printf -v string -- "$@"
+    string=${string//$'\uE000'/\`}
+    string=${string//$'\uE001'/_}
     set -A $array "${(@P)array}" "$string"
 }
 
@@ -53,6 +55,8 @@ function _zshctl_mandown {
             ;;
         esac
         outer=$line
+        line=${line//\\\`/$'\uE000'}
+        line=${line//\\_/$'\uE001'}
         while true; do
             (( count++ ))
             # _zshctl_markdown_debug
