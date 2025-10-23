@@ -1,9 +1,7 @@
 #!/usr/bin/env zsh
-
-source ${ZSH_ARGZERO:A:h:h}/lib/splat.zsh
+source share/zshctl/zshctl/include/splat.zsh
 
 function {
-    [[ $1 = toplevel ]] || return
     typeset o_fqn=1
     splat -q print -r -- true : -b o_fqn
     o_fqn=0
@@ -35,4 +33,4 @@ function {
     splat -q print -r -- : -_ o_empty
     typeset -A param
     splat -q print -r -- : -A param
-} $ZSH_EVAL_CONTEXT
+}
