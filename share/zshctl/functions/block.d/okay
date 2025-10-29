@@ -1,0 +1,3 @@
+#!/bin/zsh -f
+
+! (( $TRY_BLOCK_ERROR && ! o_block[stop] ))

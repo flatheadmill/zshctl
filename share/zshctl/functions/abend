@@ -1,0 +1,16 @@
+emulate -L zsh
+
+if [[ $# -ne 0 && $1 = -c ]]; then
+    shift
+    if (( $# )); then
+        set $1 "$@"
+        shift
+    else
+        set -- 1 "$@"
+        print -u 'warn: invalid arguments: `abend -c` requires a value'
+    fi
+else
+    set -- 1 "$@"
+fi
+warn "$@[2,-1]"
+exit $1

@@ -1,0 +1,22 @@
+emulate -L zsh
+
+# Extract a string resource from a source file. String resources are within
+# comments. They begin with a resource name surrounded by three underbars. We're
+# rather particular about white space, there should be only one space separating
+# the comment the underbars and the resource name. Furthermore, the comment must
+# begin on the first column. The string resource is terminated by a line that
+# has a comment followed by three underbars, so either the next string resource
+# or a sole three underbar terminator.
+
+# No longer used directly, and would probably now use function bodies for Zsh
+# source and heredocs in functions for other nested files.
+#
+# https://github.com/jarro2783/cxxopts/issues/120#issuecomment-437709167
+typeset name=${1:-} file=${2:-${ZSHCTL_ARGZERO:A}}
+awk '
+    /^(# )?___ '$name' ___/ { flag=1; next }
+    flag && /^(# )?___/ { exit }
+    flag && /^#$/ { print ""; next }
+    flag && /^# / { print substr($0, 3); next }
+    flag
+' $file

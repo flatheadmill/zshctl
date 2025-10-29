@@ -1,0 +1,8 @@
+#!/bin/zsh -f
+
+typeset name=${1:-}
+integer fd=$o_block[$name]
+if (( fd )); then
+    exec {fd}>&-
+    o_block[$name]=0
+fi

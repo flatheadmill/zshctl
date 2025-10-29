@@ -1,0 +1,228 @@
+emulate -L zsh
+
+# One function to pretty much gather up everything needed to create a man page,
+# to include commands from sub-commands, format a synopsis, format an options
+# section, and gather up completions.
+#
+# Caller defines the following.
+#
+# lines=() - help definition split as lines with no newline
+#
+# Caller can opt-in to particular collection by defining one of the following.
+#
+# terse=() - array of terse description lines without newlines
+# verbose=() - array of verbose description lines without newlines
+# mandown=() - array of man page lines without newlines
+# completions=() - gather completions as name and description pairs
+# synopsis=() - array of synopsis section man with newlines
+# options=() - array of options section man with newlines
+[[ -v mandown ]]     || typeset mandown=()
+[[ -v synopsis ]]    || typeset synopsis=()
+[[ -v commands ]]    || typeset commands=()
+[[ ${(t)options} == array-local ]]     || typeset options=()
+[[ -v completions ]] || typeset -A completions=()
+[[ -v completion_match ]] || typeset completion_match=()
+[[ -v terse ]]       || typeset terse=()
+[[ -v verbose ]]     || typeset verbose=()
+typeset -A option regex=(
+    opt '^#[[:space:]]+opt[[:space:]]+([^[:space:]]+)(.*)'
+    pair '^[[:space:]]+--[[:space:]]+([^=]+=.*)$'
+    single '^[[:space:]]+--[[:space:]]+(.*)'
+    arg '^#[[:space:]]+arg[[:space:]]+--(.*)'
+    escaped '^\\.'
+    list '^([[:space:]]+)\*[[:space:]]+(.*)[[:space:]]+--(.*)'
+)
+# TODO Must fix.
+typeset split=() match=() markup=() joined=() boolean=() markup=() args=()
+typeset pushf=_zshctl_pushf long mode=scan help trim
+$pushf synopsis '.SH SYNOPSIS\n'
+$pushf synopsis '.SY %s\n' "${(j:\ :)${(@)program_path}}"
+for line in "${(@)lines}"; do
+    while true; do
+        case $mode:$line in
+        (scan:\# terse)
+            mode=terse
+            ;;
+        (terse:\# *)
+            mode=scan
+            continue
+            ;;
+        (terse:*)
+            terse+=( "$line" )
+            ;;
+        (scan:\# verbose)
+            mode=verbose
+            ;;
+        (verbose:\# *)
+            mode=scan
+            continue
+            ;;
+        (verbose:*)
+            verbose+=( "$line" )
+            ;;
+        (scan:\# man)
+            mode=mandown
+            ;;
+        (scan:\# arg *)
+            [[ $line =~ $regex[arg] ]] || print bummer
+            args+=( "${${match[1]##[[:space:]]##}%%[[:space:]]##}" )
+            ;;
+        (scan:\# opt *)
+            [[ $line =~ $regex[opt] ]]
+            long=$match[1]
+            if [[ $match[2] =~ $regex[pair] ]]; then
+                option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
+                $pushf options '.HP\n'
+                if [[ -n $option[short] ]]; then
+                    $pushf options '.B \-%s\n' $option[short]
+                    $pushf options '.RI %s,\n' $match[1]
+                fi
+                $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
+                $pushf options '.RI %s\n' $match[1]
+                $pushf options '.br\n'
+                $pushf synopsis '.RB [ '
+                if [[ -n $option[short] ]]; then
+                    $pushf synopsis '\-%s | ' $option[short]
+                fi
+                $pushf synopsis '%s\n' '\-\-'$long # must put a backslash in front of
+                $pushf synopsis '.RI %s]\n' $match[1]
+                mode=argdown
+                markup=()
+            elif [[ $match[2] =~ $regex[single] ]]; then
+                option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
+                match=( "${(@)${(@)match##[[:space:]]##}%%[[:space:]]##}" )
+                $pushf options '.HP\n'
+                if [[ -n $option[short] ]]; then
+                    $pushf options '.BR \-%s ,\n' $option[short]
+                fi
+                $pushf options '.B \-\-%s\n' $long
+                $pushf options '.RI %s\n' $match[1]
+                $pushf options '.br\n'
+                $pushf synopsis '.RB [ '
+                if [[ -n $option[short] ]]; then
+                    $pushf synopsis '\-%s | ' $option[short]
+                fi
+                $pushf synopsis '\-\-%s\n' $long
+                $pushf synopsis '.RI %s]\n' $match[1]
+                mode=argdown
+                markup=()
+            else
+                option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
+                $pushf options '.HP\n'
+                if [[ -n $option[short] ]]; then
+                    $pushf options '.BR \-%s ,\n' $option[short]
+                fi
+                $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
+                $pushf options '.br\n'
+                boolean=()
+                $pushf boolean '.RB [ '
+                if [[ -n $option[short] ]]; then
+                    $pushf boolean '\-%s | ' $option[short]
+                fi
+                $pushf boolean '\-\-%s ]\n' $long
+                if [[ $long = help ]]; then
+                    help=${(j::)boolean}
+                else
+                    $pushf synopsis '%s' "${(j::)boolean}"
+                fi
+                mode=argdown
+                markup=()
+            fi
+            ;;
+        (argdown:\# *)
+            first=${markup[1]}
+            joined="${(pj:\n:)markup}"
+            if [[ $joined =~ $regex[escaped] ]]; then
+                joined=${joined#\\}
+                first=${first#\\}
+            else
+                first=${first[1]:l}${first[2,-1]}
+            fi
+            first=${first%.}
+            if [[ $zshctl[args:incomplete] = -* ]]; then
+                completion -- --$long $first
+                if [[ -n $option[short] ]]; then
+                    completion -- -$option[short] $first
+                fi
+            fi
+            _zshctl_mandown options "$joined"
+            if [[ $zshctl[args:state] = value && $zshctl[args:long] = $long ]]; then
+                function {
+                    setopt localoptions extendedglob
+                    integer is_list
+                    typeset line mode=scan body=() term joined action
+                    for line in "${(@)markup}" stop; do
+                        [[ -z $line ]] && continue
+                        if [[ $line =~ $regex[list] && ${#match[1]} > 1 ]]; then
+                            if (( is_list )); then
+                                action=stop:start
+                            else
+                                action=:start
+                            fi
+                        elif (( is_list )); then
+                            if [[ $line[1] = ' ' ]]; then
+                                action=:append
+                            else
+                                action=stop:
+                            fi
+                        fi
+                        while true; do
+                            case $action in
+                            (stop:*)
+                                joined="${(j::)body}"
+                                if [[ $joined =~ $regex[escaped] ]]; then
+                                    joined=${joined#\\}
+                                else
+                                    joined=${joined[1]:l}${joined[2,-1]}
+                                fi
+                                joined=${joined%.}
+                                completion $term "$joined"
+                                action=:${action#*:}
+                                continue
+                                ;;
+                            (*:start)
+                                is_list=1
+                                term=$match[2]
+                                body=( "${match[3]##[[:space:]]##}" )
+                                ;;
+                            (:append)
+                                body+=( "${line##[[:space:]]##}" )
+                                ;;
+                            esac
+                            action=
+                            break
+                        done
+                    done
+                }
+            fi
+            mode=scan
+            continue
+            ;;
+        (argdown:*)
+            markup+=( "$line" )
+            ;;
+        (mandown:\# *)
+            mode=scan
+            continue
+            ;;
+        (mandown:*)
+            mandown+=( "$line" )
+            ;;
+        (scan:*)
+            ;;
+        esac
+        break
+    done
+done
+if (( ${#args} )); then
+    for arg in "${(@)args}"; do
+        $pushf synopsis '.RI %s\n' $arg
+    done
+elif (( ${#commands} )); then
+    $pushf synopsis '.I command\n.RI [ arguments ]\n'
+fi
+if [[ -n $help ]]; then
+    $pushf synopsis '.SY %s\n' "${(j:\ :)${(@)program_path}}"
+    $pushf synopsis '%s' $help
+fi
+$pushf synopsis '.YS\n'

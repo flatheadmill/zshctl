@@ -1,0 +1,48 @@
+emulate -L zsh
+
+integer top=2
+while [[ $funcstack[$top] != (:execute:*|:execute|:args:*|:args)  ]]; do
+    ((top++))
+    (( top <= ${#funcstack} )) || abend 'must be called from an :execute or :args function'
+done
+typeset usage=${funcstack[$top]} cols="$(echoti cols)"
+usage=${usage//#:args/:help}
+usage=${usage//#:execute/:help}
+if (( ! ${+functions[$usage]} )); then
+    return
+fi
+typeset execute=${usage//#:help/:execute}
+function {
+    [[ $zshctl[args:state] = arguments ]] || return
+    setopt localoptions extendedglob
+    [[ $zshctl[args:incomplete] = -* ]] && return
+    typeset sub=() lines=() verbose=() help usage joined
+    typeset -A regex=( escaped '^\\.')
+    for cmd in "${(@o)${(@k)zshctl}}"; do
+        [[ $cmd = ${execute}:[^:]## ]] || continue
+        if [[ $zshctl[$cmd] != ':' ]]; then
+            source $zshctl[$cmd]
+        fi
+        usage=${cmd//#:execute/:help}
+        (( ${+functions[$usage]} )) || continue
+        $usage
+        lines=( "${(@Af)help}" ) verbose=()
+        _zshctl_help
+        (( ${#verbose} )) || continue
+        joined="${verbose[1]}"
+        if [[ $verbose[1] =~ $regex[escaped] ]]; then
+            joined=${joined#\\}
+        else
+            joined=${joined[1]:l}${joined[2,-1]}
+        fi
+        joined=${joined%.}
+        completion ${cmd##*:} $joined
+    done
+}
+$usage
+typeset lines=( "${(@Af)help}" ) flag description
+typeset -A _zshctl_options
+zshctl+=( args:mode help )
+${usage//#:help/:args}
+zshctl+=( args:mode inline )
+_zshctl_help

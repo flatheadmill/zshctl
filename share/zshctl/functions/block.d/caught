@@ -1,0 +1,57 @@
+#!/bin/zsh -f
+
+# This one contains the close that was hard to find. It is obvious now but I'd
+# introduced additional nested blocks in a search for something that works.
+
+# We close the handles to both sides of the try `coproc`.
+tekton::close user
+# Wait on the last standard error indenter `coproc`.
+typeset waited
+if (( $o_block[sed] )); then
+    wait $o_block[sed]
+    waited=$?
+    # See `wait` in `man zshbuiltins`. Also,https://stackoverflow.com/a/56879673
+    if (( waited )); then
+        print -u 2 $waited$o_block[pids]
+    fi
+    o_block[sed]=0
+fi
+# We have a copy of the input to the indent `coproc`. We opened it and left
+# it open so that the `indent` program could inherit the file handle. It was
+# open for the whole block in the parent process, our process, but it is
+# time to close it now.
+print end >&${o_block[try]}
+# Close the input side of the try `coproc`.
+tekton::close try
+# Gather the last batch of error messages.
+typeset err="$(<&${o_block[tried]})"
+# Close the ouptut side of the try `coproc`.
+tekton::close tried
+# We close the handle to the standard output indent `coproc`.
+tekton::close indent
+# And we close our standard output, which is redirected to the `indent`
+# process, so now the `indent` process will have no more input to feed to
+# its copy of the input file handle and it will close it's copy of the file
+# handle.
+exec >&-
+# When that file descriptor closes and when all the output has been written
+# to the copy of standard out in the indent `coproc`, then the indent
+# `coproc` will exit. We await it's exit.
+wait $o_block[pid]
+# And now we can print an error message, if any, after all the indented
+# output from the block.
+if (( TRY_BLOCK_ERROR )); then
+    if (( o_block[stop] )); then
+        TRY_BLOCK_ERROR=0
+    else
+        if (( ${+o_block[abend]} )); then
+            printf 'abend: %s\n' $o_block[abend] 1>&2
+        else
+            print -u 2 'abend:'
+        fi
+        if [[ -n $err ]]; then
+            printf '\n%s\n' $err 1>&2
+        fi
+        exit 1
+    fi
+fi

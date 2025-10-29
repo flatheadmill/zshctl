@@ -1,0 +1,11 @@
+emulate -L zsh
+
+# Not working yet...
+
+typeset -gA zshctl
+typeset system_fpath=${zshctl[fpath]:fpath}
+typeset dir
+while (( $# )); do
+    for dir in "${(@Oa)${(z)fpath}}"; do
+    done
+done

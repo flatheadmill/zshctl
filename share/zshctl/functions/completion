@@ -1,0 +1,63 @@
+emulate -L zsh
+
+case ${1:-} in
+(encache)
+    shift
+    eval "$(args k,key v,valid p,prefix s,suffix -- "$@")"
+    zshctl[args:kind]=encache
+    zshctl[args:key]=$o_key
+    if [[ -v o_prefix ]]; then
+        zshctl[args:prefix]=$o_prefix
+    fi
+    if [[ -v o_suffix ]]; then
+        zshctl[args:suffix]=$o_suffix
+    fi
+    zshctl[args:invoke]=${(j: :)${(@qq)@}}
+    ;;
+(directories)
+    zshctl[args:kind]=directories
+    zshctl[args:filters]=${(j: :)${(@qq)@}}
+    ;;
+(files)
+    zshctl[args:kind]=files
+    zshctl[args:filters]=${(j: :)${(@qq)@}}
+    ;;
+(*)
+    eval "$(args -b n,nothing o,ordered f,filenames -s d,delimiter t,tag k,key v,valid p,prefix s,suffix m,message -- "$@")"
+    zshctl[args:kind]=completions
+    if (( o_nothing )); then
+        zshctl[args:state]=nothing
+    fi
+    if [[ -v o_delimiter ]]; then
+        zshctl[args:delimiter]=$o_delimiter
+    fi
+    if [[ -v o_tag ]]; then
+        zshctl[args:tag]=$o_tag
+    fi
+    if (( o_ordered )); then
+        zshctl[args:ordered]=1
+    fi
+    if [[ -v o_suffix ]]; then
+        zshctl[args:suffix]=$o_suffix
+    fi
+    if [[ -v o_prefix ]]; then
+        zshctl[args:prefix]=$o_prefix
+    fi
+    if [[ -v o_valid ]]; then
+        zshctl[args:valid]=$o_valid
+    fi
+    if [[ -v o_message ]]; then
+        zshctl[args:message]=$o_message
+    fi
+    if (( o_filenames )); then
+        zshctl[args:filenames]=1
+    fi
+    if (( $# )); then
+        completion_match+=( ${1:-} )
+        if (( $# == 2 )); then
+            zshctl[args:descriptions]=1
+            completions+=( ${1:-} ${2:-} )
+        fi
+    fi
+    ;;
+esac

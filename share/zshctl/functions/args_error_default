@@ -1,0 +1,32 @@
+emulate -L zsh
+
+typeset func=${1:-} reason=${2:-} flag=${3:-}
+shift 3
+case $reason in
+(complete)
+    if (( ${+functions[complete:${func#execute:}]} )); then
+        printf 'complete:%s %s\n' ${func#execute:} "${(j: :)${(@qq)@}}"
+    else
+        printf 'delegate %s\n' "${(j: :)${(qq)@}}"
+    fi
+    ;;
+(unknown)
+    printf 'unknown argument `%s`.\n' $flag 1>&2
+    exit 1
+    ;;
+(required)
+    printf '`%s` is a required argument.\n' $flag 1>&2
+    exit 1
+    ;;
+(execute)
+    if [[ $flag = --help ]]; then
+        usage
+    else
+        abend 'unknown execute directive on `%s` flag `%s`.' $func $flag
+    fi
+    ;;
+(args)
+    printf 'abend: exception: unknown "args" flag %s' ${(@qqq)flag} 1>&2
+    exit 1
+    ;;
+esac

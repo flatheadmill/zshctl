@@ -1,0 +1,108 @@
+emulate -L zsh
+
+zmodload zsh/terminfo
+zmodload zsh/datetime
+
+# I'm trying to find a way to edit and preview with the formatting which leads
+# me to comment out `| less` and run
+#
+# ```
+# while true; do zshctl gce key | less -XE; sleep 1; done
+# ```
+#
+# Perhaps an enviroment variable?
+
+setopt localoptions extendedglob
+integer top=2
+while [[ $funcstack[$top] != (:execute:*|:execute|:args:*|:args)  ]]; do
+    ((top++))
+    (( top <= ${#funcstack} )) || abend 'must be called from an :execute or :args function'
+done
+typeset usage=${funcstack[$top]} cols="$(echoti cols)" pushf=_zshctl_pushf
+typeset release_date=$(strftime '%B %-d, %Y' $zshctl[release_date])
+usage=${usage//#:args/:help}
+usage=${usage//#:execute/:help}
+if (( ! ${+functions[$usage]} )); then
+    return
+fi
+typeset execute=${usage//#:help/:execute}
+typeset commands=()
+function {
+    typeset sub=() lines=() verbose=() help usage
+    typeset -A regex=( escaped '^\\.')
+    for cmd in "${(@o)${(@k)zshctl}}"; do
+        [[ $cmd = $execute:[^:]## ]] || continue
+        if [[ $zshctl[$cmd] != ':' ]]; then
+            source $zshctl[$cmd]
+        fi
+        usage=${cmd//#:execute/:help}
+        (( ${+functions[$usage]} )) || continue
+        $usage
+        lines=( "${(@Af)help}" ) verbose=() sub=()
+        _zshctl_help
+        (( ${#verbose} )) || continue
+        if [[ $verbose[1] =~ $regex[escaped] ]]; then
+            verbose[1]=${verbose[1]#\\}
+        fi
+        _zshctl_mandown sub "${(pj:\n:)verbose}"
+        $pushf commands '.HP\n.B %s\n.br\n%s' ${usage##*:} "${(j::)sub}"
+    done
+}
+typeset capitalized=$zshctl[program]${usage#:help}
+typeset program_path=( "${(@As,:,)capitalized}" )
+capitalized=${${capitalized//:/-}:u}
+typeset synopsis=() options=() mandown=() man=() mode=scan terse=() verbose=()
+typeset help joined
+$usage
+if [[ $zshctl[help:mode] == __mandown ]]; then
+    printf '%s' $help
+    return
+fi
+typeset lines=( "${(@Af)help}" )
+typeset -A _zshctl_options
+zshctl+=( args:mode help )
+${usage//#:help/:args}
+zshctl+=( args:mode inline )
+_zshctl_help
+typeset -A regex=( escaped '^\\.')
+if (( ! ${#terse} && ${#verbose} )); then
+    joined="${verbose[1]}"
+    if [[ $verbose[1] =~ $regex[escaped] ]]; then
+        joined=${joined#\\}
+    else
+        joined=${joined[1]:l}${joined[2,-1]}
+    fi
+    joined=${joined%.}
+    terse=( "$joined" )
+fi
+function {
+    if [[ $zshctl[help:mode] == __man ]]; then
+        cat $1
+        return
+    fi
+    if (( cols > 120 )); then
+        cols=120
+    else
+        cols=$(( cols - 7 ))
+    fi
+    if [[ $(uname) = Darwin ]]; then
+        mandoc -O width=${cols}  -T utf8 $1
+    else
+        GROFF_NO_SGR=1 groff -rLL=${cols}n -rLT=${cols}n -Wall -mtty-char -Tutf8 -man -c "$1"
+    fi
+} =(
+    printf '.TH %s 1 %s %s %s\n' \
+        ${(qqq)capitalized} \
+        ${(qqq)release_date} \
+        ${(qqq)zshctl[version]} \
+        ${(qqq)zshctl[man_title]}
+    printf '.SH NAME\n'
+    printf '%s \- ' "${(j:\ :)program_path}"
+    _zshctl_mandown man "${(pj:\n:)terse}"
+    printf '%s' "${(j::)man}"
+    printf '%s' "${(j::)synopsis}"
+    man=()
+    _zshctl_mandown man "${(pj:\n:)mandown}"
+    printf '%s' ${(j::)man}
+) | less
+exit

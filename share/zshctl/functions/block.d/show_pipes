@@ -1,0 +1,22 @@
+#!/bin/zsh -f
+
+# Pretty print just the pipes. Useful for the development of the block
+# functions, and might be useful for debugging their usage. Note that, once you
+# start using `coproc`, you'll always have two anonymous pipes hanging around.
+
+typeset split=() file long pipes=() pipe
+pushd /proc/$sysparams[pid]/fd
+{
+    for file in *; do
+        # The glob itself opens an fd that disappears once the glob is collected.
+        [[ -e $file ]] || continue
+        long=$( ls -l $file )
+        # Split on spaces and reverse, `a` means index order, `O` means reverse.
+        split=( ${(aO@s: :)long} )
+        printf -v pipe '%2s %s' $split[3] $split[1]
+        pipes+=( $pipe )
+    done
+} always {
+    popd
+}
+print ${(pj:\n:)pipes} | sort -nk 1,1

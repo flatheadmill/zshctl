@@ -41,5 +41,5 @@ function :execute:extend:link {
 
 function :complete:extend:link {
     [[ $zshctl[args:incomplete] = -* ]] && return
-    [[ $zshctl[args:state] = arguments ]] && completion:directories
+    [[ $zshctl[args:state] = arguments ]] && completion directories
 }

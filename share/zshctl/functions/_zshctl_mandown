@@ -1,0 +1,162 @@
+emulate -L zsh
+
+# Our MAN DOWN! parser.
+typeset array=${1:-} lines=( "${(@Af)2}" )
+shift 2
+if [[ -z $lines[-1] ]]; then
+    lines=( "${(@)lines[1,-2]}" )
+fi
+setopt localoptions extendedglob
+typeset line mode=scan match=() pushf=_zshctl_pushf
+typeset -A regex=(
+    quotes '^(([^`_]|\\`)*)([`_])(.*)$'
+    backtick '^(([^`]|\\`)*)([`])(.*)$'
+    underbar '^(([^_]|\\`)*)([_])(.*)$'
+    list '^([[:space:]]+)\*[[:space:]]+(.*)[[:space:]]+--(.*)'
+    include '^> (.*)'
+)
+integer count=0 is_list=0 is_indented=0
+typeset quoted=() list=() before font outer kind include=() snuggle
+function _zshctl_markdown_debug {
+    if (( count == 3 )) && [[ $array = terse ]]; then
+        printf 'mode >>%s<<\nline >>%s<<\nouter >>%s<<\n' $mode "$line" $outer
+        printf '>>%s<<\n' "${(j::)${(@P)array}}"
+        exit
+    fi
+}
+for line in "${(@)lines}"; do
+    case $line in
+    ('')
+        ;;
+    ('    '[^ ]*)
+        if (( ! is_indented )); then
+            $pushf $array '.RS 4\n'
+            is_indented=1
+        fi
+        ;;
+    (*)
+        if (( is_indented )); then
+            $pushf $array '.RE\n'
+            is_indented=0
+        fi
+        ;;
+    esac
+    outer=$line
+    line=${line//\\\`/$'\uE000'}
+    line=${line//\\_/$'\uE001'}
+    while true; do
+        (( count++ ))
+        # _zshctl_markdown_debug
+        case $mode:$line in
+        (scan:\> *)
+            [[ $line =~ $regex[include] ]]
+            case ${(P)match[1]} in
+            (mandown)
+                _zshctl_mandown include "${(P)match[2]}"
+                $pushf $array '%s' "${(j::)include}"
+                ;;
+            (man)
+                $pushf $array '%s' "${(j::)${(@P)match[2,-1]}}"
+                ;;
+            (*)
+                $pushf $array '%s' "${(j::)${(@P)match}}"
+                ;;
+            esac
+            ;;
+        (scan:\#\#\# *)
+            [[ $line = (#b)\#\#\#\ #(*) ]]
+            $pushf $array '.SS %s\n' $match[1]
+            ;;
+        (scan:\#\# *)
+            [[ $line = (#b)\#\#\ #(*) ]]
+            $pushf $array '.SH %s\n' ${match[1]:u}
+            ;;
+        (scan:\`\`\`*)
+            mode=block
+            $pushf $array '.EX\n'
+            ;;
+        (block:\`\`\`)
+            mode=scan
+            $pushf $array '.EE\n'
+            ;;
+        (block:*)
+            if [[ -z $line ]]; then
+                $pushf $array '%s\n' "$line"
+            else
+                $pushf $array '%s\n' "    $line"
+            fi
+            ;;
+        (scan:*)
+            if [[ is_list -eq 1 && $outer != '  '* ]]; then
+                is_list=0
+                $pushf $array '.RE\n'
+            fi
+            if [[ $line =~ $regex[quotes] ]]; then
+                before="$match[1]"
+                if [[ $before[-1] = [[:space:]] ]]; then
+                    snuggle=''
+                else
+                    snuggle='\c'
+                fi
+                quoted=()
+                mode=quoted
+                case $match[3] in (\`) font=B ;; (_) font=I ;; esac
+                line="$match[4]"
+                continue
+            elif [[ $line =~ $regex[list] ]]; then
+                if [[ is_list -eq 0 && ${#match[1]} > 1 ]]; then
+                    is_list=1
+                    $pushf $array '.RS\n'
+                fi
+                $pushf $array '.HP\n.B %s\n.br\n' $match[2]
+                line=$match[3]
+                continue
+            else
+                $pushf $array '%s\n' "${line##[[:space:]]##}"
+            fi
+            ;;
+        (quoted:*)
+            if [[ $line =~ $regex[quotes] ]]; then
+                quoted+=( "$match[1]" )
+                line=$match[4]
+                mode=unquote
+                continue
+            else
+                quoted+=( "$line" )
+            fi
+            ;;
+        (unquote:*)
+            if [[ -n $before ]]; then
+                $pushf $array '%s%s\n' ${before##[[:space:]]##} "$snuggle"
+            fi
+            # We might have to do something like check for escaped spaces that
+            # have been swapped for UTF, and replace them with UTF that will put
+            # the escaped spaces back. Ah, no we can just put them back now.
+            typeset re='^([^[:space:]`_]+)(.*)'
+            if [[ "$line" =~ $re ]]; then
+                line=${line#$match[1]}
+                if [[ ${match[2][1]} = ('`'|_) ]]; then
+                    snuggle=' '${match[1]}'\c'
+                else
+                    snuggle=' '${match[1]}
+                fi
+                $pushf $array '.%sR %s%s\n' $font "${${(j: :)quoted}// /\\ }" "$snuggle"
+            else
+                $pushf $array '.%s %s\n' $font "${(j: :)quoted}"
+            fi
+            line=${line##[[:space:]]##}
+            mode=scan
+            if [[ -n "$line" ]]; then
+                continue
+            fi
+            ;;
+        esac
+        break
+    done
+done
+if (( is_list )); then
+    $pushf $array '.RE\n'
+fi
+if (( is_indented )); then
+    $pushf $array '.RE\n'
+fi

@@ -1,0 +1,6 @@
+emulate -L zsh
+
+# What if we called this something other than error, something like helper,
+# but, of course, not helper, like controller. It could be the patch that
+# let's us separate the parser from completions.
+args_error_default "$@"

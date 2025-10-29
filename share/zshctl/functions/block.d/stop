@@ -1,0 +1,30 @@
+#!/bin/zsh -f
+
+# Often we want to show the user that we're going to give up on a task.
+# Perhaps it has already been performed, or perhaps flags indicate that
+# members of a set should be skipped.
+
+# In the case of skipping, we are probably already in a loop, so we can show
+# the user using `show eval '(( skip )) && continue'`. If we are not in a
+# loop, we've taken to creating a dummy loop with `while true;` so we have a
+# loop to `break` from. We can't do `(( skip )) && return` since it would only
+# return from the `eval` used by `show`.
+
+# The dummy loops are making the code a little bit ugly, so now we have
+# `stop`. #  `stop` will raise an error that can be caught by our `always`
+# block and if the `o_block[stop]` flag is true, it will reset the
+# `TRY_BLOCK_ERROR` instead of doing an `exit 1`.
+
+# We have now changed `show` to create a function `show:eval` using `eval` and
+# then invoke that function. This is because thrown errors do not propagate
+# out of `eval`. So far, using `show:eval` works and when there are compile
+# errors, the line numbers are correct.
+
+o_block[stop]=1
+if (( $# )); then
+    printf -v message "$@"
+    printf -v message '# stopping: %s' $message
+    print $message
+fi
+typeset -r THROW
+THROW= 2>/dev/null

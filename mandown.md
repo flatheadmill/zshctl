@@ -1,17 +1,43 @@
+# `zshctl`
+
+`zshctl` in a framework for creating command-line programs in Zsh.
+
+**Argument parsing**: An alternative argument parser that handles advanced
+argument types like negations and key values that creates variables with the
+appropriate Zsh type, integer, scalar, array or associative array.
+
+**Zsh completions**: Completions for Zsh driven by the command heirarchy and
+argument parser. Completions can be generated from the command heirarchy, the
+argument parser for options, the help markup, or through a completion function
+or all othe above.
+
+**Cached completions**: Networked completions can be cached for a short time,
+the cache can be invalidated, long running cached completions will display a
+spinner for the entertainment of the user.
+
+**Bash completions**: Almost as good as the Zsh completions with caching and
+spinners and all the `readline` foibles addressed.
+
+**Zshctl library**: Indented heredocs with optional `printf` formatting,
+`abend` and `warn`,
+
 ## Help authoring
 `zshctl` includes a help system that will display man formatted context
 sensitive help.
 
-Help is written using a markup language I call MAN DOWN!, which is a subset of
-Markdown. MAN DOWN! only supports bold, which expressed as backticks instead
-of asterisks, italic, and a single heading, using Markdown's heading 2.
+Help is written using a subset of Markdown simpilfied to support the
+formatting available in man pages. I call the language MAN DOWN!
+
+MAN DOWN! only supports bold, which expressed as backticks instead of
+asterisks, italic, and two heading levels, and definition lists instead of
+bullet or numbered lists.
 
 Bold is a backtick because bold is used to indicate program or command names,
 which is what the backtick generally does, so really it's the same as
 Markdown, backticks means inline keywords, but that means that there is no
 room for bold. If you want to emphasize something, you should use italics.
 
-Heading 1 is used to divide the sections of the MAN DOWN! file. Heading 3 is
+Heading 1 is used to divide the sections of the MAN DOWN! file. Heading 4 is
 used for an inclusion mechanism. This is much like the Markdown-as-XML format
 that is so popular with today's AI slopmentation.
 
@@ -82,7 +108,9 @@ the help. For mutating commands, display help. If a command is a listing or
 report then display the listing or report, which may be all the discovery the
 user needs.
 
-# `warn`
+## Standard library
+
+### `warn`
 
 Warn will print a formatted message to standard error. It does not prefix the
 message with `warn:` or `warning:`, that's up to you. We prefer the format:
@@ -143,9 +171,10 @@ function {
 }
 ```
 
-Caveat: Like `heredoc`, you cannot use the positional array parameters in the double-quoted heredoc.
+Caveat: Like `heredoc`, you cannot use the positional array parameters in the
+double-quoted heredoc.
 
-# `catch`
+### `catch`
 
 The `catch` function will gather the standard out and standard err of a command
 into variables specified by the user. In doing so, it will use `coproc` so you
@@ -207,7 +236,11 @@ have duplicated any `coproc` handles you'll need after the call, because the
 `coproc` redirection operators `>&p` and `<&p` will be closed when `catch`
 returns.
 
-Note: In for a penny, in for a pound. On occasion you think you should just capture standard error and have standard out work normally, but you wouldn't be able to encapsulate that into a function. If you gather standard out into a variable, you fork a subshell and that subshell is unable to write to a variable in the parent process. This example prints `>><<`:
+Note: In for a penny, in for a pound. On occasion you think you should just
+capture standard error and have standard out work normally, but you wouldn't
+be able to encapsulate that into a function. If you gather standard out into a
+variable, you fork a subshell and that subshell is unable to write to a
+variable in the parent process. This example prints `>><<`:
 
 ```
 function {
@@ -217,7 +250,7 @@ function {
 }
 ```
 
-# `struct`
+### `struct`
 
 The `struct` function adds shell escaped arrays and associative arrays to an
 associative array creating a struct of sorts, you can even create trees of structs.
@@ -274,8 +307,143 @@ function {
 The shell escaping can be used elsewhere in your code if you need to pass
 arrays around, but don't want to build an associative array as a tree root.
 
-# `splat`
+### `splat`
 
-When you get into the habit of using the `zshctl` argument parser in your program functions, you run into the annoyance of calling one function from another and having to build complicated argument lists. It's nice to be able to call the functions with options, but it's no fun trying to pass those arguments onto another function programmatically.
+When you get into the habit of using the `zshctl` argument parser in your
+program functions, you run into the annoyance of calling one function from
+another and having to build complicated argument lists. It's nice to be able
+to call the functions with options, but it's no fun trying to pass those
+arguments onto another function programmatically.
 
-`splat` structures calls pulling values from variables in the local scope,
+`splat` will construct a command invocation with options where the option
+values are pulled from the current dynamic scope.
+
+Caveat: As with the other utilities that expand variables in the current
+dynamic scope, you cannot use the the positional arguments `$1`, `$2`, `$3`,
+etc. nor `$@.`
+
+## Zsh-isms
+
+Here are some Zsh-isms for used by `zshctl` that you can use in your own
+`zshctl` and Zsh programs.
+
+Pending outline.
+
+ * slurp &mdash; 8 kilobyte buffered reads of files and pipes.
+ * `REPLY`/`reply` &mdash; generic replies.
+ * `[[ -v result ]]` &mdash; required return values.
+ * `autoload -zU` &mdash; lazy loading functions from `fpath`.
+ *  `__utility_N__` &mdash; dynamic variable naming for safe eval.
+ * `"${(@QA)${$(z)frozen}}"` &mdash; serialization between processes
+ * `jq` tapes &mdash; why `jq` makes Zsh my go-to for JSON
+ * Subshell avoidance &mdash; why Zsh programmers contort themselves to stay in-process
+ * `eval` considered helpful &mdash; contrary to general shell wisdom, Zsh makes eval useful with proper quoting
+ * `${(e)}` expansion &mdash; parameter expansion with evaluation (the alternative to eval)
+
+### Preface
+
+Returning values from functions, how nice it would be to have `typeset -n` but
+Zsh does not. Zsh programmers avoid forks and especially avoid subshells.
+
+I don't, because I love `coproc` best of all. I do avoid command substitution
+and process substitution, though.
+
+#### What does level four look like?
+
+"Doctor is hurts when I do this." You can put aside whatever safety fetishes
+you're carrying from the language you last saw. The dynamic scope, you can see
+it in your mind's eye, that's all that matters.
+
+#### `autoload -zU`
+
+I can understand an aversion to `autoload -zU`. Every little function, even
+one liners, in their own file. It doesn't seem worth it, but it is.
+
+It is worth it because then you get a dependency mechanism. In the case of
+`zshctl`, `pocket` uses `slurp` now, whereas before there was an aversion to
+loading `slurp` just for `pocket` so it used `$(...)`. Don't have to think
+about it.
+
+Consider them to be programs, if that helps, and recall all the shell programs
+you wrote that were just a one liner you got tired of fishing out of shell
+history.
+
+### `zslurp`
+
+8 kilobyte buffer reads and pipes.
+
+### `REPLY/reply`
+
+One way of many to return from a function.
+
+### Scope Assertions
+
+Just like result assertions, just assert that local variables used by your
+program will not be shadowed by the caller.
+
+```
+function foo {
+    [[ -v _foo ]] && print -u 2 'warn: "_foo" is reserved for "foo" in the dynamic scope"
+}
+```
+
+### `coproc`
+
+Why I no longer go running off to Perl for child process handling.
+
+### Indirection
+
+Show that you can write to arrays and associative arrays with printf, and how
+to set associative array values with `typeset` and how to read them all with
+
+#### `${(e)}`
+
+#### `eval` considered helpful
+
+I'd gotten some JavaScript through `XMLHttpRequest` and I wanted to `eval` it,
+but no, you're not supposed to do that, so instead I created a dynamic
+endpoint and added `<script>` to the DOM that would call the endpoint and
+source that. (Please don't think this is what I do for a living today.) Upon
+completion I was kind of bewildered to what safety I had achived. After
+meditating on it a bit, this much younger version of me realized I had achived
+nothing in regards to safety other than to keep from having to explain an
+`eval`.
+
+### Day-to-day
+
+#### `${(j: :)${(@qq)}}` wire format
+
+#### `jq` tapes
+
+Used to be that whenever I'd set out to munge JSON, I'd reach for `node`
+because JSON is becomes JavaScript and I could just write recursive descent to
+get through it all. Whatever objets I created I could just `JSON.stringify`
+them back to the caller.
+
+But, for these programs I'd want to use the synchronous input/output and when
+you look at that it looks I don't know how to asynchronous programming in
+Node.js, but that's not the case. I do know how, I just don't like Node.js.
+
+As far as serialization goes, `jo` is going to require more typeing that
+`JSON.stringify`, but it does not require more reasoning, which is what
+matters.
+
+As far as deserialization goes, once you have your JSON object in Node.js, you
+have to prune it, switch on it, and so on, and that usually means writing a
+handleThing, handleChildOfThing, handleChildOfTheThingThatIsAChildOfThing
+where each of those may filter or reject.
+
+I'm here to tell you, that unless your JSON is an abstract syntax tree, if it
+just ordinary objects coming off the wire, then using `jq` to filter and
+structure JSON into shell escaped words is six-of-one to the
+half-dozen-the-other of switch statements and if/else if ladders in
+JavaScript.
+
+## Opportunties
+
+Considering adding a logging library. There is one `barnyard` but it is
+probably overreach, or else I need to develop an appreciation for
+`journalctl`, as it attempts to log structured Linux messages, but what goods
+is that to OS X? Real world use is greping container logs. A logging library
+would simply log to standard out as logfmt or JSON, but I've never really had
+a once and for all opinion about logging.
