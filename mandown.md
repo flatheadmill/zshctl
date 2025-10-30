@@ -354,6 +354,10 @@ and process substitution, though.
 you're carrying from the language you last saw. The dynamic scope, you can see
 it in your mind's eye, that's all that matters.
 
+You will write functions. There is no way to pass an anonymous function
+around, so you're going to find yourself writing named functions with throw
+away names and global scope. You will resign yourself to this.
+
 #### `autoload -zU`
 
 I can understand an aversion to `autoload -zU`. Every little function, even
@@ -447,3 +451,12 @@ probably overreach, or else I need to develop an appreciation for
 is that to OS X? Real world use is greping container logs. A logging library
 would simply log to standard out as logfmt or JSON, but I've never really had
 a once and for all opinion about logging.
+
+## Outgoing
+
+Compiling, for one. Used to imagine that you could have a `zshctl` program
+compile and it probably is still possible, but as an extension. There are
+places where it is nice to have a complicated multi-command program in a
+single file. And yet, with all the installers, I don't see why you wouldn't
+just install `zshctl` and make it a single file `zshctl` program. Let us wait
+for the desire before fulfilling it.
