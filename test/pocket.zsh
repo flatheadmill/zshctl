@@ -1,4 +1,5 @@
-source share/zshctl/zshctl/include/catch.zsh
+fpath=( share/zshctl/functions $fpath )
+autoload -zU pocket
 
 function good {
     print "$@"
@@ -13,11 +14,11 @@ function bad {
 
 function {
     typeset out err
-    catch out err good hello
+    pocket out err good hello
     printf 'code: %s\n' $?
     printf 'out: %s' $out
     printf 'err: %s' $err
-    catch out err bad hello
+    pocket out err bad hello
     printf 'code: %s\n' $?
     printf 'out: %s' $out
     printf 'err: %s' $err
