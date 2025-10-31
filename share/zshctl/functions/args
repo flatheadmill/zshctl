@@ -15,14 +15,11 @@ typeset -gA zshctl
 setopt localoptions extendedglob
 typeset error=args_error depth=3
 
-typeset -A completions=()
-typeset completion_match=()
-
 # Initial loop to grab the definition and to define the variables to which
 # arguments will be assigned.
 typeset -A option=( kind scalar defined 0 required 0 ) short options missing
 typeset split=() declared=() stack=( "${(@Oa)@}" )
-typeset popped on_zeroed state=option typesets=() tset
+typeset popped state=option typesets=() tset
 integer top=${#stack} intersperse=0 usage=0 completable=0 delegated=0 complete=0
 [[ $zshctl[args:mode] = completion ]] && complete=1
 while (( top )); do
