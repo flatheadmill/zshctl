@@ -84,8 +84,10 @@ function _zshctl_execute {
     zshctl+=( args:func $func args:mode execute args:complete 0 )
     if (( ${+functions[$args]} )); then
         $args "$@"
-    else
+    elif (( ${+functions[$args]} )); then
         $func "$@"
+    else
+        abend -c 2 'fatal: invalid argument: no such command'
     fi
 }
 
