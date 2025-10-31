@@ -264,9 +264,6 @@ function {
         # Recall that we need to autoload our version info generated when we
         # create a release.
         for src in $dir/release.zsh(N); do
-            # TODO What was this about? Looks like something that is always
-            # included, but why is it named `release`? If you cannot find a
-            # use for it, remove it.
             source $src
         done
     done
