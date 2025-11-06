@@ -177,7 +177,7 @@ function __zshctl_actual {
     fi
 
     typeset describe_args=()
-    if [[ $settings[order] -eq 1 ]]; then
+    if [[ $settings[ordered] -eq 1 ]]; then
         __zshctl_debug "Activating keep order."
         describe_args+=( -V )
     fi
