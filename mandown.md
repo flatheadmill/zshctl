@@ -2,9 +2,11 @@
 
 `zshctl` in a framework for creating command-line programs in Zsh.
 
-**Argument parsing**: An alternative argument parser that handles advanced
+**Argumentitive**: An alternative argument parser that handles advanced
 argument types like negations and key values that creates variables with the
 appropriate Zsh type, integer, scalar, array or associative array.
+
+**Helpful**: Create man-formatted help using a subset of Markdown.
 
 **Zsh completions**: Completions for Zsh driven by the command heirarchy and
 argument parser. Completions can be generated from the command heirarchy, the
@@ -18,8 +20,17 @@ spinner for the entertainment of the user.
 **Bash completions**: Almost as good as the Zsh completions with caching and
 spinners and all the `readline` foibles addressed.
 
-**Zshctl library**: Indented heredocs with optional `printf` formatting,
-`abend` and `warn`,
+**Zshctl library**: Indented `heredoc` with optional `printf` formatting,
+`abend` and `warn` for `printf` or `heredoc` based errors, `pocket` to scoop
+up standard input and output of process or function, `tactac` for a more
+managable alternative to `|` pipes, `struct` for nested associative arrays,
+`block` for tool-native error reporting.
+
+**Shebangable**: Create a program `fooctl` using `#!/usr/bin/env zshctl` and
+you can in turn create programs using `#!/usr/bin/env fooctl`.
+
+**Extensible**: Link new commands into your program using `zshctl extend
+link`.
 
 ## Help authoring
 `zshctl` includes a help system that will display man formatted context
@@ -414,6 +425,17 @@ nothing in regards to safety other than to keep from having to explain an
 `eval`.
 
 ### Day-to-day
+
+#### `printf`
+
+I've lost track of all the ways in which the shell will append a newline when
+you don't want one.
+
+ * `<<<` &mdash; Always appends a new line to the string value.
+ * `print` &mdash; Appends a newline by default.
+ * `echo` &mdash; Appends a newline by default, `echo -n` will suppress.
+
+When in doubt, use `printf %s $value`.
 
 #### `${(j: :)${(@qq)}}` wire format
 
