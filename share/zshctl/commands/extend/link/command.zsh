@@ -29,14 +29,14 @@ function :execute:extend:link {
     (1)
         ;;
     (*)
-        abend 'fatal: multiple extension configurations found'
+        abend 'fatal: exception: multiple extension configurations found'
         ;;
     esac
     typeset -A extend
     source $found[1]
-    mkdir -p ~/.local/share/$zshctl[program]
-    ln -s ${found[1]:A:h} ~/.local/share/$zshctl[program]/${extend[link_as]}
-    ls -la ~/.local/share/$zshctl[program]/${extend[link_as]}
+    mkdir -p ~/.local/share/$zshctl[program]/extensions
+    ln -s ${found[1]:A:h} ~/.local/share/$zshctl[program]/extensions/${extend[link_as]}
+    ls -la ~/.local/share/$zshctl[program]/extensions/${extend[link_as]}
 }
 
 function :complete:extend:link {
