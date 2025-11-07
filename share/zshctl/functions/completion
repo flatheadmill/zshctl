@@ -14,6 +14,28 @@ case ${1:-} in
     fi
     zshctl[args:invoke]=${(j: :)${(@qq)@}}
     ;;
+(error)
+    shift
+    case $1 in
+    (-v)
+        zshctl[args:message]='fatal: exception: -v is an invalid argument to completion error'
+        ;;
+    (-n)
+        shift
+        slurp 'zshctl[args:message]' < <(function {
+            printf -- "$@[2,-1]"
+            printf '\n\n'
+            sed -e 's/^/    /' <<< $1
+        } "$@")
+        ;;
+    (*)
+        heredoc -v 'zshctl[args:message]' "$@"
+        ;;
+    esac
+    zshctl[args:throw]=1
+    readonly THROW
+    THROW= 2>/dev/null
+    ;;
 (directories)
     zshctl[args:kind]=directories
     zshctl[args:filters]=${(j: :)${(@qq)@}}

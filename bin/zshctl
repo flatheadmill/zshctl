@@ -84,7 +84,7 @@ function _zshctl_execute {
     zshctl+=( args:func $func args:mode execute args:complete 0 )
     if (( ${+functions[$args]} )); then
         $args "$@"
-    elif (( ${+functions[$args]} )); then
+    elif (( ${+functions[$func]} )); then
         $func "$@"
     else
         abend -c 2 'fatal: invalid argument: no such command'
@@ -121,7 +121,13 @@ function _zshctl_descend_completion {
         [[ $sofar != :args ]] && zshctl[args:command]=${zshctl[args:command]}${${sofar#:args}//:/-}
         complete=${sofar//#:args/:complete}
         if (( ${+functions[$complete]} )); then
-            $complete "$@"
+            {
+                $complete "$@"
+            } always {
+                if (( ${zshctl[args:throw]:-0} )); then
+                    TRY_BLOCK_ERROR=0
+                fi
+            }
         fi
         if [[ $zshctl[args:kind] = none ]]; then
             _zshctl_completions $sofar

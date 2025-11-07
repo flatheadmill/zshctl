@@ -2,7 +2,7 @@ emulate -L zsh
 
 # Assert that we got return variables and a command.
 (( $# > 2 )) || {
-    print 'usage: pocket out err echo 1'
+    print -u 2 'usage: pocket out err echo 1'
     exit 1
 }
 [[ -v $1 ]] || {
@@ -10,15 +10,15 @@ emulate -L zsh
     exit 1
 }
 [[ ${(t)${(P)1}} = scalar-local ]] || {
-    print 'out must be defined as a local scalar'
+    print -u 2 'out must be defined as a local scalar'
     exit 1
 }
 [[ -v $2 ]] || {
-    print 'err must be defined'
+    print -u 2 'err must be defined'
     exit 1
 }
 [[ ${(t)${(P)2}} = scalar-local ]] || {
-    print 'err must be defined as a local scalar'
+    print -u 2 'err must be defined as a local scalar'
     exit 1
 }
 # Create a frame by finding an undefined variable.
