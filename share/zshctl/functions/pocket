@@ -2,7 +2,7 @@ emulate -L zsh
 
 # Assert that we got return variables and a command.
 (( $# > 2 )) || {
-    print 'usage: catch out err echo 1'
+    print 'usage: pocket out err echo 1'
     exit 1
 }
 [[ -v $1 ]] || {
@@ -24,13 +24,13 @@ emulate -L zsh
 # Create a frame by finding an undefined variable.
 set -- 0 "$@"
 while true; do
-    if [[ ! -v "__catch_$1__" ]]; then
+    if [[ ! -v "__pocket_$1__" ]]; then
         break
     fi
     set -- $(( $1 + 1 )) "$@[2,-1]"
 done
 # Set to actual variable name.
-set -- "__catch_${1}__" "$@[2,-1]"
+set -- "__pocket_${1}__" "$@[2,-1]"
 # Define the variable.
 typeset $1
 # Create coprocs for standard out and standard error.
