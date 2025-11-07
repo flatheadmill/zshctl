@@ -48,5 +48,5 @@ if function {
 } && [[ $# -eq 1 && $1 != REPLY ]]; then
     # Once again, if the user has provided us with a variable, we can set that
     # variable, but if they haven't, we've assumed `REPLY`.
-    : ${(P)1::=$REPLY}
+    typeset -g "$1=$REPLY"
 fi
