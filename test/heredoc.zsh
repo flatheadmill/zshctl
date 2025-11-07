@@ -20,12 +20,17 @@ function {
         hello, %s 5
     EOF
     printf $hello
+    typeset -A assoc
+    heredoc -v 'assoc[hello]' -f world <<'    EOF'
+        hello, %s 6
+    EOF
+    printf $assoc[hello]
     typeset encounter=world
     heredoc -q <<'    EOF'
-        hello, ${encounter} 6
+        hello, ${encounter} 7
     EOF
     heredoc -v hello -q <<'    EOF'
-        hello, ${encounter} 7
+        hello, ${encounter} 8
     EOF
     printf $hello
     warn <<'    EOF'
