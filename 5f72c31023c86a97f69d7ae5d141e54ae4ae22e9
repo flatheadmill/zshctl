@@ -1,0 +1,34 @@
+coproc and file handle inheritance.
+
+This is a common problem with coproc. Closing the input file handle is often
+the signal I use to terminate a coproc, and I'm really going buck wild with
+coproc, there will be more than one. I vaguely recall having this exact
+problem with `block`. It ought to be the first place you look when you have a
+problem with corpoc, have you inherited a file handle.
+
+You can quickly debug file handle inheritance with the following code.
+
+```
+for fd in /proc/$$/fd/<3->(N); do
+  exec ${fd:t}>&-
+done
+```
+
+If closing all file handles except for the standard I/O handles allows your
+program to progress, you found your problem. Your coproc is holding onto the
+standard input file handle of another coproc. I've yet to encounter a coproc
+that needs anything other than it's standard I/O file handles.
+
+Perhaps this should be at the start of `tactac`. Couldn't be that much slower
+than the fork. Unlikely that you're write a Zsh program that holds thousands
+of file handles. Perhaps I can be said that a program in any language where a
+child stands to inherit thousands of file handles is not a terribly good
+program.
+
+For `pocket` I simply chose to close standard error before standard in.
+`pocket` blocks until it has run the program and gathered the standard input
+and output, so it is not going to disturb any other coprocs the user may have.
+The `pocket` coprocs are gone when `pocket` returns. They can only block
+each other. `pocket` is not supposed to be run in the background, that would
+fork `pocket` and you wouldn't be able to retrieve values from the `out` and
+`err` variables.
