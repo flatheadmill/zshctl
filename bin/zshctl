@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/bin/zsh -f
 
 # Currently working on separating argument parsing from completions and I
 # believe there was something in my mind about how completions address a gap

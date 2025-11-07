@@ -31,6 +31,8 @@ FROM ubuntu:24.04 AS apt
 
 RUN apt-get update
 RUN apt-get install -y make dpkg-dev git wget zsh
+RUN which zsh
+RUN zsh -c '[[ -e /bin/zsh ]]'
 COPY --from=previous /html/ /work/previous/
 COPY --from=compiled /work/ /work/compiled/
 COPY ./ /zshctl/
@@ -43,6 +45,7 @@ FROM alpine AS apk
 RUN apk --no-progress update
 RUN apk --no-progress upgrade
 RUN apk --no-progress add sudo alpine-sdk zsh
+RUN sh -c '[[ $(which zsh) = /bin/zsh ]]'
 RUN adduser -u 1983 -D -h /home/build -s /bin/false build
 RUN addgroup build abuild
 RUN mkdir /work /html && chown build:build /work /html
@@ -59,6 +62,7 @@ RUN zsh -c '[[ ! -d /home/build/.abuild ]]'
 FROM fedora AS yum
 
 RUN dnf install -y git wget gcc rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools zsh groff which glibc-common rpm-sign createrepo less groff-base
+RUN zsh -c '[[ -e /bin/zsh ]]'
 COPY --from=previous /html/ /work/previous/
 COPY --from=compiled /work/ /work/compiled/
 COPY ./ /zshctl/
@@ -74,6 +78,7 @@ RUN pacman-key --populate archlinux
 RUN pacman --noconfirm -Syu
 RUN pacman --noconfirm -S archlinux-keyring
 RUN pacman --noconfirm -S base-devel zsh wget less
+RUN zsh -c '[[ -e /bin/zsh ]]'
 RUN useradd -u 1983 -d /home/build -s /bin/false build && usermod -L build
 RUN mkdir -p /work /html /home/build
 RUN chown build:build /work /html /home/build
@@ -91,6 +96,7 @@ FROM gentoo/stage3:latest AS gentoo
 
 RUN PORTAGE_QUIET=1 emaint --all sync >/dev/null
 RUN FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox" emerge --quiet app-eselect/eselect-repository emerge dev-vcs/git zsh
+RUN zsh -c '[[ -e /bin/zsh ]]'
 COPY --from=compiled /work/ /work/compiled/
 COPY --from=previous /html/ /work/previous/
 COPY ./ /zshctl/
