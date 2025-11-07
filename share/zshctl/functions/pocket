@@ -1,13 +1,11 @@
 emulate -L zsh
 
-# Convert the optional `-s` into a explicit boolean.
+# Assert that we got return variables and a command.
 if [[ $1 = -s ]]; then
     set -- 1 "${@[2,-1]}"
 else
     set -- 0 "$@"
 fi
-# TODO Consider using `abend`. In for a penny, in for a pound.
-# Assert that we got return variables and a command.
 (( $# > 3 )) || {
     print -u 2 'usage: pocket [-s] out err echo 1'
     exit 1
@@ -46,7 +44,10 @@ function {
     typeset frame=${1:-}
     integer subst=${2:-}
     shift 2
-    # Create the coprocs.
+    # Create the coprocs. NB: Our standard error slurp coproc is going to
+    # inherit the file handles of our standard output coproc. Rather than close
+    # the inherited file handles we're going to just close the standard error
+    # input before the standard output input.
     integer input output try tried
     if (( ! subst )); then
         coproc {
@@ -90,14 +91,13 @@ function {
     shift 3
     integer input=$1 try=$2 output=$3 tried=$4
     shift 4
-    # TODO Always hangs, 100% of the time.
     typeset out err
+    exec {try}>&-
+    slurp err <&$tried
     if (( ! subst )); then
         exec {input}>&-
         slurp out <&$output
     fi
-    exec {try}>&-
-    slurp err <&$tried
     set -A $frame $subst $code "$1" "$out" "$2" "$err"
 } "$@"
 # Set our positional parameters from out one local variable.
