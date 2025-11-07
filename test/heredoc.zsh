@@ -1,4 +1,5 @@
-source share/zshctl/zshctl/include/heredoc.zsh
+fpath=( share/zshctl/functions $fpath )
+autoload -zU warn abend heredoc slurp
 
 function {
     typeset hello
@@ -38,6 +39,8 @@ function {
     EOF
     warn 'warn: greeting: hello, %s 4' $encounter
     warn -- 'warn: greeting: hello, %s 5' $encounter
+    printf -v err 'one\ntwo\n'
+    warn -n $err 'warn: greeting: hello, %s 6' $encounter
     (
     abend <<'    EOF'
         fatal: greeting: hello, world 1
@@ -81,5 +84,7 @@ function {
     (abend -- 'fatal: greeting: hello, %s 9' $encounter)
     print "code: $?"
     (abend -c 2 -- 'fatal: greeting: hello, %s 10' $encounter)
+    print "code: $?"
+    (abend -c 2 -n $err 'fatal: greeting: hello, %s 10' $encounter)
     print "code: $?"
 }

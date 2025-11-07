@@ -10,84 +10,95 @@ while true; do
 done
 # Set to actual variable name.
 set -- "__heredoc_${1}__" "$@[2,-1]"
+# Create variable.
+typeset -a $1
+# Gather heredoc and parse arguments.
 function {
+    setopt localoptions extendedglob
     typeset match=() lines=() chomped=()
-    typeset spaces=65536 leading='^( *)([^[:space:]])' line heredoc
-    IFS= read -rd '' heredoc
+    typeset spaces=65536 line heredoc REPLY
+    # Slurp the 'HEREDOC' text.
+    slurp
+    heredoc=$REPLY
+    # Find the smallest indent, gather lines into an array.
     for line in "${(@Af)heredoc}"; do
         lines+=( "$line" ) # remove the double quotes and blank lines disappear
-        if [[ $line =~ $leading && ${#match[1]} -lt $spaces ]]; then
+        if [[ $line = (#b)([[:space:]]#)([^[:space:]])* && ${#match[1]} -lt $spaces ]]; then
             spaces=${#match[1]}
         fi
     done
+    # Chomp each line.
     for line in "${(@)lines}"; do
-        # remove the double quotes and blank lines disappear
         chomped+=( "${line[spaces + 1,-1]}" )
     done
+    # Join lines with newlines.
     printf -v heredoc '%s' ${(pj:\n:)chomped[1,-2]}$'\n'
-    typeset parameters=${1:-}
+
+    # First argument is the name of our stack frame.
+    typeset frame=${1:-}
     shift
-    typeset mode=- variable=() vargs=() emit=()
+    typeset mode variable=() vargs=() emit=()
     while (( $# )); do
-        case $1 in
-        (-v)
+        case $mode:$1 in
+        (f:*)
+            vargs=( "$@" )
+            break
+            ;;
+        (:-v|q:-v|-:-v)
             variable=( $1 ${(qq)2} )
             shift 2
             ;;
-        (-)
-            mode=-
-            shift
-            ;;
-        (-q)
+        (:-)
             mode=$1
             shift
             ;;
-        (-f)
-            mode=$1
+        (:-q)
+            mode=${1[2]}
             shift
             ;;
-        (--)
+        (:-f)
+            mode=${1[2]}
             shift
-            vargs=( "$@" )
-            break
             ;;
         (*)
-            [[ $mode = -f ]] || {
-                print -u 2 'positional parameters are only for -f mode'
-                exit 1
-            }
-            vargs=( "$@" )
-            break
+            abend 'fatal: exception: heredoc positional parameters are only for -f mode'
             ;;
+        # TODO Dubious, why would you use this?
+        #(--)
+        #    shift
+        #    vargs=( "$@" )
+        #    break
+        #    ;;
         esac
     done
     typeset src emit=()
     case $mode in
-    (-)
+    (|-)
         emit=( 'printf' "${(@)variable}" '%s' '$3' )
         src=${(j: :)${(@qq)emit}}
         ;;
-    (-f)
+    (f)
         emit=( 'printf' "${(@)variable}" -- '$3' "${(@)vargs}" )
         src=${(j: :)${(@qq)emit}}
         ;;
-    (-q)
+    (q)
         printf -v heredoc '%s' $'\t'${(pj:\n\t:)chomped[1,-2]}$'\n'
         if (( ${#variable} )); then
-            printf -v src "IFS= read -rd '' %s " $variable[2]
+            printf -v src "slurp %s " $variable[2]
         else
-            src='cat '
+            src=''
         fi
-        printf -v src '%s <<-EOT\n%sEOT\n' "$src" "$heredoc"
+        printf -v src '%s<<-EOT\n%sEOT\n' "$src" "$heredoc"
         src=${(qq)src}
         heredoc=
         ;;
     esac
-    typeset frame=( $parameters $src $heredoc )
-    : ${(PA)parameters::=${(j: :)${(@qq)frame}}}
+    set -A $frame $frame $src $heredoc
 } "$@"
 # Set our positional parameters from out one local variable.
-set -- "${(@QA)${(z)${(P)1}}}"
+#set -- "${(@QA)${(z)${(P)1}}}"
+set -- "${(@P)1}"
+# Unset our frame.
 unset $1
-# Evaluate heredoc in the current process with the current set of variables.
+# Evaluate heredoc in the user's unaltered dynamic scope.
 eval "${(@QA)${(z)2}}"
