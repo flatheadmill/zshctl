@@ -1,0 +1,57 @@
+Using `block` in everyday programs.
+
+No longer reserved for pipeline automation, `block` and "tool-native error
+reporting" are now available for any program. It is important to please keep
+the clever to a minimum. We are not going to use `throw`. There is no point to
+it when you can just use `abend` and `throw` should be removed.
+
+Almost removed the `-v` option to `try` when I saw it, and certainly it was
+marked for disposal, but then I set out to actually write something with this
+new universal `block` and realized I'm no longer evaluating code as I do with
+`show` in the automation pipelines. I needed that file handle in order to
+capture errors when doing command substitution.
+
+```
+try -v try && body=(git log -n 1 --format=%B 2>&$try) || tried
+```
+
+The whole point of this exercise was trying to find something less verbose
+than the `pocket` pattern that has emerged.
+
+```
+if ! pocket -s out err git log -n 1 --format=%B; then
+    abend -n $err 'fatal: git error: unable to get commit body'
+fi
+```
+
+While `try -v try &&` had bothered me in the past, it now looks reasonable in
+part because file handles and redirection look reasonable to me now that time
+has passed and in part because repetition will make it filter out.
+
+Nice thing about `try -v try` is that you can put entire pipelines inside a
+`{}` and `{} 2>&$try' and have a more generic message, not have to go step by
+step as with `pocket` and not have to skip on error reporting, using `pocket`
+for a call to `gh` but skipping it for the `jq` manipulation. The `gh | jq` is
+really one operation, because if `jq` fails its 99% of the time because `gh`
+or whatever utility returned unfamiliar JSON, probably accompanied by an error
+on standard error.
+
+Also, do note that syntax errors or other errors coming out of Zsh, well, I'm
+not sure what path those follow. We could write a simple test where we assign
+to a variable marked read-only within a `{}` block and see what happens with
+the resulting throw. We can reason that in command substitution it will work
+fine, and the only other way to get that to `try`, not a command but an
+assignment, would be with `eval`, so `try || tried` will likely work for any
+sort of error and capture any sort of standard error message.
+
+Ah, but what about...
+
+```
+try -v try && { readonly x; x=; } 2>&$try || tried
+```
+
+Note that will `try || tried`, like with pipeline automations using `show` you
+are going to have to do things step by step, generally breaking up your
+program into reportable steps, which you do anyway, but I'm curious to see
+if you do it more. What will code look like if this becomes a once and for all
+pattern?
