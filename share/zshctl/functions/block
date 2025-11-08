@@ -44,21 +44,18 @@ zmodload zsh/system 2>/dev/null
 # is a convience function for when we want to close one, but only if it is open.
 
 fpath=(${${(%):-%x}:h}/block.d $fpath)
+autoload -zU try tried caught _block_close
 
-typeset -xgA o_block
+typeset -gA o_block=( indent 4 pids '' stop 0 indent 0 user 0 )
 
-# The banner starts a block and creates a subshell that we can use to indent the
-# output of a series of build pipeline commands.
+# The block and creates a subshell that we can use to indent the output of a
+# series of build pipeline commands.
 
-# TODO Remove zparseopts and just while it or remove.
+if [[ $1 = -i ]]; then
+    o_block[indent]=$2
+    shift 2
+fi
 
-
-#
-typeset o_indent=( '' 4 )
-zparseopts -D -F -K -- \
-    {i,--indent}:=o_indent
-o_block[pids]=''
-o_block[stop]=0
 integer fd out
 # Worked on making it so that we could just close the input to terminte the
 # loop, but unlike the `indent` input, the `try` input cannot be closed
@@ -90,40 +87,48 @@ exec {fd}<&p; o_block[tried]=$fd
 o_block[sed]=0
 # Create the initial empty AWK array.
 print reset >&${o_block[try]}
-# Copy the standard output of the main process for use in the indent `coproc`.
-exec {out}>&1
-# This is our indent `coproc`.
-coproc {
-    # Start a character count for our pipe.
-    coproc wc -c
-    # We are going to wait for our word count to finish.
-    integer wc=$! count
-    # Clone the output fd of the word count.
-    exec {count}<&p
-    # Format and print the banner.
-    if (( $# )); then
-        typeset message
-        printf -v message "$@"
-        printf '%s\n\n' $message >&$out
-    else
-        print -- >&$out
-    fi
-    # Tee into the word count, indent, and print to parent's standard out.
-    tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:o_indent[2]:: :)}"'\1/' >&$out
-    # Close the >&p and <&p of our word count `coproc`.
+
+# TODO We begin the standard output indenting here. We can wrap this in an if
+# block. Any output in the always block is going to just print, and if there is
+# no `indent` function, then there is no indent. Everything else, we can see if
+# it works as normal.
+
+if (( o_block[indent] )); then
+    # Copy the standard output of the main process for use in the indent `coproc`.
+    exec {out}>&1
+    # This is our indent `coproc`.
+    coproc {
+        # Start a character count for our pipe.
+        coproc wc -c
+        # We are going to wait for our word count to finish.
+        integer wc=$! count
+        # Clone the output fd of the word count.
+        exec {count}<&p
+        # Format and print the banner.
+        if (( $# )); then
+            typeset message
+            printf -v message "$@"
+            printf '%s\n\n' $message >&$out
+        else
+            print -- >&$out
+        fi
+        # Tee into the word count, indent, and print to parent's standard out.
+        tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:o_indent[2]:: :)}"'\1/' >&$out
+        # Close the >&p and <&p of our word count `coproc`.
+        coproc :
+        # If we had any output at all, print a new line.
+        [[ $(<&${count}) != 0 ]] && print >&$out
+        # Wait for word count to finish.
+        wait $wc
+    }
+    # We are going to wait on the indent `coproc` to finish in out `always` block.
+    o_block[pid]=${!}
+    # Close our duplicate of standard out.
+    exec {out}>&-
+    # Duplicate the input pipe of our indent `coproc`.
+    exec {fd}>&p; o_block[indent]=$fd
+    # Close the >&p and <&p of our indent `coproc`.
     coproc :
-    # If we had any output at all, print a new line.
-    [[ $(<&${count}) != 0 ]] && print >&$out
-    # Wait for word count to finish.
-    wait $wc
-}
-# We are going to wait on the indent `coproc` to finish in out `always` block.
-o_block[pid]=${!}
-# Close our duplicate of standard out.
-exec {out}>&-
-# Duplicate the input pipe of our indent `coproc`.
-exec {fd}>&p; o_block[indent]=$fd
-# Close the >&p and <&p of our indent `coproc`.
-coproc :
-# Set the DIY `try` fd to zero so we know its unallocated.
-o_block[user]=0
+    # Set the DIY `try` fd to zero so we know its unallocated.
+    o_block[user]=0
+fi

@@ -25,9 +25,9 @@ function try {
     # TODO Wait on previous set to exit, if it exists.
     # Close the indent file handle so that a long running process like
     # `ssh-agent` does not inherit it and hold it open.
-    tekton::close indent
+    _block_close indent
     # Close the user `try` handle if one exists.
-    tekton::close user
+    _block_close user
     # Create an indentation `coproc` to feed to our try `coproc`.
     coproc {
         coproc :

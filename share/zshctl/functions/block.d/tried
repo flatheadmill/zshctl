@@ -22,12 +22,21 @@
 
 # Remember that we're not trying to make a try/catch, though. We're trying to
 # make a block formatter according to requirements above.
+o_block[code]=$?
+
+if [[ $1 = -c ]]; then
+    o_block[code]=${2:-$o_block[code]}
+    shift
+    (( $# )) && shift
+fi
 
 typeset message
 if (( $# )); then
     printf -v message "$@"
     o_block[abend]=$message
 fi
-# Note that `exit 1` will just exit the program immediately.
+# We need to affect a throw, so we need to do something naughty, but not
+# something that will exit the program, like calling `exit`. This comes straight
+# from the /usr/share/zsh/functions/Exceptions/throw function.
 typeset -r THROW
 THROW= 2>/dev/null
