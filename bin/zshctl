@@ -116,6 +116,8 @@ function _zshctl_descend_completion {
         zshctl+=( args:mode completion args:complete 1 )
         $args "$@"
     else
+        print $zshctl[args:state] $zshctl[args:kind]
+        return
         typeset -A completions=()
         typeset completion_match=()
         [[ $sofar != :args ]] && zshctl[args:command]=${zshctl[args:command]}${${sofar#:args}//:/-}
@@ -129,7 +131,8 @@ function _zshctl_descend_completion {
                 fi
             }
         fi
-        if [[ $zshctl[args:kind] = none ]]; then
+        # TODO What is args:kind?
+        if true && [[ $zshctl[args:kind] = none ]]; then
             _zshctl_completions $sofar
             if (( ! ${#completion_match} )); then
                 zshctl[args:state]=nothing

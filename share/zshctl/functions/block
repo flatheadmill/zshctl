@@ -44,9 +44,9 @@ zmodload zsh/system 2>/dev/null
 # is a convience function for when we want to close one, but only if it is open.
 
 fpath=(${${(%):-%x}:h}/block.d $fpath)
-autoload -zU try tried caught _block_close
+autoload -zU indent try tried caught _block_close
 
-typeset -gA o_block=( indent 4 pids '' stop 0 indent 0 user 0 )
+typeset -gA o_block=( indent 4 pids '' stop 0 indent 4 user 0 )
 
 # The block and creates a subshell that we can use to indent the output of a
 # series of build pipeline commands.

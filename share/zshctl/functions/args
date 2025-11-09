@@ -18,7 +18,7 @@ typeset error=args_error depth=3
 # Initial loop to grab the definition and to define the variables to which
 # arguments will be assigned.
 typeset -A option=( kind scalar defined 0 required 0 ) short options missing
-typeset split=() declared=() stack=( "${(@Oa)@}" )
+typeset split=() stack=( "${(@Oa)@}" )
 typeset popped state=option typesets=() tset
 integer top=${#stack} intersperse=0 usage=0 completable=0 delegated=0 complete=0
 [[ $zshctl[args:mode] = completion ]] && complete=1
@@ -30,10 +30,9 @@ while (( top )); do
         ((top--))
         break
         ;;
-    # Short flags to the argument parser itself. Captial letters
-    # represent global options.Lower case letters are options that
-    # apply the subsequent field defintions or a single next
-    # defintiion depending on option.
+    # Short flags to the argument parser itself. Captial letters represent
+    # global options. Lower case letters are options that apply the subsequent
+    # field defintions or a single next defintiion depending on option.
     (*:-*)
         state=option
         case $popped in
@@ -151,7 +150,9 @@ while (( top )); do
     esac
 done
 
-if [[ $zshctl[args:mode] = help ]]; then
+# We are being called from the `zshctl` help system to obtain the defintiions of
+# the options.
+if [[ -v zshctl && $zshctl[args:mode] = help ]]; then
     printf '_zshctl_options=( %s )\n' "${(j: :)${(@qqkv)options}}"
     return
 fi
@@ -334,7 +335,6 @@ while (( top )); do
         ;;
     esac
 done
-zshctl[args:state]=$state
 if (( ! complete )); then
     # TODO Assert we did not stop mid argument.
     case $state in
@@ -355,9 +355,12 @@ if (( ${#combined} )); then
 else
     printf 'set --\n'
 fi
-# If we are invoked from command descent, we must call the actual
-# execution function. In order to use `args` to parse internal
-# function arguments, we also have to reset `_zshctl`.
+# When used outside of `zshctl`, we are done.
+if [[ ! -v zshctl ]]; then
+    return
+fi
+# When used inside `zshctl`, we append more commands for specific `zshctl`
+# functions.
 case $zshctl[args:mode] in
 (execute)
     if (( usage && ! ${#combined} )); then
@@ -368,11 +371,20 @@ case $zshctl[args:mode] in
     fi
     ;;
 (completion)
+    # Find the `:args` function in order to find the `:complete` function.
     integer top=2
     while [[ $funcstack[$top] != (:args:*|:args) ]]; do
         ((top++))
         (( top <= ${#funcstack} )) || abend 'must be called from an args function'
     done
+    # State was intended to drive the parsing loop above, but we ended up
+    # adopting it as a flag for our completion functions. The following is an
+    # amendment to the state that makes sense for completion.
+    if [[ $state = arguments && $zshctl[args:incomplete] = -* ]]; then
+        zshctl[args:state]=option
+    else
+        zshctl[args:state]=$state
+    fi
     # Your set of provisional switches for your completions. We need to
     # rundown all the values used in the completions and all the values used
     # in our completion functions and determine a useful set.

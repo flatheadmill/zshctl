@@ -34,7 +34,7 @@ _block_close tried
 
 if (( o_block[indent] )); then
     # We close the handle to the standard output indent `coproc`.
-    _tekton_close indent
+    _block_close indent
     # And we close our standard output, which is redirected to the `indent`
     # process, so now the `indent` process will have no more input to feed to
     # its copy of the input file handle and it will close it's copy of the file

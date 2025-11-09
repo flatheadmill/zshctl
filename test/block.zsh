@@ -1,5 +1,5 @@
 fpath=( share/zshctl/functions $fpath )
-autoload -zU warn abend heredoc slurp block
+autoload -zU warn abend heredoc slurp block show
 
 function bad {
     print something bad is about to happen
@@ -47,4 +47,10 @@ function {
         }
     )
     print $?
+    block 'hello'
+    {
+        try show print 'hello' || tried
+    } always {
+        caught
+    } > >(indent)
 }
