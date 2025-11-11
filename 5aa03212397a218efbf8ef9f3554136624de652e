@@ -16,3 +16,5 @@ an error. We'll still have our debugging and our ability to copy and paste a
 command to our own terminal. Most of the time the spew is merely to see that
 the pipeline is making progress, not to spot a pull request viewer as a `gh`
 command goes by.
+
+This merging of multi-lines would have been a deal breaker a couple years ago.
