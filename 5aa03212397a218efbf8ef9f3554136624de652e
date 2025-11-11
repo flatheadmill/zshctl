@@ -3,5 +3,16 @@ Sketch of `exemplar`.
 Mostly complete, but need to work with it to find the edge cases and determine
 if it is not too clever. Likely not and likely to make it easier to write the
 pipeline automations, increasing the amount of code eligible for syntax
-highlighting. Need to determine if new line continuations are eliminated,
-which may make things far less legible.
+highlighting.
+
+One potential problem is that line continuations, (i.e. '\\n') are eliminated,
+so we are stuck with very long lines that are going to to wrap in the
+terminal, instead of long commands being nicely-formatted with multiple lines.
+One would think that it was more important for the pipeline automation display
+to be just so, but knocking down the complexity of the pipeline code for a
+couple of run-on lines in the pipeline console display is probably worth it
+when we don't really care about the details pipeline display unless there is
+an error. We'll still have our debugging and our ability to copy and paste a
+command to our own terminal. Most of the time the spew is merely to see that
+the pipeline is making progress, not to spot a pull request viewer as a `gh`
+command goes by.
