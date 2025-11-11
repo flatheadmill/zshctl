@@ -1,0 +1,7 @@
+Sketch of `exemplar`.
+
+Mostly complete, but need to work with it to find the edge cases and determine
+if it is not too clever. Likely not and likely to make it easier to write the
+pipeline automations, increasing the amount of code eligible for syntax
+highlighting. Need to determine if new line continuations are eliminated,
+which may make things far less legible.
