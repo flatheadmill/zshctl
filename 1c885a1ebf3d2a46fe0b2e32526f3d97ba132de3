@@ -3,3 +3,7 @@ Tool-native error handling.
 Got tired of `pocket`. Still good for when you want to `case` on errors as
 with `op`, but for running `gh` and `git` and checking every error, it starts
 to get to blocky, too if/else.
+
+I've already written about it in the journal, but I wanted to note that I've
+updated all the `block` code to work with both `indent`/`show`, resurrected
+that ability and I am paving the way for `exemplar`.
