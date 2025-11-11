@@ -2,9 +2,7 @@ zmodload zsh/datetime
 
 function :help:version {
     heredoc -v help -q <<'    EOF'
-        # terse
-        display version
-        # verbose
+        # desc -- display version
         Display the current version of \`${zshctl[program]}\`.
         # opt format -- < terse | verbose | shell | json >
         Display a verbose version as test, JSON, or shell escaped.
@@ -29,7 +27,8 @@ function :execute:version {
         print $zshctl[version]
         ;;
     (verbose)
-        print "Version: $zshctl[version]\nRelease Date: $(strftime "%Y-%m-%dT%H:%M:%S:%z" $zshctl[release_date])"
+        print "Version: $zshctl[version]"
+        print "Release Date: $(strftime "%Y-%m-%dT%H:%M:%S:%z" $zshctl[release_date])"
         ;;
     (shell)
         print "${(qq)zshctl[version]} ${(qq)zshctl[release_date]}"

@@ -1,5 +1,7 @@
 emulate -L zsh
 
+setopt localoptions extendedglob
+
 # One function to pretty much gather up everything needed to create a man page,
 # to include commands from sub-commands, format a synopsis, format an options
 # section, and gather up completions.
@@ -32,6 +34,10 @@ typeset -A option regex=(
     escaped '^\\.'
     list '^([[:space:]]+)\*[[:space:]]+(.*)[[:space:]]+--(.*)'
 )
+typeset -A glob=(
+    arg         '(#b)\#[[:space:]]##arg[[:space:]]##--(*)'
+    description '(#b)\#[[:space:]]##desc(ription|)([[:space:]]##--(*)|)'
+)
 # TODO Must fix.
 typeset split=() match=() markup=() joined=() boolean=() markup=() args=()
 typeset pushf=_zshctl_pushf long mode=scan help trim
@@ -42,6 +48,19 @@ for line in "${(@)lines}"; do
         case $mode:$line in
         (scan:\# terse)
             mode=terse
+            ;;
+        (scan:\# desc(ription|)*)
+            if [[ $line = ${~glob[description]} ]]; then
+                terse="${${match[3]##[[:space:]]##}%%[[:space:]]##}"
+            fi
+            mode=description
+            ;;
+        (description:\# *)
+            mode=scan
+            continue
+            ;;
+        (description:*)
+            verbose+=( "$line" )
             ;;
         (terse:\# *)
             mode=scan
@@ -64,7 +83,7 @@ for line in "${(@)lines}"; do
             mode=mandown
             ;;
         (scan:\# arg *)
-            [[ $line =~ $regex[arg] ]] || print bummer
+            [[ $line = ${~glob[arg]} ]] || print bummer
             args+=( "${${match[1]##[[:space:]]##}%%[[:space:]]##}" )
             ;;
         (scan:\# opt *)
