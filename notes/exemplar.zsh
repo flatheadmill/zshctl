@@ -110,13 +110,13 @@ function example {
     EOF
 }
 
-function example {
+function _example {
     typeset world=world
     (){ % -n; cat %s } % $world <<"    EOF"
         hello, %s
     EOF
 }
-function example {
+function _example {
     if true; then
         (){ % hello; print %s }
     fi
@@ -140,12 +140,8 @@ EOF
 ')")"
 }
 
-function example {
+function _example {
     typeset variable variables=()
-    (){
-        print hello \
-            world
-    }
     while (( $# )); do
         (){ % $1 $1 $1; [[ -v %s ]] && variables+=( -s "%s=${%s}" ) }
         shift

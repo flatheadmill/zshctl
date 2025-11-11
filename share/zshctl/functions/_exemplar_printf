@@ -1,6 +1,6 @@
 emulate -L zsh
 
-typeset buffer stdin dedent
+typeset buffer stdin
 
 if (( ${#body} )); then
     functions[_exemplar_compile]=${(pj:\n:)body}
@@ -12,12 +12,13 @@ if (( ${#body} )); then
         else
             eof="'EOF'"
         fi
-        heredoc -v dedent <<< "${(pj:\n:)heredoc}"
+        heredoc -v stdin <<< "${(pj:\n:)heredoc}"
         if [[ -n $sprintf ]]; then
-            printf -v stdin '"$(heredoc -f %s <<< %s)"' $sprintf ${(qq)dedent}
+            printf -v stdin '"$(heredoc -f %s <<< %s)"' $sprintf ${(qq)stdin}
             printf -v stdin '"$(printf '\'' <<"EOF"\n%%s\nEOF\n'\'' %s)"' $stdin
         else
-            printf -v stdin ' <<%s\n%sEOF' $eof $dedent
+            printf -v stdin ' <<%s\n%sEOF' $eof $stdin
+            printf -v stdin %s ${(qq)stdin}
         fi
         if (( ${#lines} > 1 )); then
             printf -v buffer '{ %s; }' $buffer
