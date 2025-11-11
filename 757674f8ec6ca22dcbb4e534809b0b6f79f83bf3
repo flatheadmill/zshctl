@@ -1,0 +1,16 @@
+Postponing MAN DOWN! `arg`.
+
+Wanted to change `arg` from is current implementation, which uses spaces to
+alternate between italic and regular, as if it was ordinary `man`, but decided
+to postpone because it ain't broke and the generated `man` is clean.
+
+Worth doing as a single branch topic to detect any errors in decent man pages,
+the ones that I'll write with this current version of MAN DOWN!. I suspect
+that I need to implement a universal escape mechanism if I want to use markup
+based bold and italic everywhere and all the time.
+
+This would use only one of the UTF-8 placeholders, and keep an array of
+characters as the placeholders were added. At the we'd scan for the
+placeholders in the document order and replace them with the characters in the
+array. Another feature that would be solving a problem that we will have, but
+we won't really understand until we're facing it.
