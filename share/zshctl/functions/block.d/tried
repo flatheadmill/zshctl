@@ -35,6 +35,7 @@ if (( $# )); then
     printf -v message "$@"
     o_block[abend]=$message
 fi
+
 # We need to affect a throw, so we need to do something naughty, but not
 # something that will exit the program, like calling `exit`. This comes straight
 # from the /usr/share/zsh/functions/Exceptions/throw function.

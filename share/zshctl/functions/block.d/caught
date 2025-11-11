@@ -11,8 +11,9 @@ if (( $o_block[sed] )); then
     wait $o_block[sed]
     waited=$?
     # See `wait` in `man zshbuiltins`. Also,https://stackoverflow.com/a/56879673
-    if (( waited )); then
+    if (( waited && waited != 127 )); then
         print -u 2 $waited $o_block[pids]
+        exit 1
     fi
     o_block[sed]=0
 fi
@@ -32,9 +33,9 @@ _block_close tried
 # to the user message, so maybe that is something I ought to in `abend` and
 # `warn`.
 
-if (( o_block[indent] )); then
+if (( o_block[indented] )); then
     # We close the handle to the standard output indent `coproc`.
-    _tekton_close indent
+    _block_close indent
     # And we close our standard output, which is redirected to the `indent`
     # process, so now the `indent` process will have no more input to feed to
     # its copy of the input file handle and it will close it's copy of the file
@@ -48,20 +49,24 @@ fi
 
 # TODO The above is the indent code, so there you go. We made it.
 
-# And now we can print an error message, if any, after all the indented
-# output from the block.
-if (( TRY_BLOCK_ERROR )); then
-    if (( o_block[stop] )); then
-        TRY_BLOCK_ERROR=0
+# And now we can print an error message, if any, after all the indented output
+# from the block.
+#
+# We no longer rely on `TRY_BLOCK_ERROR`. It will not pass through an `eval` and
+# which we encountered while developmenting `exemplar` when doing an `eval` of
+# the compiled code.
+
+#
+if (( $o_block[stop] )); then
+    TRY_BLOCK_ERROR=0
+elif (( $o_block[code] )); then
+    if (( ${+o_block[abend]} )); then
+        printf 'fatal: %s\n' $o_block[abend] 1>&2
     else
-        if (( ${+o_block[abend]} )); then
-            printf 'fatal: %s\n' $o_block[abend] 1>&2
-        else
-            print -u 2 'fatal:'
-        fi
-        if [[ -n $err ]]; then
-            printf '\n%s\n' $err 1>&2
-        fi
-        exit ${o_block[code]:-1}
+        print -u 2 'fatal:' $TRY_BLOCK_ERROR
     fi
+    if [[ -n $err ]]; then
+        printf '\n%s\n' $err 1>&2
+    fi
+    exit ${o_block[code]:-1}
 fi

@@ -24,7 +24,7 @@
 function try {
     # TODO Wait on previous set to exit, if it exists.
     # Close the indent file handle so that a long running process like
-    # `ssh-agent` does not inherit it and hold it open.
+    # `ssh-agent` do not inherit it and hold it open.
     _block_close indent
     # Close the user `try` handle if one exists.
     _block_close user

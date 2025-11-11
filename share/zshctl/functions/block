@@ -44,15 +44,16 @@ zmodload zsh/system 2>/dev/null
 # is a convience function for when we want to close one, but only if it is open.
 
 fpath=(${${(%):-%x}:h}/block.d $fpath)
-autoload -zU try tried caught _block_close
+autoload -zU indent try tried caught _block_close
 
-typeset -gA o_block=( indent 4 pids '' stop 0 indent 0 user 0 )
+typeset -gA o_block=( pids '' stop 0 indented 1 user 0 )
 
 # The block and creates a subshell that we can use to indent the output of a
 # series of build pipeline commands.
 
+typeset indent=4
 if [[ $1 = -i ]]; then
-    o_block[indent]=$2
+    indent=$2 o_block[indented]=$2
     shift 2
 fi
 
@@ -93,7 +94,7 @@ print reset >&${o_block[try]}
 # no `indent` function, then there is no indent. Everything else, we can see if
 # it works as normal.
 
-if (( o_block[indent] )); then
+if (( indent )); then
     # Copy the standard output of the main process for use in the indent `coproc`.
     exec {out}>&1
     # This is our indent `coproc`.
@@ -113,7 +114,7 @@ if (( o_block[indent] )); then
             print -- >&$out
         fi
         # Tee into the word count, indent, and print to parent's standard out.
-        tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:o_indent[2]:: :)}"'\1/' >&$out
+        tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:indent:: :)}"'\1/' >&$out
         # Close the >&p and <&p of our word count `coproc`.
         coproc :
         # If we had any output at all, print a new line.
