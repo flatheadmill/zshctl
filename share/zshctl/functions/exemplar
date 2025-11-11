@@ -1,0 +1,57 @@
+emulate -L zsh
+
+autoload -zU _exemplar_printf warn abend heredoc slurp block show
+
+zmodload zsh/parameter
+
+setopt localoptions extendedglob
+typeset -A glob=(
+    # Captures leading tabs before `() {`.
+    func '(#b)('$'\t''##)\(\)[[:space:]]{'
+    # Matches `} <<'    EOF'` or `} <<"    EOF"` but might mismatch quotes.
+    eof '}(#b)([[:space:]]##(%[[:space:]]##(*)[[:space:]]##|)<<[[:space:]]#(["'\''])(*)(["'\''])[[:space:]]#|)'
+)
+typeset func=${1:-} state=scan body=() vargs=() match=() code=() heredoc=() eof
+typeset quote
+integer i=1
+for line in "${(@f)${functions[$func]}}"; do
+    case $state:$line in
+    (*:${~glob[func]})
+        state=printf
+        indent=$match[1]
+        ;;
+    (heredoc:$eof)
+        _exemplar_printf
+        ;;
+    (heredoc:*)
+        heredoc+=( "$line" )
+        ;;
+    (scan:*)
+        code[i++]=$line$'\n'
+        ;;
+    (underbar:$indent${~glob[eof]})
+        ;&
+    (printf:$indent${~glob[eof]})
+        if [[ -n $match[1] ]]; then
+            sprintf=$match[3] quote=$match[4] eof=$match[5] state=heredoc
+        else
+            _exemplar_printf
+            state=scan
+        fi
+        ;;
+    (printf:(#b)[[:space:]]##%[[:space:]]##(*))
+        vargs+=( $match[1] )
+        state=underbar
+        ;;
+    (printf:*)
+        state=underbar
+        ;&
+    (underbar:*)
+        # Drop back the two tabs added by Zsh.
+        line=${line#$'\t'$'\t'}
+        body+=( $line )
+        ;;
+    esac
+done
+
+functions[$func]=${(j::)code}

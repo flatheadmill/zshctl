@@ -1,0 +1,42 @@
+emulate -L zsh
+
+typeset buffer stdin dedent
+
+if (( ${#body} )); then
+    functions[_exemplar_compile]=${(pj:\n:)body}
+    lines=( "${(@)${(@)${(@Af)functions[_exemplar_compile]}//#$'\t'/}//$'\t'/    }" )
+    buffer="${(pj:\n:)lines}"
+    if (( ${#heredoc} )); then
+        if [[ $quote = '"' || -n $sprintf ]]; then
+            eof=EOF
+        else
+            eof="'EOF'"
+        fi
+        heredoc -v dedent <<< "${(pj:\n:)heredoc}"
+        if [[ -n $sprintf ]]; then
+            printf -v stdin '"$(heredoc -f %s <<< %s)"' $sprintf ${(qq)dedent}
+            printf -v stdin '"$(printf '\'' <<"EOF"\n%%s\nEOF\n'\'' %s)"' $stdin
+        else
+            printf -v stdin ' <<%s\n%sEOF' $eof $dedent
+        fi
+        if (( ${#lines} > 1 )); then
+            printf -v buffer '{ %s; }' $buffer
+        fi
+        functions[_exemplar_compile]=$buffer
+        lines=( "${(@)${(@Af)functions[_exemplar_compile]}//#$'\t'/}" )
+        buffer="${(pj:\n:)lines}"
+    fi
+    if (( ${#vargs} )); then
+        printf -v buffer '"$(printf %s %s)"' ${(qq)buffer} $vargs[1]
+    else
+        printf -v buffer '%s' ${(qq)buffer}
+    fi
+    if [[ -n $stdin ]]; then
+        printf -v buffer '{ try show || tried; } <<< %s%s' $buffer $stdin
+    else
+        printf -v buffer '{ try show || tried; } <<< %s' $buffer
+    fi
+    printf -v 'code[i++]' '%s\n' $buffer
+fi
+
+body=() vargs=() heredoc=()
