@@ -1,1 +1,6 @@
-Trim.
+We will have a `trim`.
+
+I don't know that I need an rtrim or an ltrim, but constantly forgetting how
+to trim is annoying and the only solution is ugly and likely error prone. Just
+doing ltrim or rtrim is legible and I don't want to add a string library, just
+this one function for this common task.
