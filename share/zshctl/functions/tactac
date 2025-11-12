@@ -27,5 +27,6 @@ function {
     coproc :
     : ${(PAA)1::=${(z)${:-stdin $stdin stdout $stdout pid $pid}}}
 } "$@"
+(( $# == 4 )) && : ${(P)4::=${${(P)1}[pid]}}
 # Set user provided variables.
-: ${(P)2::=${${(P)1}[stdin]}} ${(P)3::=${${(P)1}[stdout]}} ${(P)4::=${${(P)1}[pid]}}
+: ${(P)2::=${${(P)1}[stdin]}} ${(P)3::=${${(P)1}[stdout]}}

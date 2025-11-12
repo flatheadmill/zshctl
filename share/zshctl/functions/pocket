@@ -48,24 +48,10 @@ function {
     # inherit the file handles of our standard output coproc. Rather than close
     # the inherited file handles we're going to just close the standard error
     # input before the standard output input.
-    integer input output try tried
-    if (( ! subst )); then
-        coproc {
-            coproc :
-            slurp
-            printf %s "$REPLY"
-        }
-        exec {input}>&p
-        exec {output}<&p
-    fi
-    coproc {
-        coproc :
-        slurp
-        printf %s "$REPLY"
-    }
-    exec {try}>&p
-    exec {tried}<&p
-    coproc :
+    integer input output
+    tactac input output
+    integer try tried
+    tactac try tried
     # Return in our typeset variable.
     set -A $frame $frame $subst $input $try $output $tried "$@"
 } "$@"

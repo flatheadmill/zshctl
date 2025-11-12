@@ -1,5 +1,5 @@
 fpath=( share/zshctl/functions $fpath )
-autoload -zU pocket slurp
+autoload -zU pocket slurp tactac
 
 function good {
     print "$@"
