@@ -482,3 +482,13 @@ places where it is nice to have a complicated multi-command program in a
 single file. And yet, with all the installers, I don't see why you wouldn't
 just install `zshctl` and make it a single file `zshctl` program. Let us wait
 for the desire before fulfilling it.
+
+## Incoming
+
+Notes for `trim`.
+
+https://stackoverflow.com/questions/68259691/trimming-whitespace-from-the-ends-of-a-string-in-zsh
+
+```
+trimmed=${(*)${(*)var/#[[:space:]]#}/%[[:space:]]#}
+```
