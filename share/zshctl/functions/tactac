@@ -19,7 +19,7 @@ function {
         coproc :
         typeset REPLY
         slurp
-        printf '%s' $REPLY
+        printf '%s' "$REPLY"
     }
     pid=${!}
     exec {stdin}>&p
