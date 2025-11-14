@@ -81,10 +81,11 @@ function _zshctl_execute {
     shift
     typeset args=${func/#:execute/:args}
     typeset complete=${args/#:args/:complete}
-    zshctl+=( args:func $func args:mode execute args:complete 0 )
     if (( ${+functions[$args]} )); then
+        zshctl+=( args:func $func args:mode execute args:complete 0 )
         $args "$@"
     elif (( ${+functions[$func]} )); then
+        zshctl+=( args:func $func args:mode inline )
         $func "$@"
     else
         abend -c 2 'fatal: invalid argument: no such command'
