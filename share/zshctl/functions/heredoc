@@ -78,7 +78,7 @@ function {
         src=${(j: :)${(@qq)emit}}
         ;;
     (f)
-        emit=( 'printf' "${(@)variable}" -- '$3' "${(@)vargs}" )
+        emit=( 'printf' "${(@)variable}" -- '$3' "${(@qq)vargs}" )
         src=${(j: :)${(@qq)emit}}
         ;;
     (q)
