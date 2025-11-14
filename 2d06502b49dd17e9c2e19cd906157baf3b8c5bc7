@@ -1,0 +1,5 @@
+`eval` and shell quoting.
+
+Note that it is easy to miss. I don't use it all that often, though. When I
+do, I tend to face the challenge of quoting the quoted or quoted the quoted
+which has been quoted.
