@@ -141,7 +141,7 @@ EOF
 }
 
 function _example {
-    typeset variable variables=()
+    typeset variables=()
     while (( $# )); do
         (){ % $1 $1 $1; [[ -v %s ]] && variables+=( -s "%s=${%s}" ) }
         shift
