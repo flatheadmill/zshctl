@@ -36,8 +36,9 @@ typeset -A option _regex=(
 )
 typeset -A glob=(
     opt         '(#b)\#[[:space:]]##opt[[:space:]]##([^[:space:]]##)(*)'
-    pair        '(#b)\#[[:space:]]##--[[:space:]]##([^=]##=*)$'
-    single      '(#b)\#[[:space:]]##--[[:space:]]##(*)'
+    opt_pair    '(#b)[[:space:]]##(*)--[[:space:]]##([^=]##=*)'
+    opt_value   '(#b)[[:space:]]##(*)--[[:space:]]##(*)'
+    opt_flag    '(#b)[[:space:]]##(*)'
     arg         '(#b)\#[[:space:]]##arg[[:space:]]##--(*)'
     description '(#b)\#[[:space:]]##desc(ription|)([[:space:]]##--(*)|)'
     escaped     '\\?'
@@ -91,67 +92,70 @@ for line in "${(@)lines}"; do
             [[ $line = ${~glob[arg]} ]] || print bummer
             args+=( "${${match[1]##[[:space:]]##}%%[[:space:]]##}" )
             ;;
-        (scan:\# opt *)
-            [[ $line = ${~glob[opt]} ]]
+        (scan:\# opt${~glob[opt_pair]})
             long=$match[1]
-            if [[ $match[2] = ${~glob[pair]} ]]; then
-                option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
-                $pushf options '.HP\n'
-                if [[ -n $option[short] ]]; then
-                    $pushf options '.B \-%s\n' $option[short]
-                    $pushf options '.RI %s,\n' $match[1]
-                fi
-                $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
-                $pushf options '.RI %s\n' $match[1]
-                $pushf options '.br\n'
-                $pushf synopsis '.RB [ '
-                if [[ -n $option[short] ]]; then
-                    $pushf synopsis '\-%s | ' $option[short]
-                fi
-                $pushf synopsis '%s\n' '\-\-'$long # must put a backslash in front of
-                $pushf synopsis '.RI %s]\n' $match[1]
-                mode=argdown
-                markup=()
-            elif [[ $match[2] = ${~glob[single]} ]]; then
-                option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
-                match=( "${(@)${(@)match##[[:space:]]##}%%[[:space:]]##}" )
-                $pushf options '.HP\n'
-                if [[ -n $option[short] ]]; then
-                    $pushf options '.BR \-%s ,\n' $option[short]
-                fi
-                $pushf options '.B \-\-%s\n' $long
-                $pushf options '.RI %s\n' $match[1]
-                $pushf options '.br\n'
-                $pushf synopsis '.RB [ '
-                if [[ -n $option[short] ]]; then
-                    $pushf synopsis '\-%s | ' $option[short]
-                fi
-                $pushf synopsis '\-\-%s\n' $long
-                $pushf synopsis '.RI %s]\n' $match[1]
-                mode=argdown
-                markup=()
-            else
-                option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
-                $pushf options '.HP\n'
-                if [[ -n $option[short] ]]; then
-                    $pushf options '.BR \-%s ,\n' $option[short]
-                fi
-                $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
-                $pushf options '.br\n'
-                boolean=()
-                $pushf boolean '.RB [ '
-                if [[ -n $option[short] ]]; then
-                    $pushf boolean '\-%s | ' $option[short]
-                fi
-                $pushf boolean '\-\-%s ]\n' $long
-                if [[ $long = help ]]; then
-                    help=${(j::)boolean}
-                else
-                    $pushf synopsis '%s' "${(j::)boolean}"
-                fi
-                mode=argdown
-                markup=()
+            trim long
+            option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
+            $pushf options '.HP\n'
+            if [[ -n $option[short] ]]; then
+                $pushf options '.B \-%s\n' $option[short]
+                $pushf options '.RI %s,\n' $match[2]
             fi
+            $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
+            $pushf options '.RI %s\n' $match[2]
+            $pushf options '.br\n'
+            $pushf synopsis '.RB [ '
+            if [[ -n $option[short] ]]; then
+                $pushf synopsis '\-%s | ' $option[short]
+            fi
+            $pushf synopsis '%s\n' '\-\-'$long # must put a backslash in front of
+            $pushf synopsis '.RI %s]\n' $match[2]
+            mode=argdown
+            markup=()
+            ;;
+        (scan:\# opt${~glob[opt_value]})
+            long=$match[1]
+            trim long
+            option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
+            $pushf options '.HP\n'
+            if [[ -n $option[short] ]]; then
+                $pushf options '.BR \-%s ,\n' $option[short]
+            fi
+            $pushf options '.B \-\-%s\n' $long
+            $pushf options '.RI %s\n' $match[2]
+            $pushf options '.br\n'
+            $pushf synopsis '.RB [ '
+            if [[ -n $option[short] ]]; then
+                $pushf synopsis '\-%s | ' $option[short]
+            fi
+            $pushf synopsis '\-\-%s\n' $long
+            $pushf synopsis '.RI %s]\n' $match[2]
+            mode=argdown
+            markup=()
+            ;;
+        (scan:\# opt${~glob[opt_flag]})
+            long=$match[1]
+            trim long
+            option=( "${(@QA)${(z)_zshctl_options[$long]}}" )
+            $pushf options '.HP\n'
+            if [[ -n $option[short] ]]; then
+                $pushf options '.BR \-%s ,\n' $option[short]
+            fi
+            $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
+            $pushf options '.br\n'
+            boolean=()
+            $pushf boolean '.RB [ '
+            if [[ -n $option[short] ]]; then
+                $pushf boolean '\-%s | ' $option[short]
+            fi
+            $pushf boolean '\-\-%s ]\n' $long
+            if [[ $match[1] = help ]]; then
+                help=${(j::)boolean}
+            else
+                $pushf synopsis '%s' "${(j::)boolean}"
+            fi
+            mode=argdown
+            markup=()
             ;;
         (argdown:\# *)
             first=${markup[1]}
