@@ -37,6 +37,7 @@ function __zshctl_actual {
     # TODO What else do we get to play with.
     __zshctl_debug '========= starting completion logic =========='
     __zshctl_debug 'CURRENT: %d, words: %s, curcontext %s' $CURRENT ${(j: :)${(@qq)words}} $curcontext
+    __zshctl_debug 'CURRENT: %d, words: %s, curcontext %s' $CURRENT ${(j: :)${(@qq)${(@Q)words}}} $curcontext
     __zshctl_debug 'curcontext <%s>' $curcontext
 
     integer ret=1
@@ -99,7 +100,7 @@ function __zshctl_actual {
 
     typeset out zshctl=(
         "${words[1]}" __complete ${ZSHCTL_COMP_DEBUG_FILE:-/dev/null}
-            ${#words} "${(@)words}" $CURRENT
+            ${#words} "${(@Q)words}" $CURRENT
     )
     __zshctl_debug 'About to call: %s' "${(j: :)${(@qq)${(@)zshctl}}}"
     out=$( "${(@)zshctl}" )
