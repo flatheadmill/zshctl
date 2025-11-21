@@ -196,7 +196,13 @@ function _zshctl_encache {
     fi
     typeset -A completions=()
     typeset completion_match=()
-    $encache "$@"
+    {
+        $encache "$@"
+    } always {
+        if (( ${zshctl[args:throw]:-0} )); then
+            TRY_BLOCK_ERROR=0
+        fi
+    }
     _zshctl_completed
 }
 
