@@ -55,9 +55,10 @@ for line in "${(@)lines}"; do
         (scan:\# terse)
             mode=terse
             ;;
-        (scan:\# desc(ription|)*)
-            if [[ $line = ${~glob[description]} ]]; then
-                terse="${${match[3]##[[:space:]]##}%%[[:space:]]##}"
+        (scan:${~glob[description]})
+            if [[ -n $match[3] ]]; then
+                trim 'match[3]'
+                terse=( "${match[3]}" )
             fi
             mode=description
             ;;
