@@ -289,7 +289,7 @@ function {
     # sourced.
     for func in "${(@k)functions_source}"; do
         [[ $func = :execute:* ]] || continue
-        _zshctl_commands[$func]=':'
+        zshctl[$func]=':'
     done
     # Create a stub `:complete` function if we were not invoked by shebang.
     if (( is_zshctl )); then

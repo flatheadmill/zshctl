@@ -103,14 +103,24 @@ function example {
     EOF
 }
 
-function example {
+function _example {
     typeset world=world
     (){ % -n; cat %s } <<"    EOF"
         hello, $world
     EOF
 }
 
-function _example {
+function example {
+    : "
+    "
+    (){
+        print "
+            hello, world
+        "
+    }
+}
+
+function example {
     typeset world=world
     (){ % -n; cat %s } % $world <<"    EOF"
         hello, %s
@@ -151,12 +161,9 @@ function _example {
 }
 
 function {
-    print ">>${functions[example]}<<"
-    exemplar example
-    print ">>${functions[example]}<<"
     block environment
     {
-        example USER HOME
+        exemplar example
     } always {
         caught
     } > >(indent)
