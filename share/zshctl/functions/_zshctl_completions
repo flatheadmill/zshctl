@@ -14,6 +14,9 @@ usage=${usage//#:execute/:help}
 if (( ! ${+functions[$usage]} )); then
     return
 fi
+typeset -A glob=(
+    description '(#b)\#[[:space:]]##desc(ription|)([[:space:]]##--(*)|)'
+)
 # Within this function, we gather up all the sub-commands that are available
 # from a branch command.
 # We do this by iterating the all the functions looking for functions that are
@@ -44,8 +47,21 @@ function {
         $usage
         # Split the help text.
         lines=( "${(@Af)help}" ) verbose=()
+        typeset mode=scan
         # Parse the help text to extract verbose descriptions.
-        _zshctl_help
+        for line in "${(@)lines}"; do
+            case $mode:$line in
+            (scan:${~glob[description]})
+                mode=description
+                ;;
+            (description:\# *)
+                break
+                ;;
+            (description:*)
+                verbose+=( "$line" )
+                ;;
+            esac
+        done
         # Skip if we do not have a verbose description.
         (( ${#verbose} )) || continue
         # Down case the first character if it is not esacaped.
