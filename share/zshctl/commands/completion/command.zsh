@@ -1,8 +1,6 @@
 function :help:completion {
     heredoc -v help -q <<'    EOF'
-        # terse
-        generate shell completions
-        # verbose
+        # desc -- generate shell completions
         Install \`${zshctl[program]}\` shell completions for Zsh or Bash.
         # opt help
         Display help for \`${zshctl[program]} completions\`.
