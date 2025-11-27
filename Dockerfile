@@ -55,8 +55,8 @@ COPY --chown=1983:1983 ./ /zshctl/
 WORKDIR /work
 # Separate invocation to copy the public key to the operating system's `/etc` as root.
 RUN --mount=type=secret,id=rsa openssl rsa -in /run/secrets/rsa -pubout -out /etc/apk/keys/alan@prettyrobots.com-67eee297.rsa.pub
-USER build
-RUN --mount=type=secret,id=rsa,uid=1983 --mount=type=tmpfs,dst=/home/build/.abuild /zshctl/pkgctl/bin/pkgctl apk
+RUN --mount=type=secret,id=rsa,uid=1983 --mount=type=tmpfs,dst=/home/build/.abuild chown 1983:1983 /home/build/.abuild && \
+    su -s /bin/sh build -c '/zshctl/pkgctl/bin/pkgctl apk'
 RUN zsh -c '[[ ! -d /home/build/.abuild ]]'
 
 FROM fedora AS yum
@@ -92,9 +92,11 @@ USER build
 RUN --mount=type=secret,id=gpg,uid=1983 --mount=type=tmpfs,dst=/gpg /zshctl/pkgctl/bin/pkgctl aur
 RUN zsh -c '[[ ! -d /gpg ]]'
 
+FROM gentoo/portage AS portage
 FROM gentoo/stage3:latest AS gentoo
 
-RUN PORTAGE_QUIET=1 emaint --all sync >/dev/null
+COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
+#RUN PORTAGE_QUIET=1 emaint --all sync >/dev/null
 RUN FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox" emerge --quiet app-eselect/eselect-repository emerge dev-vcs/git zsh
 RUN zsh -c '[[ -e /bin/zsh ]]'
 COPY --from=compiled /work/ /work/compiled/

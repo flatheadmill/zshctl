@@ -1,14 +1,13 @@
 #!/zshctl/bin/zshctl
 
 function :execute:apk {
-    include heredoc
     typeset version
     version=$(compiled/$conf[program]/bin/$conf[program] version) ||
         abend 'fatal: cannot get version'
     whoami
-    mkdir -p ~/.abuild
     mkdir -p /html
     mkdir -p ~/packages
+    cp /run/secrets/rsa ~/.abuild/$conf[apk.key.name].rsa
     git config --global user.name $conf[user.name]
     git config --global user.email $conf[user.email]
     git config --global init.defaultBranch main
@@ -18,7 +17,6 @@ function :execute:apk {
     git -C origin.git add .
     git -C origin.git commit -m 'Sketch.'
     git clone ./origin.git
-    cp /run/secrets/rsa ~/.abuild/$conf[apk.key.name].rsa
     openssl rsa -in /run/secrets/rsa -pubout -out ~/.abuild/$conf[apk.key.name].rsa.pub
     {
         heredoc -q | tee ~/.abuild/abuild.conf
