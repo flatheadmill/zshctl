@@ -105,6 +105,12 @@ This allows natural indentation in your code while producing clean output - prag
 - [ ] Autoload functions.
     - [ ] Weakly mimic `autoload`.
 
+## Build
+
+Update the previous and next versions in `build.zsh` and run `zsh build.zsh`.
+
+
+
 ## Diary
 
 ### Sun Apr  6 09:39:37 AM CDT 2025

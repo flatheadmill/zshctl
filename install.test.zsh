@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 function {
-    typeset zshctl_previous_version=0.0.3 zshctl_version=0.0.4 platform
+    typeset zshctl_previous_version=0.0.4 zshctl_version=0.0.5 platform
     for platform in alpine archlinux fedora gentoo homebrew ubuntu; do
         docker build \
             --progress plain \
