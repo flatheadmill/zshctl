@@ -63,7 +63,7 @@ elif (( $o_block[code] )); then
     if (( ${+o_block[abend]} )); then
         printf 'fatal: %s\n' $o_block[abend] 1>&2
     else
-        print -u 2 'fatal:' $TRY_BLOCK_ERROR
+        print -u 2 'fatal:'
     fi
     if [[ -n $err ]]; then
         printf '\n%s\n' $err 1>&2

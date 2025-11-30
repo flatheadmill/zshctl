@@ -15,6 +15,14 @@ zmodload zsh/parameter
 # Don't leave home without it. Will not be inherited by the function we create.
 setopt localoptions extendedglob
 
+typeset show=show
+if [[
+    ${funcstack[2]} = tryable &&
+    ${functions_source[exemplar]:h} = ${functions_source[tryable]:h}
+]]; then
+    show=_exemplar_tryable
+fi
+
 # The more complicated globs used by our parser.
 typeset -A glob=(
     # Captures leading tabs before `() {`.
@@ -38,7 +46,7 @@ fi
 # By manipulating `count` and `run` we can have this oen while loop for both
 # inline inovcation and compilation.
 
-typeset func state lines=() body=() vargs=() match=() code=() heredoc=() eof quote
+typeset func state lines=() body=() tried=() vargs=() match=() code=() heredoc=() eof quote
 integer i spaces
 
 # While we have a function to compile...
@@ -57,7 +65,7 @@ while (( count-- )); do
     # exactly and we know this function had already been compiled.
     if [[ ${functions[$func]} != [[:space:]]##:\ exemplar\ $$* ]]; then
         state=scan eof='' i=2 spaces=65536
-        body=() vargs=() match=() code=( ': exemplar '${$}$'\n' ) heredoc=()
+        body=() tried=() vargs=() match=() code=( ': exemplar '${$}$'\n' ) heredoc=()
         lines=( "${(@f)${functions[$func]}}" )
         # User functions will be space indented. Zsh will tab indent its
         # prettified compiled code. We know that we must dedent by two tabs. The
@@ -119,10 +127,12 @@ while (( count-- )); do
                     state=scan
                 fi
                 ;;
+            (printf:(#b)[[:space:]]##!%[[:space:]]##(*))
+                tried+=( $match[1] )
+                ;;
             (printf:(#b)[[:space:]]##%[[:space:]]##(*))
                 # placeholder function has printf arguments
                 vargs+=( $match[1] )
-                state=underbar
                 ;;
             (printf:*)
                 # placeholder function does not have printf arguments

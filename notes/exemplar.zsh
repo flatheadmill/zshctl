@@ -1,5 +1,5 @@
 fpath=( share/zshctl/functions $fpath )
-autoload -zU exemplar block try tried heredoc slurp show
+autoload -zU exemplar block try tried heredoc slurp show tryable _exemplar_tryable
 
 zmodload zsh/parameter
 
@@ -122,10 +122,19 @@ function example {
 
 function example {
     typeset world=world
+    (){
+        !% 'bad things happened %s' 'no good'
+        print -u 2 bad && false
+    }
+}
+
+function _example {
+    typeset world=world
     (){ % -n; cat %s } % $world <<"    EOF"
         hello, %s
     EOF
 }
+
 function _example {
     if true; then
         (){ % hello; print %s }
@@ -161,10 +170,12 @@ function _example {
 }
 
 function {
-    block environment
+    block -i 0 # environment
     {
-        exemplar example
+        tryable -c example
+        print ${functions[example]}
+        example
     } always {
         caught
-    } > >(indent)
+    } # > >(indent)
 }

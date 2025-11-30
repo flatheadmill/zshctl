@@ -1,0 +1,25 @@
+emulate -L zsh
+
+if
+    # Create a frame by finding an undefined variable.
+    set -- 0 "$@"
+    while true; do
+        if [[ ! -v "__exemplar_tryable_$1__" ]]; then
+            break
+        fi
+        set -- $(( $1 + 1 )) "$@[2,-1]"
+    done
+    # Set to actual variable name.
+    set -- "__exemplar_tryable_${1}__" "$@[2,-1]"
+    # Define the variable.
+    typeset -A $1
+    printf -v "${1}[compile]" '
+        printf -v "${1}[show_eval]" "\n\nfunction _show_eval {\n%%s\n}\n\n" "${${(P)1}[source]}"
+        eval "${${(P)1}[show_eval]}" 2>/dev/null || eval "${${(P)1}[source]}"
+    '
+    heredoc -v "${1}[source]" "$@[2,-1]"
+    printf '$ %s' "${${(P)1}[source]}" >&2
+    eval ${${(P)1}[compile]} || eval "${${(P)1}[source]}"
+then
+    _show_eval
+fi

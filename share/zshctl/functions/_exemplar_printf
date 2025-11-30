@@ -97,11 +97,15 @@ if (( ${#body} )); then
     else
         printf -v buffer '%s' ${(qq)buffer}
     fi
+    typeset _tried=tried
+    if (( ${#tried} )); then
+        printf -v _tried 'tried %s' $tried[1]
+    fi
     # Append the heredoc if one exists.
     if [[ -n $stdin ]]; then
-        printf -v buffer '{ try show || tried; } <<< %s%s' $buffer $stdin
+        printf -v buffer '{ try %s || %s; } <<< %s%s' $show $_tried $buffer $stdin
     else
-        printf -v buffer '{ try show || tried; } <<< %s' $buffer
+        printf -v buffer '{ try %s || %s; } <<< %s' $show $_tried $buffer
     fi
     # Add the generate code to the function.
     printf -v 'code[i++]' '%s\n' $buffer
