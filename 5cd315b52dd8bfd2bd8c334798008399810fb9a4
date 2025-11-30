@@ -1,0 +1,33 @@
+Using the funcstack to preserve dynamic scope.
+
+You can see how I wanted to shoehorn a new version of `show` into `exemplar`
+for the purpose of using `exemplar` when we don't want to show each command as
+it is run, and instead we want to show the command only on an exception.
+
+We managed to avoid a switch by checking to see that we were both immediately
+called by `tryable` and that the definition of `tryable` is in the same
+directory as `exemplar`. Could this be a pattern that could be used in lieu of
+command line switches? Not that I'm eager to so this, but could we have
+`heredoc`, `quotedoc` and `printfdoc` wrapping `heredoc`? (This would blow up
+our implementations of `abend`, `warn` and others, but it's an example.)
+
+This test could be expressed in a case statement.
+
+```
+case $funcstack[2]:${functions_source[$funcstack[2]]:h} in
+    (quotedoc:${functions_source[heredoc]:h})
+        # quoted
+        ;;
+    (printfdoc:${functions_source[heredoc]:h})
+        # printf
+        ;;
+    (*)
+        # literal
+        ;;
+esac
+```
+
+This ought to be documented to explain `tryable` and to ensure that it does
+not get lost. It will make sense if there are functions that only ever take
+a single switch. The `heredoc`, `quotedoc`, and `printfdoc` are temping, but
+they would mean doing soemting `abend`, `abendquote`, `abendf`, etc.
