@@ -1,0 +1,163 @@
+emulate -L zsh
+
+# NB A nicely commented file has a ratio of comments to code and sometimes the
+# comments are obvious, bordering on silly, but the code won't read right if you
+# comment only the difficult parts. It does help, though, to say things like
+# "for each line" when that is obviously the point of the loop because if you
+# are reading comments, you are reading comments.
+
+# Autoload our dependencies.
+autoload -zU _exemplar_printf warn abend heredoc slurp block show
+
+# Already loaded by `bin/zshctl`, loaded here for notes and tests.
+zmodload zsh/parameter
+
+# Don't leave home without it. Will not be inherited by the function we create.
+setopt localoptions extendedglob
+
+typeset should_show
+case ${funcstack[2]}:${functions_source[$funcstack[2]]:h} in
+(tryable:${functions_source[exemplar]:h})
+    should_show='showe '
+    ;;
+(*)
+    should_show='show '
+    ;;
+esac
+
+# The more complicated globs used by our parser.
+typeset -A glob=(
+    # Captures leading tabs before `() {`.
+    func '(#b)('$'\t''##)\(\)[[:space:]]{'
+    # Matches `} <<'    EOF'` or `} <<"    EOF"` but might mismatch quotes.
+    eof '}(#b)([[:space:]]##(%[[:space:]]##(*)[[:space:]]##|)<<[[:space:]]#(["'\''])(*)(["'\''])[[:space:]]#|)'
+)
+
+# Invoked either inline as in `exemplar my_function` or as a compiler with `-c`
+# as in `exemplar -c my_function my_other_function`. When invoked inline we
+# invoke the function immediately and pass any additional arguments.
+
+#
+integer run=1 count=1
+if [[ $1 = -c ]]; then
+    shift
+    run=0       # do not run after compilation
+    count=$#    # count of functions to compile
+fi
+
+# By manipulating `count` and `run` we can have this oen while loop for both
+# inline inovcation and compilation.
+
+typeset func state lines=() body=() tried vargs show match=() code=() heredoc=() eof quote
+integer i spaces
+
+# While we have a function to compile...
+while (( count-- )); do
+    # Shift the function name from the arguments to `exemplar`.
+    func=$1
+    shift
+    # We have placed a `true` function `:` as the first command, it is in the
+    # format...
+    #
+    #   : exemplar 82371
+    #
+    # Where 82371 is thd `pid` of the current program. Highly unlikely that the
+    # user will have written this in the uncompiled source and even less likely
+    # that it would be the first line. Skip whitespace and then match this
+    # exactly and we know this function had already been compiled.
+    if [[ ${functions[$func]} != [[:space:]]##:\ exemplar\ $$* ]]; then
+        state=scan eof='' i=2 spaces=65536 tried= vargs= show=$should_show
+        code=( ': exemplar '${$}$'\n' ) lines=( "${(@f)${functions[$func]}}" )
+        body=() match=() heredoc=()
+        # User functions will be space indented. Zsh will tab indent its
+        # prettified compiled code. We know that we must dedent by two tabs. The
+        # source from `${funcitons[f]}` is presented as an anonymous function.
+        # All the source is indented by a single tab, the body of the exemplar
+        # placeholder funcions are indented by an additional tab. We can always
+        # strip our displayed function source of two leading tabs.
+        #
+        # If the user has typed a multi-line string or command substitution, we
+        # want the user to space indent it to line up with left margin of the
+        # placeholder function, and then dedent it for display.
+        #
+        # These strings and command substitution will be explicitly space
+        # indented, so like `heredoc`, we need to find all the lines that are
+        # not tab indented and determine the left margin by finding the line
+        # with the least amount of leading space and record the count of spaces.
+        #
+        # Any line we encouter that is destined for display will be dedented by
+        # that count of spaces if the line does not start with a tab.
+
+        # Determine the left margin in spaces.
+        for line in "${(@)lines}"; do
+            if [[
+                $line != $'\t'* &&
+                $line = (#b)([[:space:]]##)[^[:space:]]*
+                && ${#${match[1]}} -lt spaces
+            ]]; then
+                spaces=${#${match[1]}}
+            fi
+        done
+
+        # For each line...
+        for line in "${(@)lines}"; do
+            case $state:$line in
+            (*:${~glob[func]})
+                # start of a placeholder function, scan for `%` printf marker.
+                state=printf
+                indent=$match[1]
+                ;;
+            (heredoc:$eof)
+                _exemplar_printf
+                state=scan
+                eof=
+                ;;
+            (heredoc:*)
+                #heredoc+=( "$line" )
+                heredoc+=( "${line//$'\t'/    }" )
+                ;;
+            (scan:*)
+                code[i++]=$line$'\n'
+                ;;
+            (underbar:$indent${~glob[eof]})
+                ;&
+            (printf:$indent${~glob[eof]})
+                if [[ -n $match[1] ]]; then
+                    sprintf=$match[3] quote=$match[4] eof=$match[5] state=heredoc
+                else
+                    _exemplar_printf
+                    state=scan
+                fi
+                ;;
+            (printf:(#b)[[:space:]]##%-[[:space:]]##(*))
+                show=
+                ;;
+            (printf:(#b)[[:space:]]##%![[:space:]]##(*))
+                tried=$match[1]
+                ;;
+            (printf:(#b)[[:space:]]##%[[:space:]]##(*))
+                # placeholder function has printf arguments
+                vargs=$match[1]
+                ;;
+            (printf:*)
+                # placeholder function does not have printf arguments
+                state=underbar
+                ;&
+            (underbar:*)
+                # Drop back the two tabs added by Zsh, or dedent by user space indent.
+                #case $line in
+                #($'\t'*)
+                #    line=${line#$'\t'$'\t'}
+                #    ;;
+                #([[:space:]]*)
+                #    line=${line[spaces + 1, -1]}
+                #    ;;
+                #esac
+                body+=( "$line" )
+                ;;
+            esac
+        done
+        functions[$func]=${(j::)code}
+    fi
+    (( run )) && $func "$@" || true
+done

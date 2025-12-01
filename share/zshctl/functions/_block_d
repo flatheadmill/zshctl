@@ -1,0 +1,6 @@
+emulate -L zsh
+
+fpath=( ${${(%):-%x}:A:h}/block.d $fpath )
+function _fpath_unshift_block_d {
+    true
+}

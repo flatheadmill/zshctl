@@ -1,0 +1,98 @@
+emulate -L zsh
+
+# Assert that we got return variables and a command.
+if [[ $1 = -s ]]; then
+    set -- 1 "${@[2,-1]}"
+else
+    set -- 0 "$@"
+fi
+(( $# > 3 )) || {
+    print -u 2 'usage: pocket [-s] out err echo 1'
+    exit 1
+}
+[[ -v $2 ]] || {
+    print 'out must be defined'
+    exit 1
+}
+[[ ${(t)${(P)2}} = scalar-local ]] || {
+    print -u 2 'out must be defined as a local scalar'
+    exit 1
+}
+[[ -v $3 ]] || {
+    print -u 2 'err must be defined'
+    exit 1
+}
+[[ ${(t)${(P)3}} = scalar-local ]] || {
+    print -u 2 'err must be defined as a local scalar'
+    exit 1
+}
+# Create a frame by finding an undefined variable.
+set -- 0 "$@"
+while true; do
+    if [[ ! -v "__pocket_$1__" ]]; then
+        break
+    fi
+    set -- $(( $1 + 1 )) "$@[2,-1]"
+done
+# Set to actual variable name.
+set -- "__pocket_${1}__" "$@[2,-1]"
+# Define the variable.
+typeset -a $1
+# Create coprocs for standard out and standard error.
+function {
+    # We can use local variables here.
+    typeset frame=${1:-}
+    integer subst=${2:-}
+    shift 2
+    # Create the coprocs. NB: Our standard error slurp coproc is going to
+    # inherit the file handles of our standard output coproc. Rather than close
+    # the inherited file handles we're going to just close the standard error
+    # input before the standard output input.
+    integer input output
+    tactac input output
+    integer try tried
+    tactac try tried
+    # Return in our typeset variable.
+    set -A $frame $frame $subst $input $try $output $tried "$@"
+} "$@"
+# Set our positional parameters from out one local variable.
+set -- "${(@P)1}"
+# Unset our local variable and we are back to the state when this function
+# was called.
+unset $1
+# Evaluate the users command in the current process with the current set of
+# defined variables.
+if (( $2 )); then
+    typeset -g "$7=$("${@[9,-1]}" 2>&$4)"
+else
+    "${@[9,-1]}" 2>&$4 >&$3
+fi
+# Grab the exit code.
+set -- $? "$@"
+# Create our local variable so we don't shadow the out and err.
+typeset -a $2
+# Close our coprocs.
+function {
+    typeset code=${1:-} frame=${2:-} subst=${3:-}
+    shift 3
+    integer input=$1 try=$2 output=$3 tried=$4
+    shift 4
+    typeset out err
+    exec {try}>&-
+    slurp err <&$tried
+    if (( ! subst )); then
+        exec {input}>&-
+        slurp out <&$output
+    fi
+    set -A $frame $subst $code "$1" "$out" "$2" "$err"
+} "$@"
+# Set our positional parameters from out one local variable.
+set -- "${(@P)2}"
+# Set our err value.
+typeset -g "$5=$6"
+# Set our out value if we didn't subtitute.
+if (( ! $1 )); then
+    typeset -g "$3=$4"
+fi
+# Return the exit code.
+return $2

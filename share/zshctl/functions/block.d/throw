@@ -1,0 +1,19 @@
+#!/bin/zsh -f
+
+# Wait on the last standard error indenter `coproc`.
+if (( $o_block[sed] )); then
+    wait $o_block[sed]
+fi
+# Clear indenter pid.
+o_block[sed]=0
+# Dump the messages.
+print reset >&${o_block[try]}
+# Format the throw message.
+typeset message
+if (( $# )); then
+    printf -v message "$@"
+    o_block[abend]=$message
+fi
+# Note that `exit 1` will just exit the program immediately.
+typeset -r THROW
+THROW= 2>/dev/null

@@ -1,0 +1,115 @@
+emulate -L zsh
+
+setopt localoptions extendedglob
+
+typeset buffer stdin lines=() shifted=()
+integer spaces=65536
+
+# TODO Document that your code must be tab-free, we are not going to pick out
+# leading tabs. Use `$'\t'` in string literals and globs.
+if (( ${#body} )); then
+    # Cannot remember why I felt that it was necessary to compile the code.
+    # Probably to get it pretty formatted for display.
+    # Compilation to determine if we are one liner.
+    functions[_exemplar_compile]=${(pj:\n:)body}
+    # Get number of lines.
+    lines=( "${(@Af)functions[_exemplar_compile]}" )
+    # Create buffer of code.
+    buffer=${(pj:\n:)lines}
+    # If our function is fed a HEREDOC, we convert it.
+    if (( ${#heredoc} )); then
+        # Double quotes mean we want to interpolate variables, no idea what
+        # `sprintf` is for.
+        if [[ $quote = '"' || -n $sprintf ]]; then
+            eof=EOF
+        else
+            eof="'EOF'"
+        fi
+        # Gather heredoc lines into a single string.
+        heredoc -v stdin <<< "${(pj:\n:)heredoc}"
+        # TODO If we are formatting our HEREDOC, well, I have to sort out what
+        # all that is about, but if not, then I still have to understand why all
+        # the quoting is necessary, we are double quoting here.
+        # TODO Because you are going to feed this as a HEREDOC to `try`.
+        if [[ -n $sprintf ]]; then
+            printf -v stdin '"$(heredoc -f %s <<< %s)"' $sprintf ${(qq)stdin}
+            printf -v stdin '"$(printf '\'' <<"EOF"\n%%s\nEOF\n'\'' %s)"' $stdin
+        else
+            printf -v stdin ' <<%s\n%sEOF' $eof $stdin
+            printf -v stdin %s ${(qq)stdin}
+        fi
+        # If there is more than one line, we want to place the lines in a block.
+        if (( ${#lines} > 1 )); then
+            printf -v buffer '{\n%s\n}' $buffer
+        fi
+        # Join lines into a buffer.
+        buffer="${(pj:\n:)lines}"
+    fi
+    # Now we compile our function for to be pretty.
+    functions[_exemplar_compile]=$buffer
+    # Compilation will add a tab indent, we can remove it.
+    lines=( "${(@Af)functions[_exemplar_compile]}" )
+    # User functions will be space indented. Zsh will tab indent its prettified
+    # compiled code. We know that we must dedent by two tabs. The source from
+    # `${funcitons[f]}` is presented as an anonymous function. All the source is
+    # indented by a single tab, the body of the exemplar placeholder funcions
+    # are indented by an additional tab. We can always strip our displayed
+    # function source of two leading tabs.
+    #
+    # If the user has typed a multi-line string or command substitution, we want
+    # the user to space indent it to line up with left margin of the placeholder
+    # function, and then dedent it for display.
+    #
+    # These strings and command substitution will be explicitly space indented,
+    # so like `heredoc`, we need to find all the lines that are not tab indented
+    # and determine the left margin by finding the line with the least amount of
+    # leading space and record the count of spaces.
+    #
+    # Any line we encouter that is destined for display will be dedented by that
+    # count of spaces if the line does not start with a tab.
+
+    # Determine the left margin in spaces.
+    for line in "${(@)lines}"; do
+        if [[
+            $line != $'\t'* &&
+            $line = (#b)([[:space:]]##)[^[:space:]]*
+            && ${#${match[1]}} -lt spaces
+        ]]; then
+            spaces=${#${match[1]}}
+        fi
+    done
+    for line in "${(@)lines}"; do
+        # Drop back the two tabs added by Zsh, or dedent by user space indent.
+        case $line in
+        ($'\t'*)
+            line=${${line#$'\t'}//$'\t'/    }
+            ;;
+        ([[:space:]]*)
+            line=${line[spaces + 1, -1]}
+            ;;
+        esac
+        shifted+=( "$line" )
+    done
+    buffer=${(pj:\n:)shifted}
+    # Format based on whether we are going to printf format our function at runtime.
+    if [[ -z $vargs ]]; then
+        printf -v buffer '%s' ${(qq)buffer}
+    else
+        printf -v buffer '"$(printf -- %s %s)"' ${(qq)buffer} $vargs
+    fi
+    if [[ -z $tried ]]; then
+        tried=tried
+    else
+        printf -v tried 'tried %s' $tried
+    fi
+    # Append the heredoc if one exists.
+    if [[ -n $stdin ]]; then
+        printf -v buffer '{ try %s|| %s; } <<< %s%s' $show $tried $buffer $stdin
+    else
+        printf -v buffer '{ try %s|| %s; } <<< %s' $show $tried $buffer
+    fi
+    # Add the generate code to the function.
+    printf -v 'code[i++]' '%s\n' $buffer
+fi
+
+body=() heredoc=() tried= show=$should_show vargs=

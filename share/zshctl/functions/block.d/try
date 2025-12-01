@@ -1,0 +1,67 @@
+#!/bin/zsh -f
+
+# Why all the `coproc`? Here's why. Because the path we are following most of
+# the time expects that it remains in the parent process and not in a subhell.
+# Functions like `try` are supposed to be transparent wrappers, but if we were
+# to use the StackOverflow tricks, we'd be forking a subshell and the command
+# might want to set a variable in the scope of the calling function. By
+# redirecting to a subshell, the command stays in the parent process.
+
+# Original idea...
+# https://stackoverflow.com/a/59829273/90123
+# ...but this means that the comand given to try runs in a subshell.
+
+# Note that we are doing what we can to keep from shadowing the variable name
+# given by the user in `try -v`, even though it will probably always be `err`
+# because we are the user and that's what we like. Ergo, no `typedef` and
+# sneaking some local state into `o_block`.
+
+# When you step back an squint, the try indent `coproc` looks superflous. Why
+# not just indent in the try `coproc`. The indentation is part of the line
+# format is why.
+
+#
+function try {
+    # TODO Wait on previous set to exit, if it exists.
+    # Close the indent file handle so that a long running process like
+    # `ssh-agent` do not inherit it and hold it open.
+    _block_close indent
+    # Close the user `try` handle if one exists.
+    _block_close user
+    # Create an indentation `coproc` to feed to our try `coproc`.
+    coproc {
+        coproc :
+        sed -ue 's/^\(..*\)$/    \1/' >&${o_block[try]}
+    }
+    # We will wait for our standard error intent `coproc` to exit.
+    o_block[sed]=${!}
+    o_block[pids]+=" try $o_block[sed]"
+    # Tell the try `coproc` to clear any error lines it's gathered.
+    print reset >&${o_block[try]}
+    # If called with `-v` we're going to give the user a handle to the `try`
+    # coproc and trust they will do the right thing with it. Otherwise, we
+    # invoke the given arguments and return the error code.
+    if [[ $1 = '-v' ]]; then
+        # Duplicate the standard error indent `coproc` into a variable named by
+        # the user. Note how we're abusing `$1` here, which could never be a
+        # variable given to `try -v`. I'm surprised it works.
+        exec {1}>&p; o_block[user]=$1
+        # Close the >&p and <&p of our standard error indent `coproc`.
+        coproc :
+        # Assign the fd to the variable given by the user.
+        : ${(P)2::=$1}
+    else
+        {
+            # Run the command and redirect the output to the standard error
+            # indent `coproc`.
+            "$@" 2>&p
+        } always {
+            # Capture the error code.
+            o_block[code]=$?
+            # Close the >&p and <&p of our standard error indent `coproc`.
+            coproc :
+        }
+        # Retrun the error code.
+        return $o_block[code]
+    fi
+}

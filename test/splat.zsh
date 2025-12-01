@@ -1,0 +1,36 @@
+#!/usr/bin/env zsh
+source share/zshctl/zshctl/include/splat.zsh
+
+function {
+    typeset o_fqn=1
+    splat -q print -r -- true : -b o_fqn
+    o_fqn=0
+    splat -q print -r -- false : -b o_fqn
+    o_fqn=1
+    splat -q print -r -- terminate : -b o_fqn -- :
+    splat -q print -r -- scalar : o_fqn
+    splat -q print -r -- rename : foo=o_fqn
+    typeset o_task=finally
+    splat -q print -r -- equals/space : -= fqn=o_fqn -_ o_task
+    splat -qd++ print -r -- delimited ++ -= fqn=o_fqn -_ o_task
+    splat -qd ++ print -r -- delimited ++ -= fqn=o_fqn -_ o_task
+    splat -q print -r -- short : -1+ t=o_task -b b=o_fqn
+    splat -qe print -r -- evaluate : o_task -b o_fqn
+    typeset o_array=( alfa bravo charlie )
+    splat -q print -r -- array : -a o_array
+    typeset -A o_kubernetes=( cluster cluster-foo hostname cluster.foo.com ready 1 other '' )
+    splat -q print -r -- map : -m o_kubernetes cluster hostname missing -b ready -Mb o_fqn
+    integer o_count=3
+    splat -q print -r -- count : -c o_count
+    o_fqn=1
+    splat -q print -r -- negatable : -! o_fqn
+    splat -q print -r -- : -0 -v -o o_task
+    splat -q print -r -- : -0 -v-o o_task -b2 o_fqn
+    splat -q print -r -- : -A o_kubernetes -b o_fqn
+    typeset o_spaced='hello world'
+    splat -q print -r -- : o_spaced
+    typeset o_empty=
+    splat -q print -r -- : -_ o_empty
+    typeset -A param
+    splat -q print -r -- : -A param
+}

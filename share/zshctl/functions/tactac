@@ -1,0 +1,32 @@
+emulate -L zsh
+
+# Create a frame by finding an undefined variable.
+set -- 0 "$@"
+while true; do
+    if [[ ! -v "__tactac_$1__" ]]; then
+        break
+    fi
+    set -- $(( $1 + 1 )) "$@[2,-1]"
+done
+# Set to actual variable name.
+set -- "__tactac_${1}__" "$@[2,-1]"
+# Create our frame.
+typeset -A $1
+# Create an echoing pipe.
+function {
+    integer stdin stdout pid
+    coproc {
+        coproc :
+        typeset REPLY
+        slurp
+        printf '%s' "$REPLY"
+    }
+    pid=${!}
+    exec {stdin}>&p
+    exec {stdout}<&p
+    coproc :
+    : ${(PAA)1::=${(z)${:-stdin $stdin stdout $stdout pid $pid}}}
+} "$@"
+(( $# == 4 )) && : ${(P)4::=${${(P)1}[pid]}}
+# Set user provided variables.
+: ${(P)2::=${${(P)1}[stdin]}} ${(P)3::=${${(P)1}[stdout]}}

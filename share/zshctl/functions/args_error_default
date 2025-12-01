@@ -1,0 +1,26 @@
+emulate -L zsh
+
+typeset func=${1:-} reason=${2:-} flag=${3:-}
+shift 3
+case $reason in
+(unknown)
+    printf 'fatal: invalid argument: unknown argument %s.\n' ${(qqq)flag} 1>&2
+    exit 2
+    ;;
+(required)
+    printf 'fatal: required argument: %s is a required argument.\n' ${(qqq)flag} 1>&2
+    exit 3
+    ;;
+(execute)
+    if [[ $flag = --help ]]; then
+        usage
+    else
+        printf 'fatal: exception: unknown execute directive on %s flag %s.' ${(qqq)func} ${(qqq)flag}
+        exit 1
+    fi
+    ;;
+(args)
+    printf 'fatal: exception: unknown "args" flag %s' ${(@qqq)flag} 1>&2
+    exit 1
+    ;;
+esac

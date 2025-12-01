@@ -1,0 +1,32 @@
+emulate -L zsh
+
+# No arguments is an implicit `-` argument.
+if (( ! $# )); then
+    warn -
+    return
+fi
+
+# Possible arguments.
+case $1 in
+# Send to heredoc as-is and redirect to standard error.
+(-f | -q | -)
+    heredoc "$@" 1>&2
+    ;;
+# `printf` a mesage and indent a tool-native error.
+(-n)
+    shift
+    printf "$@[2,-1]" 1>&2
+    printf '\n\n' 1>&2
+    # "<<<" appends a newline, have to use the pipes.
+    sed -e 's/^/    /' <<< $1 1>&2
+    ;;
+# `printf` starts after this argument guard.
+(--)
+    shift
+    ;&
+# `printf` the arguments and redirect to standard error.
+(*)
+    printf -- "$@" 1>&2
+    printf '\n' 1>&2
+    ;;
+esac

@@ -1,0 +1,9 @@
+emulate -L zsh
+
+# Pushes formatted strings onto an array by reference.
+typeset array=${1:-} string
+shift
+printf -v string -- "$@"
+string=${string//$'\uE000'/\`}
+string=${string//$'\uE001'/_}
+set -A $array "${(@P)array}" "$string"

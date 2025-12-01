@@ -1,0 +1,52 @@
+#!/bin/zsh -f
+
+# Read stdin verbatim and as efficiently as possible into $REPLY,
+# stopping without any change to $REPLY in the event of any error.
+# Benchmarked by Roman Perepelitsa in zsh-users/29472
+
+# Although this function faithfully records the input stream, later
+# references to $REPLY with the multibyte option back in effect will
+# (re-)interpret the content as multibyte characters.  This may not be
+# what is desired.
+
+emulate -L zsh -o no_multibyte
+
+### Alternate formulation, faster on bigger files
+# # /dev/fd/0 is treated specially by -f so also check /dev/fd
+# if [[ -d /dev/fd && -f /dev/fd/0 ]] && zmodload zsh/mapfile
+# then
+#     local +h -Ar mapfile
+#     typeset -g REPLY="${mapfile[/dev/fd/0]}" && return
+# fi
+# # else fall through to read from pipe/socket
+
+zmodload zsh/system || return
+
+# We want to offer the user the ability to set variable so they can use this as
+# a drop in replacement for `IFS= read -rd '' value`, and so, yet another way to
+# respect the user's dynamic scope...
+
+# If the user does not specify a return variable, or that variable is the
+# `REPLY` variable, do nothing, but if the user has specified a return variable,
+# we know that is not named `REPLY` so we declare a local `REPLY`.
+if [[ $# -eq 1 && $1 != REPLY ]]; then
+    local REPLY
+fi
+
+# Now wrap the `zslurp` in an anonymous function so we can use local variables
+# to accmulate the reads. Write the result to `REPLY` which is either what the
+# user wants or it's not what the user wants, but we've shadowed nothing.
+if function {
+    local -a content
+    local -i i=0
+    while true; do
+        sysread 'content[++i]' && continue
+        (( $? == 5 )) || return
+        break
+    done
+    typeset -g REPLY=${(j::)content}
+} && [[ $# -eq 1 && $1 != REPLY ]]; then
+    # Once again, if the user has provided us with a variable, we can set that
+    # variable, but if they haven't, we've assumed `REPLY`.
+    typeset -g "$1=$REPLY"
+fi

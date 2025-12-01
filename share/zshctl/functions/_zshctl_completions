@@ -1,0 +1,87 @@
+emulate -L zsh
+
+# We must be called from a function that will give us a clue as to what
+# completions are attempting to complete.
+integer top=2
+while [[ $funcstack[$top] != (:execute:*|:execute|:args:*|:args)  ]]; do
+    ((top++))
+    (( top <= ${#funcstack} )) || abend 'must be called from an :execute or :args function'
+done
+# Determine if we have any help availale
+typeset usage=${funcstack[$top]}
+usage=${usage//#:args/:help}
+usage=${usage//#:execute/:help}
+if (( ! ${+functions[$usage]} )); then
+    return
+fi
+typeset -A glob=(
+    description '(#b)\#[[:space:]]##desc(ription|)([[:space:]]##--(*)|)'
+)
+# Within this function, we gather up all the sub-commands that are available
+# from a branch command.
+# We do this by iterating the all the functions looking for functions that are
+# immediate sub-commands of the command we are completing.
+function {
+    # If we are not completing arguments, we're completing options or values,
+    # and we are not completing a potential command.
+    [[ $zshctl[args:state] = arguments ]] || return
+    # If we are completing an option, we can skip completion of sub-commands.
+    [[ $zshctl[args:incomplete] = -* ]] && return
+    setopt localoptions extendedglob
+    # Get the name of the execute function for the command.
+    typeset execute=${usage//#:help/:execute}
+    # TODO Replace with an extended glob.
+    typeset -A regex=( escaped '^\\.')
+    typeset lines=() verbose=() help usage joined key
+    # For every key in the zshctl associative array...
+    for key in "${(@o)${(@k)zshctl}}"; do
+        # Check that the key is an immediate sub-scommand.
+        [[ $key = ${execute}:[^:]## ]] || continue
+        # Source the command if it has not yet been sourced.
+        [[ $zshctl[$key] != ':' ]] && source $zshctl[$key]
+        # Get the help function for the sub-command.
+        usage=${key//#:execute/:help}
+        # Skip if the help function does not exist.
+        (( ${+functions[$usage]} )) || continue
+        # Get the help text.
+        $usage
+        # Split the help text.
+        lines=( "${(@Af)help}" ) verbose=()
+        typeset mode=scan
+        # Parse the help text to extract verbose descriptions.
+        for line in "${(@)lines}"; do
+            case $mode:$line in
+            (scan:${~glob[description]})
+                mode=description
+                ;;
+            (description:\# *)
+                break
+                ;;
+            (description:*)
+                verbose+=( "$line" )
+                ;;
+            esac
+        done
+        # Skip if we do not have a verbose description.
+        (( ${#verbose} )) || continue
+        # Down case the first character if it is not esacaped.
+        joined=$verbose[1]
+        if [[ $verbose[1] =~ $regex[escaped] ]]; then
+            joined=${joined#\\}
+        else
+            joined=${joined[1]:l}${joined[2,-1]}
+        fi
+        # Strip the period.
+        joined=${joined%.}
+        # Add to the completions.
+        completion ${key##*:} $joined
+    done
+}
+# Get the completions for the current command by invoking .
+$usage
+typeset lines=( "${(@Af)help}" ) flag description
+typeset -A _zshctl_options
+zshctl+=( args:mode help )
+${usage//#:help/:args}
+zshctl+=( args:mode inline )
+_zshctl_help

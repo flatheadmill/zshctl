@@ -1,0 +1,12 @@
+#!/bin/zsh -f
+
+# The entire `always` block, the try and the catch part, get redirected to this
+# function running in a process substitution subshell. When we close our
+# duplicate of the fd and the `caught` function closes its file descriptor the
+# standard output indent `coproc` exits.
+
+typeset -gA o_block
+integer indent=$o_block[indent]
+>&${indent}
+# TODO Does it work without this? (Does it matter?)
+exec {indent}>&-

@@ -1,0 +1,71 @@
+emulate -L zsh
+
+if
+    # Create a frame by finding an undefined variable.
+    set -- 0 "$@"
+    while true; do
+        if [[ ! -v "__show_$1__" ]]; then
+            break
+        fi
+        set -- $(( $1 + 1 )) "$@[2,-1]"
+    done
+    # Set to actual variable name.
+    set -- "__show_${1}__" "$@[2,-1]"
+    # Define the variable.
+    typeset -A $1
+    printf -v "${1}[compile]" '
+        printf -v "${1}[show_eval]" "\n\nfunction _show_eval {\n%%s\n}\n\n" "${${(P)1}[source]}"
+        eval "${${(P)1}[show_eval]}" 2>/dev/null || eval "${${(P)1}[source]}"
+    '
+    if [[ $2 = eval ]]; then
+        typeset -g "${1}[source]=$3"
+        case $funcstack[2]:${functions_source[$funcstack[2]]:h} in
+        (showe:${functions_source[show]:h})
+            printf '$ %s\n' "${${(P)1}[source]}" >&2
+            ;;
+        (*)
+            printf '$ %s\n' "${${(P)1}[source]}"
+            ;;
+        esac
+        eval ${${(P)1}[compile]} || eval"${${(P)1}[source]}"
+    else
+        if [[ $# -eq 1 || $2 = - || $2 = -f || $2 = -q ]]; then
+            heredoc -v "${1}[source]" "$@[2,-1]"
+            case $funcstack[2]:${functions_source[$funcstack[2]]:h} in
+            (showe:${functions_source[show]:h})
+                printf '$ %s' "${${(P)1}[source]}" >&2
+                ;;
+            (*)
+                printf '$ %s' "${${(P)1}[source]}"
+                ;;
+            esac
+            eval ${${(P)1}[compile]} || eval "${${(P)1}[source]}"
+        else
+            function {
+                typeset frame=$1
+                shift
+                typeset words=()
+                while (( $# )); do
+                    if [[ -z $1 || ${(q)1} = *"\\"* ]]; then
+                        words+=( ${(qqq)1} )
+                    else
+                        words+=( $1 )
+                    fi
+                    shift
+                done
+                typeset -g "${frame}[source]=${(j: :)${(@)words}}"
+            } "$@"
+            case $funcstack[2]:${functions_source[$funcstack[2]]:h} in
+            (showe:${functions_source[show]:h})
+                printf '$ %s\n' "${${(P)1}[source]}" >&2
+                ;;
+            (*)
+                printf '$ %s\n' "${${(P)1}[source]}"
+                ;;
+            esac
+            eval ${${(P)1}[compile]} || eval"${${(P)1}[source]}"
+        fi
+    fi
+then
+    _show_eval
+fi

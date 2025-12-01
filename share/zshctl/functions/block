@@ -1,0 +1,135 @@
+emulate -L zsh
+
+# When you go nuts with `coproc` you're going to find that your programs hang,
+# and you're going to spend hours picking at things and purpousefully forgetting
+# how pipes work. Do I need to send a terminator down the pipe or something? No,
+# dum dum, when was that ever? How would anything work?
+#
+# Look at all the places were a file handle is inherited and immediately closed.
+# One of those, the last one, too hours to find. Yes, I spend some time
+# wondering if I should send an unusual line down the pipe and catch it as an
+# exit in a while loop, but no, I knew that wasn't how pipes work.
+#
+# What you can do to find your open file handles is this.
+#
+# `pstree -p` will give you a process tree with PIDs. I didn't need more than
+# this because I could easily see my hung process running under the Perl program
+# I use to launch a program from a TMUX chord. You an use...
+
+zmodload zsh/system 2>/dev/null
+
+# ... to get the PID of a `coproc`. $$ will always be the PID of the parent
+# shell of any subshells, but `$sysparams[pid]` will have the PID of the child.
+
+# The problem with this was that I wanted some sort of blocky syntax for blocks
+# of work in a Tekton pipeline. It didn't have to look exactly like a try/catch
+# block a la C++, JavaScript, Python, etc. It just had to be easier than typing
+# "or exit with this error message" on each line, it had to  boilerplate without
+# variables, and it the boilerplate had to be at the start and the end of the
+# block where you could easily see typos.
+
+# With this, it can be fragile as all shell hacks are. So long as you can spot
+# it by looking.
+
+# Some things to know about shell programming to understand this code.
+
+# What does `exec {out}>&1` do and why `exec`?
+# https://stackoverflow.com/a/39881482/90123
+
+# `coproc` notes.
+# https://www.zsh.org/mla/users/1999/msg00619.html
+
+
+# We track file descriptors in a widely scoped `o_block` associative array. This
+# is a convience function for when we want to close one, but only if it is open.
+
+fpath=(${${(%):-%x}:h}/block.d $fpath)
+autoload -zU indent try tried caught _block_close
+
+typeset -gA o_block=( pids '' stop 0 indented 1 user 0 )
+
+# The block and creates a subshell that we can use to indent the output of a
+# series of build pipeline commands.
+
+typeset indent=4
+if [[ $1 = -i ]]; then
+    indent=$2 o_block[indented]=$2
+    shift 2
+fi
+
+integer fd out
+# Worked on making it so that we could just close the input to terminte the
+# loop, but unlike the `indent` input, the `try` input cannot be closed
+# inside the block. Running `/bin/true {try}>&-` will prevent `/bin/true`
+# from inheriting the file handle, as will `true {try}>&-`, but in the
+# latter the file handle will be closed in the parent process because `true`
+# is a built in. Similarly, calling `zsh my_program.zsh {try}>&-` will leave
+# the handle open in the block, but calling calling `my_function {try}&>-`
+# will close it in the block. Since we are looking for one command line by
+# line, we may as well look for another.
+#
+# `while` is slow so someday we can replace with this an `awk` program.
+{
+    coproc awk -Winteractive '
+    /^reset$/ { split("", arr) }
+    /^$/ || /^ / { arr[length(arr) + 1] = $0 }
+    /^end$/ {
+        for (i = 1; i <= length(arr); i++) {
+            print arr[i]
+        }
+        exit 0
+    }
+    '
+} 2>/dev/null # awk: unknown option -Winteractive ignored
+# Keep both the input and output.
+exec {fd}>&p; o_block[try]=$fd
+exec {fd}<&p; o_block[tried]=$fd
+# No block intender.
+o_block[sed]=0
+# Create the initial empty AWK array.
+print reset >&${o_block[try]}
+
+# TODO We begin the standard output indenting here. We can wrap this in an if
+# block. Any output in the always block is going to just print, and if there is
+# no `indent` function, then there is no indent. Everything else, we can see if
+# it works as normal.
+
+if (( indent )); then
+    # Copy the standard output of the main process for use in the indent `coproc`.
+    exec {out}>&1
+    # This is our indent `coproc`.
+    coproc {
+        # Start a character count for our pipe.
+        coproc wc -c
+        # We are going to wait for our word count to finish.
+        integer wc=$! count
+        # Clone the output fd of the word count.
+        exec {count}<&p
+        # Format and print the banner.
+        if (( $# )); then
+            typeset message
+            printf -v message "$@"
+            printf '%s\n\n' $message >&$out
+        else
+            print -- >&$out
+        fi
+        # Tee into the word count, indent, and print to parent's standard out.
+        tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:indent:: :)}"'\1/' >&$out
+        # Close the >&p and <&p of our word count `coproc`.
+        coproc :
+        # If we had any output at all, print a new line.
+        [[ $(<&${count}) != 0 ]] && print >&$out
+        # Wait for word count to finish.
+        wait $wc
+    }
+    # We are going to wait on the indent `coproc` to finish in out `always` block.
+    o_block[pid]=${!}
+    # Close our duplicate of standard out.
+    exec {out}>&-
+    # Duplicate the input pipe of our indent `coproc`.
+    exec {fd}>&p; o_block[indent]=$fd
+    # Close the >&p and <&p of our indent `coproc`.
+    coproc :
+    # Set the DIY `try` fd to zero so we know its unallocated.
+    o_block[user]=0
+fi
