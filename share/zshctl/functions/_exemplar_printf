@@ -92,23 +92,24 @@ if (( ${#body} )); then
     done
     buffer=${(pj:\n:)shifted}
     # Format based on whether we are going to printf format our function at runtime.
-    if (( ${#vargs} )); then
-        printf -v buffer '"$(printf %s %s)"' ${(qq)buffer} $vargs[1]
-    else
+    if [[ -z $vargs ]]; then
         printf -v buffer '%s' ${(qq)buffer}
+    else
+        printf -v buffer '"$(printf -- %s %s)"' ${(qq)buffer} $vargs
     fi
-    typeset _tried=tried
-    if (( ${#tried} )); then
-        printf -v _tried 'tried %s' $tried[1]
+    if [[ -z $tried ]]; then
+        tried=tried
+    else
+        printf -v tried 'tried %s' $tried
     fi
     # Append the heredoc if one exists.
     if [[ -n $stdin ]]; then
-        printf -v buffer '{ try %s || %s; } <<< %s%s' $show $_tried $buffer $stdin
+        printf -v buffer '{ try %s|| %s; } <<< %s%s' $show $tried $buffer $stdin
     else
-        printf -v buffer '{ try %s || %s; } <<< %s' $show $_tried $buffer
+        printf -v buffer '{ try %s|| %s; } <<< %s' $show $tried $buffer
     fi
     # Add the generate code to the function.
     printf -v 'code[i++]' '%s\n' $buffer
 fi
 
-body=() vargs=() heredoc=()
+body=() heredoc=() tried= show=$should_show vargs=

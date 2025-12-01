@@ -1,5 +1,5 @@
 fpath=( share/zshctl/functions $fpath )
-autoload -zU exemplar block try tried heredoc slurp show tryable _exemplar_tryable
+autoload -zU exemplar block try tried heredoc slurp show tryable showe
 
 zmodload zsh/parameter
 
@@ -96,8 +96,7 @@ function example {
     typeset switch=-n
     (){
         % $switch
-        slurp=$(cat %s)
-        print $slurp
+        { slurp=$(cat %s); print $slurp; }
     } <<'    EOF'
         hello, world
     EOF
@@ -110,7 +109,7 @@ function _example {
     EOF
 }
 
-function example {
+function _example {
     : "
     "
     (){
@@ -123,7 +122,7 @@ function example {
 function example {
     typeset world=world
     (){
-        !% 'bad things happened %s' 'no good'
+        %! 'bad things happened %s' 'no good'
         print -u 2 bad && false
     }
 }
@@ -170,12 +169,11 @@ function _example {
 }
 
 function {
-    block -i 0 # environment
+    block environment
     {
-        tryable -c example
-        print ${functions[example]}
+        exemplar example
         example
     } always {
         caught
-    } # > >(indent)
+    } > >(indent)
 }

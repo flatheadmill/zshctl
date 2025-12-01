@@ -19,12 +19,26 @@ if
     '
     if [[ $2 = eval ]]; then
         typeset -g "${1}[source]=$3"
-        printf '$ %s\n' "${${(P)1}[source]}"
+        case $funcstack[2]:${functions_source[$funcstack[2]]:h} in
+        (showe:${functions_source[show]:h})
+            printf '$ %s\n' "${${(P)1}[source]}" >&2
+            ;;
+        (*)
+            printf '$ %s\n' "${${(P)1}[source]}"
+            ;;
+        esac
         eval ${${(P)1}[compile]} || eval"${${(P)1}[source]}"
     else
         if [[ $# -eq 1 || $2 = - || $2 = -f || $2 = -q ]]; then
             heredoc -v "${1}[source]" "$@[2,-1]"
-            printf '$ %s' "${${(P)1}[source]}"
+            case $funcstack[2]:${functions_source[$funcstack[2]]:h} in
+            (showe:${functions_source[show]:h})
+                printf '$ %s' "${${(P)1}[source]}" >&2
+                ;;
+            (*)
+                printf '$ %s' "${${(P)1}[source]}"
+                ;;
+            esac
             eval ${${(P)1}[compile]} || eval "${${(P)1}[source]}"
         else
             function {
@@ -41,7 +55,14 @@ if
                 done
                 typeset -g "${frame}[source]=${(j: :)${(@)words}}"
             } "$@"
-            printf '$ %s\n' "${${(P)1}[source]}"
+            case $funcstack[2]:${functions_source[$funcstack[2]]:h} in
+            (showe:${functions_source[show]:h})
+                printf '$ %s\n' "${${(P)1}[source]}" >&2
+                ;;
+            (*)
+                printf '$ %s\n' "${${(P)1}[source]}"
+                ;;
+            esac
             eval ${${(P)1}[compile]} || eval"${${(P)1}[source]}"
         fi
     fi

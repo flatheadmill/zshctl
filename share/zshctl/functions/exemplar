@@ -15,13 +15,15 @@ zmodload zsh/parameter
 # Don't leave home without it. Will not be inherited by the function we create.
 setopt localoptions extendedglob
 
-typeset show=show
-if [[
-    ${funcstack[2]} = tryable &&
-    ${functions_source[exemplar]:h} = ${functions_source[tryable]:h}
-]]; then
-    show=_exemplar_tryable
-fi
+typeset should_show
+case ${funcstack[2]}:${functions_source[$funcstack[2]]:h} in
+(tryable:${functions_source[exemplar]:h})
+    should_show='showe '
+    ;;
+(*)
+    should_show='show '
+    ;;
+esac
 
 # The more complicated globs used by our parser.
 typeset -A glob=(
@@ -46,7 +48,7 @@ fi
 # By manipulating `count` and `run` we can have this oen while loop for both
 # inline inovcation and compilation.
 
-typeset func state lines=() body=() tried=() vargs=() match=() code=() heredoc=() eof quote
+typeset func state lines=() body=() tried vargs show match=() code=() heredoc=() eof quote
 integer i spaces
 
 # While we have a function to compile...
@@ -64,9 +66,9 @@ while (( count-- )); do
     # that it would be the first line. Skip whitespace and then match this
     # exactly and we know this function had already been compiled.
     if [[ ${functions[$func]} != [[:space:]]##:\ exemplar\ $$* ]]; then
-        state=scan eof='' i=2 spaces=65536
-        body=() tried=() vargs=() match=() code=( ': exemplar '${$}$'\n' ) heredoc=()
-        lines=( "${(@f)${functions[$func]}}" )
+        state=scan eof='' i=2 spaces=65536 tried= vargs= show=$should_show
+        code=( ': exemplar '${$}$'\n' ) lines=( "${(@f)${functions[$func]}}" )
+        body=() match=() heredoc=()
         # User functions will be space indented. Zsh will tab indent its
         # prettified compiled code. We know that we must dedent by two tabs. The
         # source from `${funcitons[f]}` is presented as an anonymous function.
@@ -127,12 +129,15 @@ while (( count-- )); do
                     state=scan
                 fi
                 ;;
-            (printf:(#b)[[:space:]]##!%[[:space:]]##(*))
-                tried+=( $match[1] )
+            (printf:(#b)[[:space:]]##%-[[:space:]]##(*))
+                show=
+                ;;
+            (printf:(#b)[[:space:]]##%![[:space:]]##(*))
+                tried=$match[1]
                 ;;
             (printf:(#b)[[:space:]]##%[[:space:]]##(*))
                 # placeholder function has printf arguments
-                vargs+=( $match[1] )
+                vargs=$match[1]
                 ;;
             (printf:*)
                 # placeholder function does not have printf arguments
