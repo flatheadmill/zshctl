@@ -1,4 +1,5 @@
 # `zshctl`
+<!-- CLI framework for Zsh: argument parsing, man-formatted help, completions, and utility library -->
 
 `zshctl` in a framework for creating command-line programs in Zsh.
 
@@ -33,6 +34,8 @@ you can in turn create programs using `#!/usr/bin/env fooctl`.
 link`.
 
 ## Help authoring
+<!-- MAN DOWN! format: Markdown subset for man pages with backtick-bold, italic, two heading levels, definition lists -->
+
 `zshctl` includes a help system that will display man formatted context
 sensitive help.
 
@@ -99,6 +102,8 @@ print $version[release_date]
 ### options
 ````
 ## Help authoring style
+<!-- branch commands get full rationale in DESCRIPTION, leaf commands get focused help -->
+
 `zshctl` programs have a command path where real operations take place at the
 leaves of the commands. You're going to find that at branch commands you tend
 to write general purpose documentation and users are going to have to scroll
@@ -120,8 +125,10 @@ report then display the listing or report, which may be all the discovery the
 user needs.
 
 ## Standard library
+<!-- utility functions: warn, catch/pocket, struct, splat, heredoc, block, tactac -->
 
 ### `warn`
+<!-- printf or heredoc formatted messages to stderr, three modes: single-quoted, printf-formatted, double-quoted -->
 
 Warn will print a formatted message to standard error. It does not prefix the
 message with `warn:` or `warning:`, that's up to you. We prefer the format:
@@ -186,6 +193,7 @@ Caveat: Like `heredoc`, you cannot use the positional array parameters in the
 double-quoted heredoc.
 
 ### `catch`
+<!-- gather stdout/stderr into caller-provided variables using coproc, explicit contract pattern -->
 
 The `catch` function will gather the standard out and standard err of a command
 into variables specified by the user. In doing so, it will use `coproc` so you
@@ -262,6 +270,7 @@ function {
 ```
 
 ### `struct`
+<!-- nested associative arrays using shell quoting as wire format, serializable between processes -->
 
 The `struct` function adds shell escaped arrays and associative arrays to an
 associative array creating a struct of sorts, you can even create trees of structs.
@@ -319,6 +328,7 @@ The shell escaping can be used elsewhere in your code if you need to pass
 arrays around, but don't want to build an associative array as a tree root.
 
 ### `splat`
+<!-- construct command invocations with options pulled from dynamic scope, avoids manual argument list building -->
 
 When you get into the habit of using the `zshctl` argument parser in your
 program functions, you run into the annoyance of calling one function from
@@ -334,6 +344,7 @@ dynamic scope, you cannot use the the positional arguments `$1`, `$2`, `$3`,
 etc. nor `$@.`
 
 ## Zsh-isms
+<!-- Zsh patterns: slurp, REPLY, autoload, frame pattern, wire format, jq tapes, subshell avoidance, eval -->
 
 Here are some Zsh-isms for used by `zshctl` that you can use in your own
 `zshctl` and Zsh programs.
@@ -352,6 +363,7 @@ Pending outline.
  * `${(e)}` expansion &mdash; parameter expansion with evaluation (the alternative to eval)
 
 ### Preface
+<!-- no typeset -n in Zsh, avoid subshells, dynamic scope is what matters, resign to named functions -->
 
 Returning values from functions, how nice it would be to have `typeset -n` but
 Zsh does not. Zsh programmers avoid forks and especially avoid subshells.
@@ -360,6 +372,7 @@ I don't, because I love `coproc` best of all. I do avoid command substitution
 and process substitution, though.
 
 #### What does level four look like?
+<!-- doctor it hurts pattern, dynamic scope visualization, accept named functions with global scope -->
 
 "Doctor is hurts when I do this." You can put aside whatever safety fetishes
 you're carrying from the language you last saw. The dynamic scope, you can see
@@ -370,6 +383,7 @@ around, so you're going to find yourself writing named functions with throw
 away names and global scope. You will resign yourself to this.
 
 #### `autoload -zU`
+<!-- lazy loading from fpath, one file per function enables dependency mechanism, treat as tiny programs -->
 
 I can understand an aversion to `autoload -zU`. Every little function, even
 one liners, in their own file. It doesn't seem worth it, but it is.
@@ -384,14 +398,17 @@ you wrote that were just a one liner you got tired of fishing out of shell
 history.
 
 ### `zslurp`
+<!-- 8KB buffered reads via sysread, 70x faster than IFS= read -rd '' for pipes -->
 
 8 kilobyte buffer reads and pipes.
 
 ### `REPLY/reply`
+<!-- convention for function returns, but typeset -g sets least-local not global, scope chain gotchas -->
 
 One way of many to return from a function.
 
 ### Scope Assertions
+<!-- assert reserved variables won't shadow caller with [[ -v _foo ]], defensive dynamic scope -->
 
 Just like result assertions, just assert that local variables used by your
 program will not be shadowed by the caller.
@@ -403,17 +420,21 @@ function foo {
 ```
 
 ### `coproc`
+<!-- bidirectional IPC without forking to Perl, handles close after use, duplicate before catch -->
 
 Why I no longer go running off to Perl for child process handling.
 
 ### Indirection
+<!-- write to arrays/associative arrays with printf and typeset, (P) expansion for indirect access -->
 
 Show that you can write to arrays and associative arrays with printf, and how
 to set associative array values with `typeset` and how to read them all with
 
 #### `${(e)}`
+<!-- parameter expansion with evaluation, alternative to eval for template expansion -->
 
 #### `eval` considered helpful
+<!-- contrary to shell wisdom, Zsh quoting makes eval safe and useful, avoiding eval achieves nothing -->
 
 I'd gotten some JavaScript through `XMLHttpRequest` and I wanted to `eval` it,
 but no, you're not supposed to do that, so instead I created a dynamic
@@ -425,8 +446,10 @@ nothing in regards to safety other than to keep from having to explain an
 `eval`.
 
 ### Day-to-day
+<!-- practical patterns: printf for newline control, wire format serialization, jq for JSON munging -->
 
 #### `printf`
+<!-- newline control: <<< always appends, print appends by default, use printf %s when in doubt -->
 
 I've lost track of all the ways in which the shell will append a newline when
 you don't want one.
@@ -438,8 +461,10 @@ you don't want one.
 When in doubt, use `printf %s $value`.
 
 #### `${(j: :)${(@qq)}}` wire format
+<!-- shell quoting as serialization: ${(@qq)} to encode, ${(@QA)${(z)}} to decode, passes through pipes -->
 
 #### `jq` tapes
+<!-- filter JSON into shell words with jq, six-of-one to JavaScript switch statements, jo for output -->
 
 Used to be that whenever I'd set out to munge JSON, I'd reach for `node`
 because JSON is becomes JavaScript and I could just write recursive descent to
@@ -465,7 +490,8 @@ structure JSON into shell escaped words is six-of-one to the
 half-dozen-the-other of switch statements and if/else if ladders in
 JavaScript.
 
-## Opportunties
+## Opportunities
+<!-- potential additions: logging library for logfmt/JSON, undecided opinion about logging -->
 
 Considering adding a logging library. There is one `barnyard` but it is
 probably overreach, or else I need to develop an appreciation for
@@ -475,6 +501,7 @@ would simply log to standard out as logfmt or JSON, but I've never really had
 a once and for all opinion about logging.
 
 ## Outgoing
+<!-- features not being pursued: compile to single file, wait for desire before fulfilling -->
 
 Compiling, for one. Used to imagine that you could have a `zshctl` program
 compile and it probably is still possible, but as an extension. There are
@@ -484,6 +511,7 @@ just install `zshctl` and make it a single file `zshctl` program. Let us wait
 for the desire before fulfilling it.
 
 ## Incoming
+<!-- pending additions: trim function for whitespace stripping -->
 
 Notes for `trim`.
 
