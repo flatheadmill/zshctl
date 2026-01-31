@@ -490,6 +490,53 @@ structure JSON into shell escaped words is six-of-one to the
 half-dozen-the-other of switch statements and if/else if ladders in
 JavaScript.
 
+The tape pattern is this: build one honkin' long flat array in `jq`, serialize
+it with `@sh`, deserialize it in Zsh with `${(@QA)${(z)...}}`, then eat it like
+Pacman with a while loop and shifting.
+
+The naive approach outputs JSONL, one array per line:
+
+```jq
+# WRONG - outputs JSONL, now you're parsing line-by-line in Zsh
+.[] | [.n, .role, .content] | @sh
+```
+
+This fights the shell. You end up doing multiple `jq` calls or reading JSONL
+line-by-line, which is what you were trying to avoid by not using Node.js.
+
+The Pacman approach builds one array and eats it whole:
+
+```jq
+# RIGHT - one array, serialize whole, consume by shifting
+[
+    length,
+    (.[] | .n, .role, .content, (.links | length), .links[])
+] | @sh
+```
+
+One array. One `@sh`. One `${(@QA)${(z)...}}`. Then shift through it:
+
+```zsh
+tape=( "${(@QA)${(z)$(jq -r '...' $jsonl)}}" )
+set -- "${(@)tape}"
+integer total=$1; shift
+
+while (( $# )); do
+    n=$1 role=$2 content=$3 link_count=$4
+    shift 4
+    links=( "${(@)@[1,$link_count]}" )
+    shift $link_count
+    # ... process entry
+done
+```
+
+Variable-length records work because you embed the count before the items. Read
+count, shift that many, repeat. Wakka wakka through the tape until it's empty.
+
+For a working example, see `claudectl chat transcript` which parses Grok and
+Gemini API responses into conversation turns with variable-length citation
+arrays.
+
 ## Opportunities
 <!-- potential additions: logging library for logfmt/JSON, undecided opinion about logging -->
 
