@@ -125,7 +125,103 @@ report then display the listing or report, which may be all the discovery the
 user needs.
 
 ## Standard library
-<!-- utility functions: warn, catch/pocket, struct, splat, heredoc, block, tactac -->
+<!-- utility functions: args, warn, catch/pocket, struct, splat, heredoc, block, tactac -->
+
+### `args`
+<!-- argument parser: generates eval-able code for typed variables, supports scalars, arrays, maps, booleans, counters, toggles, negatable, execute-on-match -->
+
+The `args` function is the argument parser at the core of every `zshctl` command. It generates eval-able Zsh code that declares typed variables from command-line flags. When you see the incantation `eval "$(args ... -- "$@")"`, you are looking at option parsing.
+
+The standard pattern for a branch command that supports completions and shows usage when invoked without arguments looks like this:
+
+```
+function :args:secret {
+    eval "$(args -CU -bx h,help -- "$@")"
+}
+```
+
+The global flags `-C` enables completion support and `-U` displays usage when no arguments are given. The `-bx h,help` defines a boolean (`-b`) help flag with both short (`h`) and long (`help`) forms that triggers an execute handler (`-x`) when provided. The double-dash separates the flag definitions from `$@`.
+
+A leaf command that does real work will typically add scalar options for its parameters:
+
+```
+function :args:secret:get {
+    typeset o_format=json
+    eval "$(args -UC -bx h,help a,any -ds f,format -- "$@")"
+}
+```
+
+Here `-ds f,format` defines a scalar (`-s`) for `--format` or `-f` that preserves the predeclared default (`-d`) when not provided. The variable will be `o_format` and it will be `json` unless the user provides `--format xml` or `-f xml`.
+
+The `args` function generates `typeset` statements and assignments that declare variables with the `o_` prefix. A flag `--verbose` or `-v` becomes `o_verbose`. A flag `--dry-run` becomes `o_dry_run` with hyphens converted to underscores.
+
+---
+
+Type Flags
+
+The type flags determine what kind of variable is created and how repeated uses of the flag are handled.
+
+A scalar (`-s`) holds a single string value. The flag `--format json` or `--format=json` or `-f json` all assign `o_format='json'`. If not provided, the variable is unset unless you use the defined modifier (`-d`) to preserve a predeclared value.
+
+A boolean (`-b`) is an integer that starts at 0 and becomes 1 when the flag is present. The flag `--verbose` sets `o_verbose=1`. Booleans support short flag clustering, so `-vqd` expands to `-v -q -d` and sets all three.
+
+An array (`-a`) accumulates values across multiple uses. The flags `-i foo -i bar -i baz` produce `o_include=(foo bar baz)`. Each use appends to the array.
+
+A map (`-A`) collects key-value pairs. The flags `--config user=alice --config role=admin` produce an associative array where `o_config[user]` is `alice` and `o_config[role]` is `admin`. The key and value can be separated by equals or space.
+
+A counter (`-c`) is an integer that increments with each use. The flags `-vvv` produce `o_verbose=3`. This is useful for verbosity levels.
+
+A toggle (`-t`) is an integer that flips between 0 and 1 with each use. The flags `--toggle --toggle` end at 0 because it flipped twice.
+
+A negatable (`-!`) boolean supports `--no-` prefix for explicit negation. Define it as `-!b c,color` and the user can say `--color` to set 1 or `--no-color` to set 0. Short negation uses uppercase: `-c` sets, `-C` clears.
+
+---
+
+Behavior Modifiers
+
+The behavior modifiers change how options are processed rather than what type they produce.
+
+Defined (`-d`) preserves a predeclared default. Without it, scalars are unset when not provided. With it, the `args` function skips the declaration and only assigns if the user provides a value. Predeclare your default, add `-d`, and the variable keeps its value unless overridden.
+
+Required (`-r`) causes an error if the option is not provided. Use sparingly; positional arguments or sensible defaults are usually better.
+
+Execute (`-x`) triggers a handler when the flag is matched. This is for `--help` which should display help and exit rather than continue parsing. The handler is `args_error` with the function name and the word `execute`.
+
+Interspersed (`-@`) allows flags to appear after positional arguments. Without it, the first non-flag stops parsing and everything after goes into `$@`. With it, flags are extracted wherever they appear.
+
+---
+
+Global Flags
+
+The global flags affect the parser itself rather than individual options.
+
+Completion mode (`-C`) enables the completion infrastructure. Branch commands that have subcommands need this.
+
+Usage mode (`-U`) shows the command's usage when invoked with no arguments. This is conventional for branch commands that dispatch to subcommands.
+
+Delegated mode (`-D`) is used by the framework internals when a command delegates to subcommands.
+
+---
+
+Syntax Variations
+
+Flag definitions use the format `short,long` where short is a single character and long is the full name. The short is optional: `,verbose` defines only `--verbose` with no short form.
+
+Values can be attached with equals (`--format=json`), separated by space (`--format json`), or attached to short flags (`-fjson`).
+
+The double-dash (`--`) stops flag processing. Everything after it becomes positional arguments in `$@`. The pattern `-- --` means passthrough: don't parse anything, pass all arguments through.
+
+```
+function :args:rag:rg {
+    eval "$(args -- -- "$@")"
+}
+```
+
+This command does nothing with its arguments except make them available for the execute function to pass along.
+
+---
+
+For the complete reference of all patterns and the generated code for each, run `zshctl etude args`. The etude demonstrates every type, modifier, and syntax variation with actual output showing exactly what code `args` generates.
 
 ### `warn`
 <!-- printf or heredoc formatted messages to stderr, three modes: single-quoted, printf-formatted, double-quoted -->
