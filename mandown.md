@@ -656,7 +656,8 @@ for the desire before fulfilling it.
 ## Incoming
 <!-- pending additions: trim function for whitespace stripping -->
 
-Notes for `trim`.
+Notes for `trim`. `trim` because it's so common and so annoying to write out
+the pattern substitution.
 
 https://stackoverflow.com/questions/68259691/trimming-whitespace-from-the-ends-of-a-string-in-zsh
 
