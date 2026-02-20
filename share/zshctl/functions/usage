@@ -3,15 +3,6 @@ emulate -L zsh
 zmodload zsh/terminfo
 zmodload zsh/datetime
 
-# I'm trying to find a way to edit and preview with the formatting which leads
-# me to comment out `| less` and run
-#
-# ```
-# while true; do zshctl gce key | less -XE; sleep 1; done
-# ```
-#
-# Perhaps an enviroment variable?
-
 setopt localoptions extendedglob
 integer top=2
 while [[ $funcstack[$top] != (:execute:*|:execute|:args:*|:args)  ]]; do
@@ -75,6 +66,10 @@ if (( ! ${#terse} && ${#verbose} )); then
     joined=${joined%.}
     terse=( "$joined" )
 fi
+typeset pager=( less )
+if [[ -n ${ZSHCTL_HELP_TEXT:-} ]]; then
+    pager=( col -bx )
+fi
 function {
     if [[ $zshctl[help:mode] == __man ]]; then
         cat $1
@@ -104,5 +99,5 @@ function {
     man=()
     _zshctl_mandown man "${(pj:\n:)mandown}"
     printf '%s' ${(j::)man}
-) | less
+) | "${(@)pager}"
 exit
