@@ -96,6 +96,9 @@ for line in "${(@)lines}"; do
             if [[ -z $line ]]; then
                 $pushf $array '%s\n' "$line"
             else
+                # groff interprets \ inside .EX/.EE — the 4-space indent
+                # already protects . and ' from control interpretation.
+                line=${line//\\/\\\\}
                 $pushf $array '%s\n' "    $line"
             fi
             ;;
