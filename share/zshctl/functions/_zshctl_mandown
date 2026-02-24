@@ -15,8 +15,15 @@ typeset -A regex=(
     list '^([[:space:]]+)\*[[:space:]]+(.*)[[:space:]]+--(.*)'
     include '^> (.*)'
 )
-integer count=0 is_list=0 is_indented=0
-typeset quoted=() list=() before font outer kind include=() snuggle
+integer count=0 is_list=0 is_indented=0 _ei
+typeset quoted=() list=() before font outer kind include=() snuggle _ec _ep
+# CommonMark ASCII punctuation set. Backslash is first because \\* must
+# consume the double backslash before \* can match. Each \X sequence is
+# swapped to a private-use Unicode character (U+E000+) so the parser only
+# sees unescaped structural characters. _zshctl_pushf restores them at the
+# output boundary.
+typeset -a _esc=( $'\\' '!' '"' '#' '$' '%' '&' "'" '(' ')' '*' '+' ',' '-' '.' '/' \
+    ':' ';' '<' '=' '>' '?' '@' '[' ']' '^' '_' '`' '{' '|' '}' '~' )
 function _zshctl_markdown_debug {
     if (( count == 3 )) && [[ $array = terse ]]; then
         printf 'mode >>%s<<\nline >>%s<<\nouter >>%s<<\n' $mode "$line" $outer
@@ -42,8 +49,14 @@ for line in "${(@)lines}"; do
         ;;
     esac
     outer=$line
-    line=${line//\\\`/$'\uE000'}
-    line=${line//\\_/$'\uE001'}
+    if [[ $mode != block ]]; then
+        _ei=0xE000
+        for _ec in "${(@)_esc}"; do
+            _ep="\\$_ec"
+            line=${line//$_ep/${(#)_ei}}
+            (( _ei++ ))
+        done
+    fi
     while true; do
         (( count++ ))
         # _zshctl_markdown_debug
