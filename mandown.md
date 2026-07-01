@@ -3,66 +3,38 @@
 
 `zshctl` in a framework for creating command-line programs in Zsh.
 
-**Argumentitive**: An alternative argument parser that handles advanced
-argument types like negations and key values that creates variables with the
-appropriate Zsh type, integer, scalar, array or associative array.
+**Argumentitive**: An alternative argument parser that handles advanced argument types like negations and key values that creates variables with the appropriate Zsh type, integer, scalar, array or associative array.
 
 **Helpful**: Create man-formatted help using a subset of Markdown.
 
-**Zsh completions**: Completions for Zsh driven by the command heirarchy and
-argument parser. Completions can be generated from the command heirarchy, the
-argument parser for options, the help markup, or through a completion function
-or all othe above.
+**Zsh completions**: Completions for Zsh driven by the command heirarchy and argument parser. Completions can be generated from the command heirarchy, the argument parser for options, the help markup, or through a completion function or all othe above.
 
-**Cached completions**: Networked completions can be cached for a short time,
-the cache can be invalidated, long running cached completions will display a
-spinner for the entertainment of the user.
+**Cached completions**: Networked completions can be cached for a short time, the cache can be invalidated, long running cached completions will display a spinner for the entertainment of the user.
 
-**Bash completions**: Almost as good as the Zsh completions with caching and
-spinners and all the `readline` foibles addressed.
+**Bash completions**: Almost as good as the Zsh completions with caching and spinners and all the `readline` foibles addressed.
 
-**Zshctl library**: Indented `heredoc` with optional `printf` formatting,
-`abend` and `warn` for `printf` or `heredoc` based errors, `pocket` to scoop
-up standard input and output of process or function, `tactac` for a more
-managable alternative to `|` pipes, `struct` for nested associative arrays,
-`block` for tool-native error reporting.
+**Zshctl library**: Indented `heredoc` with optional `printf` formatting, `abend` and `warn` for `printf` or `heredoc` based errors, `pocket` to scoop up standard input and output of process or function, `tactac` for a more managable alternative to `|` pipes, `struct` for nested associative arrays, `block` for tool-native error reporting.
 
-**Shebangable**: Create a program `fooctl` using `#!/usr/bin/env zshctl` and
-you can in turn create programs using `#!/usr/bin/env fooctl`.
+**Shebangable**: Create a program `fooctl` using `#!/usr/bin/env zshctl` and you can in turn create programs using `#!/usr/bin/env fooctl`.
 
-**Extensible**: Link new commands into your program using `zshctl extend
-link`.
+**Extensible**: Link new commands into your program using `zshctl extend link`.
 
 ## Help authoring
 <!-- MAN DOWN! format: Markdown subset for man pages with backtick-bold, italic, two heading levels, definition lists -->
 
-`zshctl` includes a help system that will display man formatted context
-sensitive help.
+`zshctl` includes a help system that will display man formatted context sensitive help.
 
-Help is written using a subset of Markdown simpilfied to support the
-formatting available in man pages. I call the language MAN DOWN!
+Help is written using a subset of Markdown simpilfied to support the formatting available in man pages. I call the language MAN DOWN!
 
-MAN DOWN! only supports bold, which expressed as backticks instead of
-asterisks, italic, and two heading levels, and definition lists instead of
-bullet or numbered lists.
+MAN DOWN! only supports bold, which expressed as backticks instead of asterisks, italic, and two heading levels, and definition lists instead of bullet or numbered lists.
 
-Bold is a backtick because bold is used to indicate program or command names,
-which is what the backtick generally does, so really it's the same as
-Markdown, backticks means inline keywords, but that means that there is no
-room for bold. If you want to emphasize something, you should use italics.
+Bold is a backtick because bold is used to indicate program or command names, which is what the backtick generally does, so really it's the same as Markdown, backticks means inline keywords, but that means that there is no room for bold. If you want to emphasize something, you should use italics.
 
-Heading 1 is used to divide the sections of the MAN DOWN! file. Heading 4 is
-used for an inclusion mechanism. This is much like the Markdown-as-XML format
-that is so popular with today's AI slopmentation.
+Heading 1 is used to divide the sections of the MAN DOWN! file. Heading 4 is used for an inclusion mechanism. This is much like the Markdown-as-XML format that is so popular with today's AI slopmentation.
 
-MAN DOWN! does not supprt bullet lists nor numbered lists. These are rarely
-used in `man` pages. When you see them, someone has used a tool like Pandoc to
-generate a `man` page that is mostly roff. Bullet lists and numbered lists are
-not part of `man(7)`.
+MAN DOWN! does not supprt bullet lists nor numbered lists. These are rarely used in `man` pages. When you see them, someone has used a tool like Pandoc to generate a `man` page that is mostly roff. Bullet lists and numbered lists are not part of `man(7)`.
 
-MAN DOWN! does supports definition lists which are common in man pages.
-Nesting is not univeral, yet. A definition list in an argument description
-will nest, but there's no way to create that double nesteing in the main body.
+MAN DOWN! does supports definition lists which are common in man pages. Nesting is not univeral, yet. A definition list in an argument description will nest, but there's no way to create that double nesteing in the main body.
 
 What follows is a complete MAN DOWN! file definition.
 
@@ -104,25 +76,11 @@ print $version[release_date]
 ## Help authoring style
 <!-- branch commands get full rationale in DESCRIPTION, leaf commands get focused help -->
 
-`zshctl` programs have a command path where real operations take place at the
-leaves of the commands. You're going to find that at branch commands you tend
-to write general purpose documentation and users are going to have to scroll
-past it to see the available commands. This bothers you and you think you want
-to have a shorter description and then an addendum, but that goes against the
-recommendations of
-[`man-page(7)`](https://man7.org/linux/man-pages/man7/man-pages.7.html).
-Describe your program, it's purpose, it's rationale, and it's caveats with
-some examples in the *DESCRIPTION*. Use sub-sections for outlining.
+`zshctl` programs have a command path where real operations take place at the leaves of the commands. You're going to find that at branch commands you tend to write general purpose documentation and users are going to have to scroll past it to see the available commands. This bothers you and you think you want to have a shorter description and then an addendum, but that goes against the recommendations of [`man-page(7)`](https://man7.org/linux/man-pages/man7/man-pages.7.html). Describe your program, it's purpose, it's rationale, and it's caveats with some examples in the *DESCRIPTION*. Use sub-sections for outlining.
 
-For the leaves, the commands that actually do something, you can get straght
-to the point and keep the *DESCRIPTION* focused having covered the reasoning
-in the branch command help.
+For the leaves, the commands that actually do something, you can get straght to the point and keep the *DESCRIPTION* focused having covered the reasoning in the branch command help.
 
-When the user is using completion, they can get the gist from the completion
-system. The user ought to be able to tab complete and run any command to see
-the help. For mutating commands, display help. If a command is a listing or
-report then display the listing or report, which may be all the discovery the
-user needs.
+When the user is using completion, they can get the gist from the completion system. The user ought to be able to tab complete and run any command to see the help. For mutating commands, display help. If a command is a listing or report then display the listing or report, which may be all the discovery the user needs.
 
 ## Standard library
 <!-- utility functions: args, warn, catch/pocket, struct, splat, heredoc, block, tactac -->
@@ -226,8 +184,7 @@ For the complete reference of all patterns and the generated code for each, run 
 ### `warn`
 <!-- printf or heredoc formatted messages to stderr, three modes: single-quoted, printf-formatted, double-quoted -->
 
-Warn will print a formatted message to standard error. It does not prefix the
-message with `warn:` or `warning:`, that's up to you. We prefer the format:
+Warn will print a formatted message to standard error. It does not prefix the message with `warn:` or `warning:`, that's up to you. We prefer the format:
 
 ```
 warn: message type: message details.
@@ -239,8 +196,7 @@ For example:
 warn: invalid argument: `abend -c` requires an argument.
 ```
 
-The message is either printf formatted or heredoc formatted based on the
-arguments.
+The message is either printf formatted or heredoc formatted based on the arguments.
 
 When called with no arguments or `-`, it is a single-quoted heredoc.
 
@@ -273,8 +229,7 @@ function {
 }
 ```
 
-When called without one of the above switches or with `--` the arguments are
-`printf`  formatted.
+When called without one of the above switches or with `--` the arguments are `printf`  formatted.
 
 ```
 function {
@@ -285,17 +240,12 @@ function {
 }
 ```
 
-Caveat: Like `heredoc`, you cannot use the positional array parameters in the
-double-quoted heredoc.
+Caveat: Like `heredoc`, you cannot use the positional array parameters in the double-quoted heredoc.
 
 ### `catch`
 <!-- gather stdout/stderr into caller-provided variables using coproc, explicit contract pattern -->
 
-The `catch` function will gather the standard out and standard err of a command
-into variables specified by the user. In doing so, it will use `coproc` so you
-must make sure that you have duplicated any `coproc` handles you'll need after
-the call, because the `coproc` redirection operators `>&p` and `<&p` will be
-closed when `catch` returns.
+The `catch` function will gather the standard out and standard err of a command into variables specified by the user. In doing so, it will use `coproc` so you must make sure that you have duplicated any `coproc` handles you'll need after the call, because the `coproc` redirection operators `>&p` and `<&p` will be closed when `catch` returns.
 
 ```
 function {
@@ -305,8 +255,7 @@ function {
 }
 ```
 
-This is useful when working with an external utility translating its error
-messages into known error states.
+This is useful when working with an external utility translating its error messages into known error states.
 
 ```
 function docker_login {
@@ -346,16 +295,9 @@ function {
 }
 ```
 
-*Caveat*: The `catch` function will use `coproc` so you must make sure that you
-have duplicated any `coproc` handles you'll need after the call, because the
-`coproc` redirection operators `>&p` and `<&p` will be closed when `catch`
-returns.
+*Caveat*: The `catch` function will use `coproc` so you must make sure that you have duplicated any `coproc` handles you'll need after the call, because the `coproc` redirection operators `>&p` and `<&p` will be closed when `catch` returns.
 
-Note: In for a penny, in for a pound. On occasion you think you should just
-capture standard error and have standard out work normally, but you wouldn't
-be able to encapsulate that into a function. If you gather standard out into a
-variable, you fork a subshell and that subshell is unable to write to a
-variable in the parent process. This example prints `>><<`:
+Note: In for a penny, in for a pound. On occasion you think you should just capture standard error and have standard out work normally, but you wouldn't be able to encapsulate that into a function. If you gather standard out into a variable, you fork a subshell and that subshell is unable to write to a variable in the parent process. This example prints `>><<`:
 
 ```
 function {
@@ -368,8 +310,7 @@ function {
 ### `struct`
 <!-- nested associative arrays using shell quoting as wire format, serializable between processes -->
 
-The `struct` function adds shell escaped arrays and associative arrays to an
-associative array creating a struct of sorts, you can even create trees of structs.
+The `struct` function adds shell escaped arrays and associative arrays to an associative array creating a struct of sorts, you can even create trees of structs.
 
 ```
 function {
@@ -395,9 +336,7 @@ function {
 }
 ```
 
-The `struct` function can be used as a wire format. You can create structured
-messages that include arrays and associative arrays and then serialize them
-using shell quoting. You can deserialize them with word splitting.
+The `struct` function can be used as a wire format. You can create structured messages that include arrays and associative arrays and then serialize them using shell quoting. You can deserialize them with word splitting.
 
 ```
 function {
@@ -420,30 +359,21 @@ function {
 }
 ```
 
-The shell escaping can be used elsewhere in your code if you need to pass
-arrays around, but don't want to build an associative array as a tree root.
+The shell escaping can be used elsewhere in your code if you need to pass arrays around, but don't want to build an associative array as a tree root.
 
 ### `splat`
 <!-- construct command invocations with options pulled from dynamic scope, avoids manual argument list building -->
 
-When you get into the habit of using the `zshctl` argument parser in your
-program functions, you run into the annoyance of calling one function from
-another and having to build complicated argument lists. It's nice to be able
-to call the functions with options, but it's no fun trying to pass those
-arguments onto another function programmatically.
+When you get into the habit of using the `zshctl` argument parser in your program functions, you run into the annoyance of calling one function from another and having to build complicated argument lists. It's nice to be able to call the functions with options, but it's no fun trying to pass those arguments onto another function programmatically.
 
-`splat` will construct a command invocation with options where the option
-values are pulled from the current dynamic scope.
+`splat` will construct a command invocation with options where the option values are pulled from the current dynamic scope.
 
-Caveat: As with the other utilities that expand variables in the current
-dynamic scope, you cannot use the the positional arguments `$1`, `$2`, `$3`,
-etc. nor `$@.`
+Caveat: As with the other utilities that expand variables in the current dynamic scope, you cannot use the the positional arguments `$1`, `$2`, `$3`, etc. nor `$@.`
 
 ## Zsh-isms
 <!-- Zsh patterns: slurp, REPLY, autoload, frame pattern, wire format, jq tapes, subshell avoidance, eval -->
 
-Here are some Zsh-isms for used by `zshctl` that you can use in your own
-`zshctl` and Zsh programs.
+Here are some Zsh-isms for used by `zshctl` that you can use in your own `zshctl` and Zsh programs.
 
 Pending outline.
 
@@ -461,37 +391,25 @@ Pending outline.
 ### Preface
 <!-- no typeset -n in Zsh, avoid subshells, dynamic scope is what matters, resign to named functions -->
 
-Returning values from functions, how nice it would be to have `typeset -n` but
-Zsh does not. Zsh programmers avoid forks and especially avoid subshells.
+Returning values from functions, how nice it would be to have `typeset -n` but Zsh does not. Zsh programmers avoid forks and especially avoid subshells.
 
-I don't, because I love `coproc` best of all. I do avoid command substitution
-and process substitution, though.
+I don't, because I love `coproc` best of all. I do avoid command substitution and process substitution, though.
 
 #### What does level four look like?
 <!-- doctor it hurts pattern, dynamic scope visualization, accept named functions with global scope -->
 
-"Doctor is hurts when I do this." You can put aside whatever safety fetishes
-you're carrying from the language you last saw. The dynamic scope, you can see
-it in your mind's eye, that's all that matters.
+"Doctor is hurts when I do this." You can put aside whatever safety fetishes you're carrying from the language you last saw. The dynamic scope, you can see it in your mind's eye, that's all that matters.
 
-You will write functions. There is no way to pass an anonymous function
-around, so you're going to find yourself writing named functions with throw
-away names and global scope. You will resign yourself to this.
+You will write functions. There is no way to pass an anonymous function around, so you're going to find yourself writing named functions with throw away names and global scope. You will resign yourself to this.
 
 #### `autoload -zU`
 <!-- lazy loading from fpath, one file per function enables dependency mechanism, treat as tiny programs -->
 
-I can understand an aversion to `autoload -zU`. Every little function, even
-one liners, in their own file. It doesn't seem worth it, but it is.
+I can understand an aversion to `autoload -zU`. Every little function, even one liners, in their own file. It doesn't seem worth it, but it is.
 
-It is worth it because then you get a dependency mechanism. In the case of
-`zshctl`, `pocket` uses `slurp` now, whereas before there was an aversion to
-loading `slurp` just for `pocket` so it used `$(...)`. Don't have to think
-about it.
+It is worth it because then you get a dependency mechanism. In the case of `zshctl`, `pocket` uses `slurp` now, whereas before there was an aversion to loading `slurp` just for `pocket` so it used `$(...)`. Don't have to think about it.
 
-Consider them to be programs, if that helps, and recall all the shell programs
-you wrote that were just a one liner you got tired of fishing out of shell
-history.
+Consider them to be programs, if that helps, and recall all the shell programs you wrote that were just a one liner you got tired of fishing out of shell history.
 
 ### `zslurp`
 <!-- 8KB buffered reads via sysread, 70x faster than IFS= read -rd '' for pipes -->
@@ -506,8 +424,7 @@ One way of many to return from a function.
 ### Scope Assertions
 <!-- assert reserved variables won't shadow caller with [[ -v _foo ]], defensive dynamic scope -->
 
-Just like result assertions, just assert that local variables used by your
-program will not be shadowed by the caller.
+Just like result assertions, just assert that local variables used by your program will not be shadowed by the caller.
 
 ```
 function foo {
@@ -523,8 +440,7 @@ Why I no longer go running off to Perl for child process handling.
 ### Indirection
 <!-- write to arrays/associative arrays with printf and typeset, (P) expansion for indirect access -->
 
-Show that you can write to arrays and associative arrays with printf, and how
-to set associative array values with `typeset` and how to read them all with
+Show that you can write to arrays and associative arrays with printf, and how to set associative array values with `typeset` and how to read them all with
 
 #### `${(e)}`
 <!-- parameter expansion with evaluation, alternative to eval for template expansion -->
@@ -532,14 +448,7 @@ to set associative array values with `typeset` and how to read them all with
 #### `eval` considered helpful
 <!-- contrary to shell wisdom, Zsh quoting makes eval safe and useful, avoiding eval achieves nothing -->
 
-I'd gotten some JavaScript through `XMLHttpRequest` and I wanted to `eval` it,
-but no, you're not supposed to do that, so instead I created a dynamic
-endpoint and added `<script>` to the DOM that would call the endpoint and
-source that. (Please don't think this is what I do for a living today.) Upon
-completion I was kind of bewildered to what safety I had achived. After
-meditating on it a bit, this much younger version of me realized I had achived
-nothing in regards to safety other than to keep from having to explain an
-`eval`.
+I'd gotten some JavaScript through `XMLHttpRequest` and I wanted to `eval` it, but no, you're not supposed to do that, so instead I created a dynamic endpoint and added `<script>` to the DOM that would call the endpoint and source that. (Please don't think this is what I do for a living today.) Upon completion I was kind of bewildered to what safety I had achived. After meditating on it a bit, this much younger version of me realized I had achived nothing in regards to safety other than to keep from having to explain an `eval`.
 
 ### Day-to-day
 <!-- practical patterns: printf for newline control, wire format serialization, jq for JSON munging -->
@@ -547,8 +456,7 @@ nothing in regards to safety other than to keep from having to explain an
 #### `printf`
 <!-- newline control: <<< always appends, print appends by default, use printf %s when in doubt -->
 
-I've lost track of all the ways in which the shell will append a newline when
-you don't want one.
+I've lost track of all the ways in which the shell will append a newline when you don't want one.
 
  * `<<<` &mdash; Always appends a new line to the string value.
  * `print` &mdash; Appends a newline by default.
@@ -562,33 +470,17 @@ When in doubt, use `printf %s $value`.
 #### `jq` tapes
 <!-- filter JSON into shell words with jq, six-of-one to JavaScript switch statements, jo for output -->
 
-Used to be that whenever I'd set out to munge JSON, I'd reach for `node`
-because JSON is becomes JavaScript and I could just write recursive descent to
-get through it all. Whatever objets I created I could just `JSON.stringify`
-them back to the caller.
+Used to be that whenever I'd set out to munge JSON, I'd reach for `node` because JSON is becomes JavaScript and I could just write recursive descent to get through it all. Whatever objets I created I could just `JSON.stringify` them back to the caller.
 
-But, for these programs I'd want to use the synchronous input/output and when
-you look at that it looks I don't know how to asynchronous programming in
-Node.js, but that's not the case. I do know how, I just don't like Node.js.
+But, for these programs I'd want to use the synchronous input/output and when you look at that it looks I don't know how to asynchronous programming in Node.js, but that's not the case. I do know how, I just don't like Node.js.
 
-As far as serialization goes, `jo` is going to require more typeing that
-`JSON.stringify`, but it does not require more reasoning, which is what
-matters.
+As far as serialization goes, `jo` is going to require more typeing that `JSON.stringify`, but it does not require more reasoning, which is what matters.
 
-As far as deserialization goes, once you have your JSON object in Node.js, you
-have to prune it, switch on it, and so on, and that usually means writing a
-handleThing, handleChildOfThing, handleChildOfTheThingThatIsAChildOfThing
-where each of those may filter or reject.
+As far as deserialization goes, once you have your JSON object in Node.js, you have to prune it, switch on it, and so on, and that usually means writing a handleThing, handleChildOfThing, handleChildOfTheThingThatIsAChildOfThing where each of those may filter or reject.
 
-I'm here to tell you, that unless your JSON is an abstract syntax tree, if it
-just ordinary objects coming off the wire, then using `jq` to filter and
-structure JSON into shell escaped words is six-of-one to the
-half-dozen-the-other of switch statements and if/else if ladders in
-JavaScript.
+I'm here to tell you, that unless your JSON is an abstract syntax tree, if it just ordinary objects coming off the wire, then using `jq` to filter and structure JSON into shell escaped words is six-of-one to the half-dozen-the-other of switch statements and if/else if ladders in JavaScript.
 
-The tape pattern is this: build one honkin' long flat array in `jq`, serialize
-it with `@sh`, deserialize it in Zsh with `${(@QA)${(z)...}}`, then eat it like
-Pacman with a while loop and shifting.
+The tape pattern is this: build one honkin' long flat array in `jq`, serialize it with `@sh`, deserialize it in Zsh with `${(@QA)${(z)...}}`, then eat it like Pacman with a while loop and shifting.
 
 The naive approach outputs JSONL, one array per line:
 
@@ -597,8 +489,7 @@ The naive approach outputs JSONL, one array per line:
 .[] | [.n, .role, .content] | @sh
 ```
 
-This fights the shell. You end up doing multiple `jq` calls or reading JSONL
-line-by-line, which is what you were trying to avoid by not using Node.js.
+This fights the shell. You end up doing multiple `jq` calls or reading JSONL line-by-line, which is what you were trying to avoid by not using Node.js.
 
 The Pacman approach builds one array and eats it whole:
 
@@ -626,38 +517,24 @@ while (( $# )); do
 done
 ```
 
-Variable-length records work because you embed the count before the items. Read
-count, shift that many, repeat. Wakka wakka through the tape until it's empty.
+Variable-length records work because you embed the count before the items. Read count, shift that many, repeat. Wakka wakka through the tape until it's empty.
 
-For a working example, see `claudectl chat transcript` which parses Grok and
-Gemini API responses into conversation turns with variable-length citation
-arrays.
+For a working example, see `claudectl chat transcript` which parses Grok and Gemini API responses into conversation turns with variable-length citation arrays.
 
 ## Opportunities
 <!-- potential additions: logging library for logfmt/JSON, undecided opinion about logging -->
 
-Considering adding a logging library. There is one `barnyard` but it is
-probably overreach, or else I need to develop an appreciation for
-`journalctl`, as it attempts to log structured Linux messages, but what goods
-is that to OS X? Real world use is greping container logs. A logging library
-would simply log to standard out as logfmt or JSON, but I've never really had
-a once and for all opinion about logging.
+Considering adding a logging library. There is one `barnyard` but it is probably overreach, or else I need to develop an appreciation for `journalctl`, as it attempts to log structured Linux messages, but what goods is that to OS X? Real world use is greping container logs. A logging library would simply log to standard out as logfmt or JSON, but I've never really had a once and for all opinion about logging.
 
 ## Outgoing
 <!-- features not being pursued: compile to single file, wait for desire before fulfilling -->
 
-Compiling, for one. Used to imagine that you could have a `zshctl` program
-compile and it probably is still possible, but as an extension. There are
-places where it is nice to have a complicated multi-command program in a
-single file. And yet, with all the installers, I don't see why you wouldn't
-just install `zshctl` and make it a single file `zshctl` program. Let us wait
-for the desire before fulfilling it.
+Compiling, for one. Used to imagine that you could have a `zshctl` program compile and it probably is still possible, but as an extension. There are places where it is nice to have a complicated multi-command program in a single file. And yet, with all the installers, I don't see why you wouldn't just install `zshctl` and make it a single file `zshctl` program. Let us wait for the desire before fulfilling it.
 
 ## Incoming
 <!-- pending additions: trim function for whitespace stripping -->
 
-Notes for `trim`. `trim` because it's so common and so annoying to write out
-the pattern substitution.
+Notes for `trim`. `trim` because it's so common and so annoying to write out the pattern substitution.
 
 https://stackoverflow.com/questions/68259691/trimming-whitespace-from-the-ends-of-a-string-in-zsh
 
