@@ -1,357 +1,543 @@
-## MANDOC
+# `zshctl`
+<!-- CLI framework for Zsh: argument parsing, man-formatted help, completions, and utility library -->
 
-We write our help in mandoc and in the most basic mandoc. We use `groff` on
-Linux to display our mandoc and we use `mandoc` on OS X.
+`zshctl` in a framework for creating command-line programs in Zsh.
 
-We follow conventions for mandoc and if you diverge from these conventions you
-might want to chat with us let's think about it. It's more than enough for us
-to make useful help.
+**Argumentitive**: An alternative argument parser that handles advanced argument types like negations and key values that creates variables with the appropriate Zsh type, integer, scalar, array or associative array.
 
-We've hacked mandoc a little bit. First, no `.TH` line. We'll generate that
-for you. Secondly, we have a pre-compiler that does two things.
+**Helpful**: Create man-formatted help using a subset of Markdown.
 
-First, if you add the bogus macro `.PG`, it will replace any instance of
-`zshctl` on the line with the name of the program. This is so you can reuse
-commands between programs and `zshctl` is acting as a stand-in for the
-ultimate program name.
+**Zsh completions**: Completions for Zsh driven by the command heirarchy and argument parser. Completions can be generated from the command heirarchy, the argument parser for options, the help markup, or through a completion function or all othe above.
 
-Second, for autoloading, we have the ability to auto-generate your commands
-section. It will be a sorted list of commands that are available according to
-the command discovery mechanism, which is still in flux.
+**Cached completions**: Networked completions can be cached for a short time, the cache can be invalidated, long running cached completions will display a spinner for the entertainment of the user.
 
-## Utilities
+**Bash completions**: Almost as good as the Zsh completions with caching and spinners and all the `readline` foibles addressed.
 
-### `heredoc`
+**Zshctl library**: Indented `heredoc` with optional `printf` formatting, `abend` and `warn` for `printf` or `heredoc` based errors, `pocket` to scoop up standard input and output of process or function, `tactac` for a more managable alternative to `|` pipes, `struct` for nested associative arrays, `block` for tool-native error reporting.
 
-The `heredoc` function solves the spaces vs tabs problem with multi-line strings in shell scripts. While Zsh's built-in `<<-` heredoc only strips leading tabs, `heredoc` strips common leading spaces, working with how modern editors actually indent.
+**Shebangable**: Create a program `fooctl` using `#!/usr/bin/env zshctl` and you can in turn create programs using `#!/usr/bin/env fooctl`.
 
-**Basic usage:**
-```zsh
-include heredoc
+**Extensible**: Link new commands into your program using `zshctl extend link`.
 
-# Assign clean YAML to variable
-typeset config
-heredoc -v config <<'    EOF'
-    apiVersion: v1
-    kind: ConfigMap
-    data:
-      key: value
-EOF
-# $config now has the YAML without leading spaces
+## Help authoring
+<!-- MAN DOWN! format: Markdown subset for man pages with backtick-bold, italic, two heading levels, definition lists -->
+
+`zshctl` includes a help system that will display man formatted context sensitive help.
+
+Help is written using a subset of Markdown simpilfied to support the formatting available in man pages. I call the language MAN DOWN!
+
+MAN DOWN! only supports bold, which expressed as backticks instead of asterisks, italic, and two heading levels, and definition lists instead of bullet or numbered lists.
+
+Bold is a backtick because bold is used to indicate program or command names, which is what the backtick generally does, so really it's the same as Markdown, backticks means inline keywords, but that means that there is no room for bold. If you want to emphasize something, you should use italics.
+
+Heading 1 is used to divide the sections of the MAN DOWN! file. Heading 4 is used for an inclusion mechanism. This is much like the Markdown-as-XML format that is so popular with today's AI slopmentation.
+
+MAN DOWN! does not supprt bullet lists nor numbered lists. These are rarely used in `man` pages. When you see them, someone has used a tool like Pandoc to generate a `man` page that is mostly roff. Bullet lists and numbered lists are not part of `man(7)`.
+
+MAN DOWN! does supports definition lists which are common in man pages. Nesting is not univeral, yet. A definition list in an argument description will nest, but there's no way to create that double nesteing in the main body.
+
+What follows is a complete MAN DOWN! file definition.
+
+````markdown
+# terse
+display version
+# verbose
+Display the current version of `zshctl`.
+# arg format -- < terse | verbose | shell | json >
+Display a verbose version as test, JSON, or shell escaped.
+    * terse -- Display version number only.
+    * verbose -- Display version number and release date.
+    * shell -- Display shell esacped version number and release date as UNIX epoch.
+    * json -- Display version number and release date as UNIX epoch as JSON.
+# arg help
+Help for `zshctl`.
+# man
+## DESCRIPTION
+Displays the current version of `zshctl`.
+
+The version can be formatted for programmatic consumption from shell or a JSON
+parser like `jq`.
+
+Consuming the version as JSON.
+
+```shell
+acrectl version --format json | jq -r '.release_date'
 ```
 
-**Modes:**
-- `heredoc` - Read from stdin, strip indentation, print to stdout
-- `heredoc -v varname` - Assign de-indented content to variable
-- `heredoc -q` - Quote mode, preserve literally (for templates with `$vars`)
-- `heredoc -f format args...` - Use as printf format string
-
-**Real-world examples:**
-
-YAML template for Kubernetes:
-```zsh
-typeset template
-heredoc -v template <<'    EOF'
-    apiVersion: isindir.github.com/v1alpha3
-    kind: SopsSecret
-    metadata: {}
-    spec:
-      secretTemplates: {}
-EOF
-```
-
-Git commit message template with quote mode:
-```zsh
-typeset message
-heredoc -q -v message <<'    EOF'
-    ### Description
-    ${blocks[description]}
-    ### Risk Assessment
-    ${blocks[risk_assessment]}
-EOF
-# Variables like ${blocks[description]} are preserved for later expansion
-```
-
-JSON configuration:
-```zsh
-typeset json_config
-heredoc -v json_config <<'    EOF'
-    {
-      "name": "example",
-      "settings": {
-        "enabled": true,
-        "timeout": 30
-      }
-    }
-EOF
-```
-
-This allows natural indentation in your code while producing clean output - pragmatic tooling that works with what developers actually type, not what the tabs vs spaces war says they should type.
-
-## Checklist
-
-- [ ] Documentation.
-    - [ ] Document completion commands.
-    - [ ] Document version.
-- [ ] Autoload new commands.
-    - [ ] Create a tied search path.
-    - [ ] Search search path at startup, use globs or some such to find
-    directories, or a file like `commands.zsh`.
-    - [ ] Discover commands in `git` repositories.
-    - [ ] Create a git clone in `~/.local/var` or similiar.
-    - [ ] Compile on `git clone` and `git pull`.
-    - [ ] Skip compilation of symlinked commands.
-    - [ ] Implement command description MANDOC generation.
-- [ ] Autoload functions.
-    - [ ] Weakly mimic `autoload`.
-
-## Build
-
-Update the previous and next versions in `build.zsh` and run `zsh build.zsh`.
-
-
-
-## Diary
-
-### Sun Apr  6 09:39:37 AM CDT 2025
-
-Had the idea that the developer could specify which commands they wanted to
-include in their application by providing patterns like `zshctl:*`. I'd have
-no use for it. It would be a feature. I'd have no use for it because I'd never
-want to exclude `version`, nor the `complition`. I don't always need
-completion, for things that are purely programmatic, but I don't need
-Zsh builtin `getopts` either, so I just don't call it.
-
-Why do this and add code and wait five years and wonder why I added it and
-delete it? Thought about alternatives, like saying that the user could just
-remove commands from the `COMMANDS` array, but now I'm providing hooks upon
-hooks. Oh, well, I suppose the user could do this with an anonymous function,
-so I suppose that settles that.
-
-So, you see? You create these features, but it's Zsh and you'll have something
-easier and more obvious if you just pursue the path that smiplifies the core
-complexities we're attempting to add to the program.
-
-### Sat Apr  5 12:04:47 PM CDT 2025
-
-Seeing that for local commands we can't quite have something as simple as
-having a `./deltactl` directory in a reposiory unless we really want to link
-it hard. Oh, well, I suppose we could link all of the individual command
-directories, but then we can't extend and existing command without a lot of
-thinking about linking.
-
-Easier to have a search path. So a directory structure. If there is a
-`command.zsh` then we run that. Now, if we want to go by what we see in the
-directory structure, we can link that way, or we can have a configuration file
-that is named something like `link-as` and in it we can have `my-project` or
-similar, and we can soft link to that directory, but with a different name.
-
-Acceptable.
-
-Loading a library, we be able to get the function name, probably, but probably
-not. Not when we are in a nested function, so then we have to go up the stack,
-but we would know definitively if we hit a command because we'll have our
-command hash.
-
-Or when we source the command and execute it, we update the include path,
-which is even easier, isn't it? And we can do it for each command.
-
-### Sat Apr  5 11:40:47 AM CDT 2025
-
-Appears that we explicitly load libraries and automatically load commands.
-
-### Sat Apr  5 09:24:24 AM CDT 2025
-
-Considering autoloading. Compiled Zsh is opportunistic. The source is supposed
-to live next the compiled Zsh and it is supposed to be recompiled as needed.
-The source path is still reported from `functions_source` when the compiled
-Zsh is used. This means we can stick with using `awk` to fetch our MANDOC and
-we can easily add additional MANDOC for a description to include in options.
-
-Occurs to me that, we can either symlink to your checkout of the project, or
-we can clone the project for you, then symlink to that, so we can have an
-`asdf` like extensibility mechanism. In fact, we can prompt you to ask, if
-you're in a repo, if you want to link here, or cache a copy.
-
-Could be an extensible dependency installer, then. We're already keeping a
-database. Let's make sure that we've correctly white-labeled and that we
-create a database for your application, not for `zshctl` in general.
-
-Do you maintain a search path? Or do you have a local path? Search path with
-strict rules, I suppose.
-
-We can go ahead and add libraries while you're at it. This is going to make it
-easier for someone to pick and choose what they include, and make us feel
-better about fiddling with new libraries. We will end up duplicating them on
-disk. We might have `block.zsh` for `alfactl` in its search path and another
-`block.zsh` in for `bravoctl` in its search path. This bothers me not at all.
-If it bothers me later on, try not to let it bother you, me.
-
-Now that we have shebangable programs, we may as well have a go at
-autoloading. Make it like `autoload` but let's not delve too deep into
-`autoload`. We can learn more about it as we work on our dotfiles. We'll come
-back to it when we're ready to benchmark `zshctl` performance.
-
-Two extensions might want to include the same library but at different
-versions. We can make this a downstream problem, or else we have to think of a
-way to autoload the correct version for a command. Probably the latter. Then
-we have a rule that if you go down a command path, you're building a
-particular version of a program, so if you want to call another one of your
-commands, you should fork a new process and have it do it's resolution.
-
-Note that if you have `charliectl` and you wanto make `zshctl` properties
-visible you can just copy it, and maybe then it's a `zshctl` property to know
-which one to use?
-
-### Fri Apr  4 12:28:27 AM CDT 2025
-
-Considering how we might have autoloaded extensions to applications, not to
-`zshctl` itself, but to a `zshctl` program.
-
-Imagine you have `acmectl`, the utility for managing resources as Acme, Inc.
-and you want to have special functions for your `frobinate` repository.
-
-In the repo there could be an `./acmectl` directory with a `frobinate`
-file in it, or perhaps a `./acmectl/frobinate/reticuate`,
-`./acmectl/frobinate/splines`, etc. We can use directory traversal to list
-these options.
-
-We don't want to have relative paths in a search path, that's dangerous.
-Considered ad hoc search path manipulation, also dangerious because it would
-just end up in your shell history ready to get fired at the wrong time.
-
-Instead, you could symlink it into your path, and your path could then be very
-short. It would get linked to the first entry in your path. We can also take
-the opportunity to compile the functions and put them in a single package.
-
-A word on packaging. How do you include all the helpers? Separate functions
-for each helper? After some consideration, the following seems best.
-
-Found in `notes/packaged.zsh`.
+Consuming the version as shell escaped variables in Zsh.
 
 ```
-function packaged {
-    function _packaged_helper {
-        print hello, $1
-    }
-    function packaged {
-        _packaged_helper "$@"
-    }
-    packaged "$@"
+typeset -A version=( "${(@QA)${(z)$(acrectl version --format shell)}}" )
+print $version[release_date]
+```
+## OPTIONS
+### options
+````
+## Help authoring style
+<!-- branch commands get full rationale in DESCRIPTION, leaf commands get focused help -->
+
+`zshctl` programs have a command path where real operations take place at the leaves of the commands. You're going to find that at branch commands you tend to write general purpose documentation and users are going to have to scroll past it to see the available commands. This bothers you and you think you want to have a shorter description and then an addendum, but that goes against the recommendations of [`man-page(7)`](https://man7.org/linux/man-pages/man7/man-pages.7.html). Describe your program, it's purpose, it's rationale, and it's caveats with some examples in the *DESCRIPTION*. Use sub-sections for outlining.
+
+For the leaves, the commands that actually do something, you can get straght to the point and keep the *DESCRIPTION* focused having covered the reasoning in the branch command help.
+
+When the user is using completion, they can get the gist from the completion system. The user ought to be able to tab complete and run any command to see the help. For mutating commands, display help. If a command is a listing or report then display the listing or report, which may be all the discovery the user needs.
+
+## Standard library
+<!-- utility functions: args, warn, catch/pocket, struct, splat, heredoc, block, tactac -->
+
+### `args`
+<!-- argument parser: generates eval-able code for typed variables, supports scalars, arrays, maps, booleans, counters, toggles, negatable, execute-on-match -->
+
+The `args` function is the argument parser at the core of every `zshctl` command. It generates eval-able Zsh code that declares typed variables from command-line flags. When you see the incantation `eval "$(args ... -- "$@")"`, you are looking at option parsing.
+
+The standard pattern for a branch command that supports completions and shows usage when invoked without arguments looks like this:
+
+```
+function :args:secret {
+    eval "$(args -CU -bx h,help -- "$@")"
 }
+```
 
+The global flags `-C` enables completion support and `-U` displays usage when no arguments are given. The `-bx h,help` defines a boolean (`-b`) help flag with both short (`h`) and long (`help`) forms that triggers an execute handler (`-x`) when provided. The double-dash separates the flag definitions from `$@`.
+
+A leaf command that does real work will typically add scalar options for its parameters:
+
+```
+function :args:secret:get {
+    typeset o_format=json
+    eval "$(args -UC -bx h,help a,any -ds f,format -- "$@")"
+}
+```
+
+Here `-ds f,format` defines a scalar (`-s`) for `--format` or `-f` that preserves the predeclared default (`-d`) when not provided. The variable will be `o_format` and it will be `json` unless the user provides `--format xml` or `-f xml`.
+
+The `args` function generates `typeset` statements and assignments that declare variables with the `o_` prefix. A flag `--verbose` or `-v` becomes `o_verbose`. A flag `--dry-run` becomes `o_dry_run` with hyphens converted to underscores.
+
+---
+
+Type Flags
+
+The type flags determine what kind of variable is created and how repeated uses of the flag are handled.
+
+A scalar (`-s`) holds a single string value. The flag `--format json` or `--format=json` or `-f json` all assign `o_format='json'`. If not provided, the variable is unset unless you use the defined modifier (`-d`) to preserve a predeclared value.
+
+A boolean (`-b`) is an integer that starts at 0 and becomes 1 when the flag is present. The flag `--verbose` sets `o_verbose=1`. Booleans support short flag clustering, so `-vqd` expands to `-v -q -d` and sets all three.
+
+An array (`-a`) accumulates values across multiple uses. The flags `-i foo -i bar -i baz` produce `o_include=(foo bar baz)`. Each use appends to the array.
+
+A map (`-A`) collects key-value pairs. The flags `--config user=alice --config role=admin` produce an associative array where `o_config[user]` is `alice` and `o_config[role]` is `admin`. The key and value can be separated by equals or space.
+
+A counter (`-c`) is an integer that increments with each use. The flags `-vvv` produce `o_verbose=3`. This is useful for verbosity levels.
+
+A toggle (`-t`) is an integer that flips between 0 and 1 with each use. The flags `--toggle --toggle` end at 0 because it flipped twice.
+
+A negatable (`-!`) boolean supports `--no-` prefix for explicit negation. Define it as `-!b c,color` and the user can say `--color` to set 1 or `--no-color` to set 0. Short negation uses uppercase: `-c` sets, `-C` clears.
+
+---
+
+Behavior Modifiers
+
+The behavior modifiers change how options are processed rather than what type they produce.
+
+Defined (`-d`) preserves a predeclared default. Without it, scalars are unset when not provided. With it, the `args` function skips the declaration and only assigns if the user provides a value. Predeclare your default, add `-d`, and the variable keeps its value unless overridden.
+
+Required (`-r`) causes an error if the option is not provided. Use sparingly; positional arguments or sensible defaults are usually better.
+
+Execute (`-x`) triggers a handler when the flag is matched. This is for `--help` which should display help and exit rather than continue parsing. The handler is `args_error` with the function name and the word `execute`.
+
+Interspersed (`-@`) allows flags to appear after positional arguments. Without it, the first non-flag stops parsing and everything after goes into `$@`. With it, flags are extracted wherever they appear.
+
+---
+
+Global Flags
+
+The global flags affect the parser itself rather than individual options.
+
+Completion mode (`-C`) enables the completion infrastructure. Branch commands that have subcommands need this.
+
+Usage mode (`-U`) shows the command's usage when invoked with no arguments. This is conventional for branch commands that dispatch to subcommands.
+
+Delegated mode (`-D`) is used by the framework internals when a command delegates to subcommands.
+
+---
+
+Syntax Variations
+
+Flag definitions use the format `short,long` where short is a single character and long is the full name. The short is optional: `,verbose` defines only `--verbose` with no short form.
+
+Values can be attached with equals (`--format=json`), separated by space (`--format json`), or attached to short flags (`-fjson`).
+
+The double-dash (`--`) stops flag processing. Everything after it becomes positional arguments in `$@`. The pattern `-- --` means passthrough: don't parse anything, pass all arguments through.
+
+```
+function :args:rag:rg {
+    eval "$(args -- -- "$@")"
+}
+```
+
+This command does nothing with its arguments except make them available for the execute function to pass along.
+
+---
+
+For the complete reference of all patterns and the generated code for each, run `zshctl etude args`. The etude demonstrates every type, modifier, and syntax variation with actual output showing exactly what code `args` generates.
+
+### `warn`
+<!-- printf or heredoc formatted messages to stderr, three modes: single-quoted, printf-formatted, double-quoted -->
+
+Warn will print a formatted message to standard error. It does not prefix the message with `warn:` or `warning:`, that's up to you. We prefer the format:
+
+```
+warn: message type: message details.
+```
+
+For example:
+
+```
+warn: invalid argument: `abend -c` requires an argument.
+```
+
+The message is either printf formatted or heredoc formatted based on the arguments.
+
+When called with no arguments or `-`, it is a single-quoted heredoc.
+
+```
 function {
-    packaged world
+    warn <<'    EOF'
+        warn: greeting: hello, world.
+    EOF
 }
 ```
 
-Leaning ever harder toward keeping this out of `autoload` and leaving that for
-Zsh alone, using a `zshctl` based autoloading mechanism that has features like
-the ones described.
-
-Regarding white labeling. That's over now. We're going to instead work with
-the shebang line a little more. Obviously, we're considering autoloading and
-compiling.
-
-### Thu Apr  3 05:41:38 PM CDT 2025
-
-Shebang lines are recursive, aren't they? That would provide a lot of
-structure to work with.
-
-Earlier I was thinking about how one might use `autoload`. `autoload` is a
-simple beast, however. You could as easily implement your own `autoload` where
-the colons in the function name map to relative file paths in a search path.
-
-You'd need to either be in for a penny, in for a pound, and load an entire
-subcommand as needed, or else you could have a structure with a directory name
-for the command, but a file with a funny character in it, like `@` or perhaps
-you use the `.zsh` extension, oh, yeah, `.` is pretty funny isn't it?
-Something like `function.zsh`.
-
-Using the `functions_sources` array, we could always find the mandoc.
-
-But, how to discover it with tab completion? Well, you could now add two
-separate sections to the mandoc. A mandoc section and a description section.
-
-Now you can pluck the short desecription. You can create the `OPTIONS` section
-of the mandoc programmatically.
-
-How to insert it? With a bogus macro. `.BG` for bogus, I suppose, and have...
+When called with -f it is printf formatted `heredoc`.
 
 ```
-.SH OPTIONS
-.BG options
+function {
+    warn -f hello <<'    EOF'
+        warn: greeting: %s, world.
+    EOF
+}
 ```
 
-Which could be extended for the program name substitution, or not.
-
-Note too that you can compile Zsh to `*.zwc` files which will load faster, but
-we might lose the pointer to the source directory. Suppose we could make a
-note of that as we source the file, we're writing an autoloader after all.
-
-### Wed Apr  2 08:54:19 AM CDT 2025
-
-Could just make the user add any additional commands they want.
-Also, give them a formula for invoking their own shebang line.
-Then compiling is simply appending before the exit split and at the bottom of
-the file.
-
-Could the convention be that their man function is named for the file?
-And could we have a covention that instead of `blurdyctl:` it's something like
-`command:`? I'm going to have to ask Jordan.
+When called with -f it is a double-quoted `heredoc`.
 
 ```
-commands 'blurdyctl:*' 'zshctl:*'
+function {
+    typeset greeting=hello
+    warn -q <<'    EOF'
+        warn: greeting: %s, world.
+    EOF
+}
 ```
 
-### Wed Apr  2 12:20:15 AM CDT 2025
+When called without one of the above switches or with `--` the arguments are `printf`  formatted.
 
-We can change delegate to use a map, it can include both `zshctl:` and `user:`
-command, searching for them and adding to the map without the prefix. The
-value of the map will include the source file to find the usage, and the
-original name, also to fine the usage.
+```
+function {
+    typeset greeting=hello
+    warn -q <<'    EOF'
+        warn: greeting: %s, world.
+    EOF
+}
+```
 
-Thoughts like that suggest a way to perform white labeling, but we have
-already decided against white-labeling. It's probably not a good idea and it
-really doesn't make sense to have two programs with identitcal names.
+Caveat: Like `heredoc`, you cannot use the positional array parameters in the double-quoted heredoc.
 
-Instead of white-labeling, you can install your program with an installer that
-places `zshctl` in a /usr/libexec/ and make your shebang line use that program
-directly. We can add other programs as needed.
+### `catch`
+<!-- gather stdout/stderr into caller-provided variables using coproc, explicit contract pattern -->
 
-Need to register `zshctl.sh` and `zshctl.com`.
+The `catch` function will gather the standard out and standard err of a command into variables specified by the user. In doing so, it will use `coproc` so you must make sure that you have duplicated any `coproc` handles you'll need after the call, because the `coproc` redirection operators `>&p` and `<&p` will be closed when `catch` returns.
 
-We can have a curl installer `sh -c "$(curl -L zshctl.sh)"`. Everything can be
-sored in GitHub. We can use `flatheadmill.github.io/zshctl` for APT, yum, apk
-and aur. Gentoo and Homebrew can pull their tarballs from elsewhere, so we can
-pull them from GitHub downloads. There are limits on downloads and such, but
-we are not going to reach them, because this will never gain traction. We are
-not going to hit the repository limits any time soon. I only release things
-very rarely, and when that happens, all we're doing is storing zipped archive
-files. We can always squash and force push to keep the size minimal.
+```
+function {
+    typeset out err
+    catch out err echo 1
+    [[ $out = 1 ]] && echo woot || echo bummer
+}
+```
 
-Homebew and ebuild can use a `homebrew` and `ebuild` branch, so Homebrew will
-set up quickly. For apt and apk, which will be early, we need to create the
-github pages website.
+This is useful when working with an external utility translating its error messages into known error states.
 
-To build we use Docker to get all the different operating system versions. It
-is a no-arch build so it can be run on any architecture. We clone the
-repository in the build, I suppose, rather than mounting it, and we design it
-so that it only really builds releases.
+```
+function docker_login {
+    typeset out err
+    if catch out err op read op://my_vault/my_item/my_field; then
+        printf '%s' $out |
+            docker login --username alan --password-stdin harbor.flatheadmill.com
+    elif [[ $err = *'You are not currently signed in.'* ]]; then
+        abend -c 2 'fatal: not signed in: unable to connect to 1Password'
+    elif [[ $err = '"'*'" isn'\''t a vault in this account. Specify'* ]]; then
+        abend -c 3 'fatal: no such vault: vault does not exist in this account'
+    elif [[ $err = *'"'*'" isn'\''t an item in the "'*'" vault.'* ]]; then
+        abend -c 4 'fatal: no such item: item does not exist'
+    else
+        abend -q <<'        EOF'
+            fatal: exception: unknown 1Password error
 
-We can see if we can use GitHub pages to host our root domain. No, we host on
-S3 or GCS and probably GCS because there's a free-tier.
+            $(sed 's/^/  /' <<< "$err")
+        EOF
+    fi
+}
+```
 
-Need to make some decisions about required commands, like `completion`. Are
-they optional or are they conventional. Conventional, I assume. Which means we
-also have to have conventions, or we could have conventions for `version` and
-`version --long`. If we want to disable these commands, we can deleted them
-from the `COMMANDS` array in our application.
+It's also useful for simply panicking on an unknown error.
 
-Okay, we can white-label. Apparently, I can trace back a function to its
-source now, so we can have a compile that keeps a global list of prefixes to
-farm for function names. This would be a shorter path to getting the existing
-applications out because I don't have to develop a build for `zshctl`.
+```
+function {
+    [[ -t 0 && -t 1 ]] || abend -c 2 'fatal: not a tty: must be run from the termainal'
+    typeset greeting=hello out err
+    catch out err vared "Edit greeting: " -p greeting ||
+        abend -q <<'        EOF'
+            fatal: exception: did the terminal disappear?
 
-Note that another reason we cannot universally intersperse arguments is
-because we need to detect a shebang line.
+            $(sed 's/^/  /' <<< "$err")
+        EOF
+    printf '%s, world\n' $greeting
+}
+```
+
+*Caveat*: The `catch` function will use `coproc` so you must make sure that you have duplicated any `coproc` handles you'll need after the call, because the `coproc` redirection operators `>&p` and `<&p` will be closed when `catch` returns.
+
+Note: In for a penny, in for a pound. On occasion you think you should just capture standard error and have standard out work normally, but you wouldn't be able to encapsulate that into a function. If you gather standard out into a variable, you fork a subshell and that subshell is unable to write to a variable in the parent process. This example prints `>><<`:
+
+```
+function {
+    typeset err
+    typeset out=$(catch err print -u 2 warning)
+    print ">>$err<<"
+}
+```
+
+### `struct`
+<!-- nested associative arrays using shell quoting as wire format, serializable between processes -->
+
+The `struct` function adds shell escaped arrays and associative arrays to an associative array creating a struct of sorts, you can even create trees of structs.
+
+```
+function {
+    typeset -A struct assoc
+    struct put struct child first 1 second 2 third 3
+    struct get struct child assoc
+    print -r -- "${(@kv)assoc}" # prints: third 3 first 1 second 2
+    struct push struct child fourth 4
+    struct get struct child assoc
+    print -r -- "${(@kv)assoc}" # prints: third 3 first 1 fourth 4 second 2
+}
+```
+
+Internally, `struct` maintains these arrays using shell quoting.
+
+```
+function {
+    typeset array=( one "two three" four )
+    typeset wired="${(@qq)array}"
+    typeset unwired=( "${(@QA)${(z)wired}}" )
+    print ${#unwired} # prints: 3
+    print -r -- "${(@q)unwired}" # prints: one two\ three four
+}
+```
+
+The `struct` function can be used as a wire format. You can create structured messages that include arrays and associative arrays and then serialize them using shell quoting. You can deserialize them with word splitting.
+
+```
+function {
+    coproc {
+        typeset wired array=()
+        typeset -A struct child
+        coproc :
+        struct=$( "${(@QA)${(z)$(cat)}}" )
+        struct get struct child
+        print -r -- $child[greeting] # prints: hello
+        struct get child array
+        print -r -- "${(@q)array}" # prints: one two\ three four
+    }
+    typeset -A struct child
+    struct put child array one 'two three' four
+    child[greeting]=hello
+    struct put struct child "${(@kv)child}"
+    print -whatever "${(@kvqq)struct}"
+    coproc :
+}
+```
+
+The shell escaping can be used elsewhere in your code if you need to pass arrays around, but don't want to build an associative array as a tree root.
+
+### `splat`
+<!-- construct command invocations with options pulled from dynamic scope, avoids manual argument list building -->
+
+When you get into the habit of using the `zshctl` argument parser in your program functions, you run into the annoyance of calling one function from another and having to build complicated argument lists. It's nice to be able to call the functions with options, but it's no fun trying to pass those arguments onto another function programmatically.
+
+`splat` will construct a command invocation with options where the option values are pulled from the current dynamic scope.
+
+Caveat: As with the other utilities that expand variables in the current dynamic scope, you cannot use the the positional arguments `$1`, `$2`, `$3`, etc. nor `$@.`
+
+## Zsh-isms
+<!-- Zsh patterns: slurp, REPLY, autoload, frame pattern, wire format, jq tapes, subshell avoidance, eval -->
+
+Here are some Zsh-isms for used by `zshctl` that you can use in your own `zshctl` and Zsh programs.
+
+Pending outline.
+
+ * slurp &mdash; 8 kilobyte buffered reads of files and pipes.
+ * `REPLY`/`reply` &mdash; generic replies.
+ * `[[ -v result ]]` &mdash; required return values.
+ * `autoload -zU` &mdash; lazy loading functions from `fpath`.
+ *  `__utility_N__` &mdash; dynamic variable naming for safe eval.
+ * `"${(@QA)${$(z)frozen}}"` &mdash; serialization between processes
+ * `jq` tapes &mdash; why `jq` makes Zsh my go-to for JSON
+ * Subshell avoidance &mdash; why Zsh programmers contort themselves to stay in-process
+ * `eval` considered helpful &mdash; contrary to general shell wisdom, Zsh makes eval useful with proper quoting
+ * `${(e)}` expansion &mdash; parameter expansion with evaluation (the alternative to eval)
+
+### Preface
+<!-- no typeset -n in Zsh, avoid subshells, dynamic scope is what matters, resign to named functions -->
+
+Returning values from functions, how nice it would be to have `typeset -n` but Zsh does not. Zsh programmers avoid forks and especially avoid subshells.
+
+I don't, because I love `coproc` best of all. I do avoid command substitution and process substitution, though.
+
+#### What does level four look like?
+<!-- doctor it hurts pattern, dynamic scope visualization, accept named functions with global scope -->
+
+"Doctor is hurts when I do this." You can put aside whatever safety fetishes you're carrying from the language you last saw. The dynamic scope, you can see it in your mind's eye, that's all that matters.
+
+You will write functions. There is no way to pass an anonymous function around, so you're going to find yourself writing named functions with throw away names and global scope. You will resign yourself to this.
+
+#### `autoload -zU`
+<!-- lazy loading from fpath, one file per function enables dependency mechanism, treat as tiny programs -->
+
+I can understand an aversion to `autoload -zU`. Every little function, even one liners, in their own file. It doesn't seem worth it, but it is.
+
+It is worth it because then you get a dependency mechanism. In the case of `zshctl`, `pocket` uses `slurp` now, whereas before there was an aversion to loading `slurp` just for `pocket` so it used `$(...)`. Don't have to think about it.
+
+Consider them to be programs, if that helps, and recall all the shell programs you wrote that were just a one liner you got tired of fishing out of shell history.
+
+### `zslurp`
+<!-- 8KB buffered reads via sysread, 70x faster than IFS= read -rd '' for pipes -->
+
+8 kilobyte buffer reads and pipes.
+
+### `REPLY/reply`
+<!-- convention for function returns, but typeset -g sets least-local not global, scope chain gotchas -->
+
+One way of many to return from a function.
+
+### Scope Assertions
+<!-- assert reserved variables won't shadow caller with [[ -v _foo ]], defensive dynamic scope -->
+
+Just like result assertions, just assert that local variables used by your program will not be shadowed by the caller.
+
+```
+function foo {
+    [[ -v _foo ]] && print -u 2 'warn: "_foo" is reserved for "foo" in the dynamic scope"
+}
+```
+
+### `coproc`
+<!-- bidirectional IPC without forking to Perl, handles close after use, duplicate before catch -->
+
+Why I no longer go running off to Perl for child process handling.
+
+### Indirection
+<!-- write to arrays/associative arrays with printf and typeset, (P) expansion for indirect access -->
+
+Show that you can write to arrays and associative arrays with printf, and how to set associative array values with `typeset` and how to read them all with
+
+#### `${(e)}`
+<!-- parameter expansion with evaluation, alternative to eval for template expansion -->
+
+#### `eval` considered helpful
+<!-- contrary to shell wisdom, Zsh quoting makes eval safe and useful, avoiding eval achieves nothing -->
+
+I'd gotten some JavaScript through `XMLHttpRequest` and I wanted to `eval` it, but no, you're not supposed to do that, so instead I created a dynamic endpoint and added `<script>` to the DOM that would call the endpoint and source that. (Please don't think this is what I do for a living today.) Upon completion I was kind of bewildered to what safety I had achived. After meditating on it a bit, this much younger version of me realized I had achived nothing in regards to safety other than to keep from having to explain an `eval`.
+
+### Day-to-day
+<!-- practical patterns: printf for newline control, wire format serialization, jq for JSON munging -->
+
+#### `printf`
+<!-- newline control: <<< always appends, print appends by default, use printf %s when in doubt -->
+
+I've lost track of all the ways in which the shell will append a newline when you don't want one.
+
+ * `<<<` &mdash; Always appends a new line to the string value.
+ * `print` &mdash; Appends a newline by default.
+ * `echo` &mdash; Appends a newline by default, `echo -n` will suppress.
+
+When in doubt, use `printf %s $value`.
+
+#### `${(j: :)${(@qq)}}` wire format
+<!-- shell quoting as serialization: ${(@qq)} to encode, ${(@QA)${(z)}} to decode, passes through pipes -->
+
+#### `jq` tapes
+<!-- filter JSON into shell words with jq, six-of-one to JavaScript switch statements, jo for output -->
+
+Used to be that whenever I'd set out to munge JSON, I'd reach for `node` because JSON is becomes JavaScript and I could just write recursive descent to get through it all. Whatever objets I created I could just `JSON.stringify` them back to the caller.
+
+But, for these programs I'd want to use the synchronous input/output and when you look at that it looks I don't know how to asynchronous programming in Node.js, but that's not the case. I do know how, I just don't like Node.js.
+
+As far as serialization goes, `jo` is going to require more typeing that `JSON.stringify`, but it does not require more reasoning, which is what matters.
+
+As far as deserialization goes, once you have your JSON object in Node.js, you have to prune it, switch on it, and so on, and that usually means writing a handleThing, handleChildOfThing, handleChildOfTheThingThatIsAChildOfThing where each of those may filter or reject.
+
+I'm here to tell you, that unless your JSON is an abstract syntax tree, if it just ordinary objects coming off the wire, then using `jq` to filter and structure JSON into shell escaped words is six-of-one to the half-dozen-the-other of switch statements and if/else if ladders in JavaScript.
+
+The tape pattern is this: build one honkin' long flat array in `jq`, serialize it with `@sh`, deserialize it in Zsh with `${(@QA)${(z)...}}`, then eat it like Pacman with a while loop and shifting.
+
+The naive approach outputs JSONL, one array per line:
+
+```jq
+# WRONG - outputs JSONL, now you're parsing line-by-line in Zsh
+.[] | [.n, .role, .content] | @sh
+```
+
+This fights the shell. You end up doing multiple `jq` calls or reading JSONL line-by-line, which is what you were trying to avoid by not using Node.js.
+
+The Pacman approach builds one array and eats it whole:
+
+```jq
+# RIGHT - one array, serialize whole, consume by shifting
+[
+    length,
+    (.[] | .n, .role, .content, (.links | length), .links[])
+] | @sh
+```
+
+One array. One `@sh`. One `${(@QA)${(z)...}}`. Then shift through it:
+
+```zsh
+tape=( "${(@QA)${(z)$(jq -r '...' $jsonl)}}" )
+set -- "${(@)tape}"
+integer total=$1; shift
+
+while (( $# )); do
+    n=$1 role=$2 content=$3 link_count=$4
+    shift 4
+    links=( "${(@)@[1,$link_count]}" )
+    shift $link_count
+    # ... process entry
+done
+```
+
+Variable-length records work because you embed the count before the items. Read count, shift that many, repeat. Wakka wakka through the tape until it's empty.
+
+For a working example, see `claudectl chat transcript` which parses Grok and Gemini API responses into conversation turns with variable-length citation arrays.
+
+## Opportunities
+<!-- potential additions: logging library for logfmt/JSON, undecided opinion about logging -->
+
+Considering adding a logging library. There is one `barnyard` but it is probably overreach, or else I need to develop an appreciation for `journalctl`, as it attempts to log structured Linux messages, but what goods is that to OS X? Real world use is greping container logs. A logging library would simply log to standard out as logfmt or JSON, but I've never really had a once and for all opinion about logging.
+
+## Outgoing
+<!-- features not being pursued: compile to single file, wait for desire before fulfilling -->
+
+Compiling, for one. Used to imagine that you could have a `zshctl` program compile and it probably is still possible, but as an extension. There are places where it is nice to have a complicated multi-command program in a single file. And yet, with all the installers, I don't see why you wouldn't just install `zshctl` and make it a single file `zshctl` program. Let us wait for the desire before fulfilling it.
+
+## Incoming
+<!-- pending additions: trim function for whitespace stripping -->
+
+Notes for `trim`. `trim` because it's so common and so annoying to write out the pattern substitution.
+
+https://stackoverflow.com/questions/68259691/trimming-whitespace-from-the-ends-of-a-string-in-zsh
+
+```
+trimmed=${(*)${(*)var/#[[:space:]]#}/%[[:space:]]#}
+```
