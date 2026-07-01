@@ -16,10 +16,8 @@ setopt localoptions extendedglob
 # verbose=() - array of verbose description lines without newlines
 # mandown=() - array of man page lines without newlines
 # completions=() - gather completions as name and description pairs
-# synopsis=() - array of synopsis section man with newlines
 # options=() - array of options section man with newlines
 [[ -v mandown ]]     || typeset mandown=()
-[[ -v synopsis ]]    || typeset synopsis=()
 [[ -v commands ]]    || typeset commands=()
 [[ ${(t)options} == array-local ]]     || typeset options=()
 [[ -v completions ]] || typeset -A completions=()
@@ -45,10 +43,9 @@ typeset -A glob=(
     list        '(#b)([[:space:]]##)\*[[:space:]]##(*)[[:space:]]##--(*)'
 )
 # TODO Must fix.
-typeset split=() match=() markup=() joined=() boolean=() markup=() args=()
-typeset pushf=_zshctl_pushf long mode=scan help trim
-$pushf synopsis '.SH SYNOPSIS\n'
-$pushf synopsis '.SY %s\n' "${(j:\ :)${(@)program_path}}"
+typeset split=() match=() markup=() joined=() markup=() args=()
+typeset generated_synopsis=() generated_mandown=()
+typeset pushf=_zshctl_pushf long mode=scan help trim tail entry
 for line in "${(@)lines}"; do
     while true; do
         case $mode:$line in
@@ -105,12 +102,14 @@ for line in "${(@)lines}"; do
             $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
             $pushf options '.RI %s\n' $match[2]
             $pushf options '.br\n'
-            $pushf synopsis '.RB [ '
+            tail=$match[2]
+            trim tail
             if [[ -n $option[short] ]]; then
-                $pushf synopsis '\-%s | ' $option[short]
+                entry="[-$option[short] | --$long $tail]"
+            else
+                entry="[--$long $tail]"
             fi
-            $pushf synopsis '%s\n' '\-\-'$long # must put a backslash in front of
-            $pushf synopsis '.RI %s]\n' $match[2]
+            generated_synopsis+=( "$entry" )
             mode=argdown
             markup=()
             ;;
@@ -125,12 +124,14 @@ for line in "${(@)lines}"; do
             $pushf options '.B \-\-%s\n' $long
             $pushf options '.RI %s\n' $match[2]
             $pushf options '.br\n'
-            $pushf synopsis '.RB [ '
+            tail=$match[2]
+            trim tail
             if [[ -n $option[short] ]]; then
-                $pushf synopsis '\-%s | ' $option[short]
+                entry="[-$option[short] | --$long $tail]"
+            else
+                entry="[--$long $tail]"
             fi
-            $pushf synopsis '\-\-%s\n' $long
-            $pushf synopsis '.RI %s]\n' $match[2]
+            generated_synopsis+=( "$entry" )
             mode=argdown
             markup=()
             ;;
@@ -144,16 +145,15 @@ for line in "${(@)lines}"; do
             fi
             $pushf options '.B %s\n' '\-\-'$long # must put a backslash in front of
             $pushf options '.br\n'
-            boolean=()
-            $pushf boolean '.RB [ '
             if [[ -n $option[short] ]]; then
-                $pushf boolean '\-%s | ' $option[short]
-            fi
-            $pushf boolean '\-\-%s ]\n' $long
-            if [[ $match[1] = help ]]; then
-                help=${(j::)boolean}
+                entry="[-$option[short] | --$long]"
             else
-                $pushf synopsis '%s' "${(j::)boolean}"
+                entry="[--$long]"
+            fi
+            if [[ $match[1] = help ]]; then
+                help=$entry
+            else
+                generated_synopsis+=( "$entry" )
             fi
             mode=argdown
             markup=()
@@ -243,15 +243,22 @@ for line in "${(@)lines}"; do
         break
     done
 done
-if (( ${#args} )); then
-    for arg in "${(@)args}"; do
-        $pushf synopsis '.RI %s\n' $arg
+function {
+    setopt localoptions extendedglob
+    typeset line
+    for line in "${(@)mandown}"; do
+        [[ ${line:u} = (#b)\#\#[[:space:]]##SYNOPSIS ]] && return
     done
-elif (( ${#commands} )); then
-    $pushf synopsis '.I command\n.RI [ arguments ]\n'
-fi
-if [[ -n $help ]]; then
-    $pushf synopsis '.SY %s\n' "${(j:\ :)${(@)program_path}}"
-    $pushf synopsis '%s' $help
-fi
-$pushf synopsis '.YS\n'
+    if (( ${#args} )); then
+        generated_synopsis+=( "${(@)args}" )
+    elif (( ${#commands} )); then
+        generated_synopsis+=( 'command' '[arguments]' )
+    fi
+    generated_mandown=( '## SYNOPSIS' '```synopsis' )
+    if (( ${#generated_synopsis} )); then
+        generated_mandown+=( "${(j: :)generated_synopsis}" )
+    fi
+    [[ -n $help ]] && generated_mandown+=( "$help" )
+    generated_mandown+=( '```' '' )
+    mandown=( "${(@)generated_mandown}" "${(@)mandown}" )
+}

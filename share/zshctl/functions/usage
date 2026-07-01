@@ -42,7 +42,8 @@ function {
 typeset capitalized=$zshctl[program]${usage#:help}
 typeset program_path=( "${(@As,:,)capitalized}" )
 capitalized=${${capitalized//:/-}:u}
-typeset synopsis=() options=() mandown=() man=() mode=scan terse=() verbose=()
+typeset mandown_synopsis_program="${(j: :)program_path}"
+typeset options=() mandown=() man=() mode=scan terse=() verbose=()
 typeset help joined
 $usage
 if [[ $zshctl[help:mode] == __mandown ]]; then
@@ -95,7 +96,6 @@ function {
     printf '%s \- ' "${(j:\ :)program_path}"
     _zshctl_mandown man "${(pj:\n:)terse}"
     printf '%s' "${(j::)man}"
-    printf '%s' "${(j::)synopsis}"
     man=()
     _zshctl_mandown man "${(pj:\n:)mandown}"
     printf '%s' ${(j::)man}
