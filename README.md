@@ -1,7 +1,17 @@
 # `zshctl`
 <!-- CLI framework for Zsh: argument parsing, man-formatted help, completions, and utility library -->
 
-`zshctl` in a framework for creating command-line programs in Zsh.
+`zshctl` is what happens when you stop pretending shell scripts are throwaway and start treating them like real programs.
+
+Most of us have written the same script three times: first as a one-liner, then as a pile of `case` statements, then as a "temporary" tool that somehow survives for years. `zshctl` steps in at that third phase.
+
+It gives your Zsh CLI structure: nested commands, argument parsing, help generation, shell completions, and extension points, without forcing you into a different language or a giant framework mindset.
+
+The philosophy is simple: keep the shell, add discipline. Commands live where you can find them. Help text is close to the code that implements behavior. Completion comes from the same command tree your users run. If your program grows from `myctl version` into `myctl cluster node drain`, you don't rewrite from scratch; you keep descending the tree.
+
+A tiny `zshctl` program can feel like a script. A large one can feel like a product. That middle ground, where shell utilities usually become brittle, is exactly where `zshctl` is most useful.
+
+In short: if your CLI belongs in Zsh, but your users deserve something better than duct tape, `zshctl` is the structure you were going to invent anyway.
 
 **Argumentitive**: An alternative argument parser that handles advanced argument types like negations and key values that creates variables with the appropriate Zsh type, integer, scalar, array or associative array.
 
