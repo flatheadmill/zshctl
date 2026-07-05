@@ -46,7 +46,9 @@ function {
         # Get the help text.
         $usage
         # Split the help text.
-        lines=( "${(@Af)help}" ) verbose=()
+        lines=()
+        _zshctl_help_lines
+        verbose=()
         typeset mode=scan
         # Parse the help text to extract verbose descriptions.
         for line in "${(@)lines}"; do
@@ -77,9 +79,13 @@ function {
         completion ${key##*:} $joined
     done
 }
-# Get the completions for the current command by invoking .
+# Get the completions for the current command by invoking it. Declare `help`
+# ahead of the invocation, matching `usage`, so the front-door assertion in
+# `_zshctl_help_lines` is a framework invariant and not an abend on an author
+# `:help:` that exists but does not assign.
+typeset help lines=() flag description
 $usage
-typeset lines=( "${(@Af)help}" ) flag description
+_zshctl_help_lines
 typeset -A _zshctl_options
 zshctl+=( args:mode help )
 ${usage//#:help/:args}

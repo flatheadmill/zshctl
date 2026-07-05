@@ -29,7 +29,9 @@ function {
         usage=${cmd//#:execute/:help}
         (( ${+functions[$usage]} )) || continue
         $usage
-        lines=( "${(@Af)help}" ) verbose=() sub=()
+        lines=()
+        _zshctl_help_lines
+        verbose=() sub=()
         _zshctl_help
         (( ${#verbose} )) || continue
         if [[ $verbose[1] =~ $regex[escaped] ]]; then
@@ -46,11 +48,12 @@ typeset mandown_synopsis_program="${(j: :)program_path}"
 typeset options=() mandown=() man=() mode=scan terse=() verbose=()
 typeset help joined
 $usage
+typeset lines=()
+_zshctl_help_lines
 if [[ $zshctl[help:mode] == __mandown ]]; then
     printf '%s' $help
     return
 fi
-typeset lines=( "${(@Af)help}" )
 typeset -A _zshctl_options
 zshctl+=( args:mode help )
 ${usage//#:help/:args}
