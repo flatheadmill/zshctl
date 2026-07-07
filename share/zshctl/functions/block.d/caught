@@ -28,6 +28,13 @@ _block_close try
 typeset err="$(<&${o_block[tried]})"
 # Close the ouptut side of the try `coproc`.
 _block_close tried
+# The try `coproc` exits once it has echoed the gathered lines. Reap it here
+# at a safe point (see `try` for why transient children must not exit
+# asynchronously).
+if (( o_block[awk] )); then
+    wait $o_block[awk] 2>/dev/null
+    o_block[awk]=0
+fi
 
 # TODO Here down is very indent specific. I notice that I am repending `abend: `
 # to the user message, so maybe that is something I ought to in `abend` and
