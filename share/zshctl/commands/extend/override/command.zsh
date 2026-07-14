@@ -38,6 +38,7 @@ function :execute:extend:override {
     if (( ${o_clear:-0} )); then
         print -r -- "unset $variable"
         print -u 2 -P "%F{8}→ ${zshctl[program]} override cleared for this session%f"
+        print -u 2 -P "%F{8}  apply to this shell:  eval \"\$(${zshctl[program]} extend override --clear)\"%f"
         return
     fi
     if (( ${o_show:-0} )); then
