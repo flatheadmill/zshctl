@@ -382,6 +382,12 @@ case $zshctl[args:mode] in
     # amendment to the state that makes sense for completion.
     if [[ $state = arguments && $zshctl[args:incomplete] = -* ]]; then
         zshctl[args:state]=option
+    elif [[ $state = option && $zshctl[args:incomplete] != -* ]]; then
+        # Interspersed positionals leave the loop in `option` state, and the
+        # descent skips the `:complete` function for that state — so only the
+        # first argument would ever complete. The cursor is on a word that is
+        # not an option, so complete arguments.
+        zshctl[args:state]=arguments
     else
         zshctl[args:state]=$state
     fi
