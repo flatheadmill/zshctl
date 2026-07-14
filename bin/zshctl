@@ -256,6 +256,19 @@ function {
                 command_path+=( ~/.local/share/${zshctl[program]}/extensions/*(N) )
             fi
         fi
+        # A session-local override. `<PROGRAM>_OVERRIDE` (e.g. `ACRECTL_OVERRIDE`)
+        # is a colon-separated list of extension directories appended last, so
+        # their commands and functions win over the installed extensions (the
+        # loop below is last-writer-wins). This lets a single shell session
+        # redirect the program at a working copy — a git worktree, say — without
+        # touching the per-user `~/.local/share` symlinks that every session and
+        # every other program share. Set and cleared with `<program> extend override`.
+        typeset override_variable=${(U)zshctl[program]}
+        override_variable=${override_variable//[^A-Za-z0-9]/_}_OVERRIDE
+        typeset override=${(P)override_variable:-}
+        if [[ -n $override ]]; then
+            command_path+=( ${(s.:.)override}(N/) )
+        fi
     fi
     # Preserve the system fpath for a systemload function.
     zshctl[fpath]=$fpath
