@@ -61,6 +61,7 @@ function :execute:extend:override {
     typeset dir=${found[1]:A:h}
     print -r -- "export $variable=${(q)dir}"
     print -u 2 -P "%F{8}→ ${zshctl[program]} now overrides \`${extend[link_as]}\` from ${dir} (this session)%f"
+    print -u 2 -P "%F{8}  apply to this shell:  eval \"\$(${zshctl[program]} extend override)\"%f"
 }
 
 function :complete:extend:override {
