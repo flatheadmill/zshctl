@@ -69,13 +69,10 @@ function :execute:yum {
     EOF
     cat $conf[program].spec
     rpmbuild -ba $conf[program].spec || abend '`rpmbuild` failed.'
-    touch passphrase
     heredoc -q <<'    EOF' > ~/.rpmmacros
-    %_signature gpg
     %_gpg_path /root/.gnupg
     %_gpg_name $conf[gpg.key.name]
-    %_gpgbin /usr/bin/gpg2
-    %__gpg_sign_cmd %{__gpg} gpg --force-v3-sigs --batch --verbose --no-armor --passphrase-file /work/passphrase --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} --digest-algo sha256 %{__plaintext_filename}'
+    %_gpg_digest_algo sha256
     EOF
     gpg --list-keys
     # sign
