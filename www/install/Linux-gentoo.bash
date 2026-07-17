@@ -35,6 +35,7 @@ sync-type = git
 sync-uri = https://zshctl.sh/ebuild.git
 sync-git-verify-commit-signature = true
 sync-openpgp-key-path = /usr/share/openpgp-keys/zshctl.asc
+sync-openpgp-key-refresh = false
 sync-depth = 0
 clone-depth = 0
 EOF
