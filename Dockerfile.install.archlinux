@@ -8,6 +8,7 @@ ARG ZSHCTL_VERSION
 RUN sh -c 'echo update ${ZSHCTL_PREVIOUS_VERSION} to ${ZSHCTL_VERSION}'
 # Pacman 7's syscall sandbox is unavailable under amd64 emulation on arm64.
 RUN sed -i 's/^#DisableSandboxSyscalls/DisableSandboxSyscalls/' /etc/pacman.conf
+RUN pacman --noconfirm -Sy archlinux-keyring
 RUN pacman --noconfirm -Syu
 RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
 RUN bash -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
@@ -23,8 +24,8 @@ RUN echo ${ZSHCTL_VERSION}
 RUN sed -i 's/^#DisableSandboxSyscalls/DisableSandboxSyscalls/' /etc/pacman.conf
 RUN pacman-key --init
 RUN pacman-key --populate archlinux
+RUN pacman --noconfirm -Sy archlinux-keyring
 RUN pacman --noconfirm -Syu
-RUN pacman --noconfirm -S archlinux-keyring
 WORKDIR /work
 COPY www/install/Linux-archlinux.bash /work
 RUN bash Linux-archlinux.bash
