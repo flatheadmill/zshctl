@@ -24,6 +24,7 @@ function :execute {
     for distro in "$@"; do
         docker build \
             "${(@)args}" \
+            --platform linux/amd64 \
             --progress plain \
             --build-arg ZSHCTL_VERSION=$version[next] \
             --build-arg ZSHCTL_PREVIOUS_VERSION=$version[previous] \
