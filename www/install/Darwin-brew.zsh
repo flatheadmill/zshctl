@@ -25,9 +25,11 @@ if ! whence brew > /dev/null; then
     fi
 fi
 
-# tap and install zshctl.
+# Homebrew requires third-party taps to be trusted before loading their formulae.
+brew update
+brew tap zshctl/zshctl https://zshctl.sh/brew.git
+brew trust zshctl/zshctl
 brew install zshctl/zshctl/zshctl
-#brew install zshctl
 
 type zshctl
 "$(brew --prefix)/bin/zshctl" version
