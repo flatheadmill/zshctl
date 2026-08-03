@@ -257,6 +257,19 @@ function {
             fi
         fi
     fi
+    # Your program has already been sourced, so your `:extensions` hook is
+    # defined; the scan below has not yet run, so nothing is decided. This is
+    # your opportunity to amend `command_path` and its companions in the
+    # dynamic scope before they are employed. Each extension entry is the
+    # symlink itself, so its tail is the name the extension was linked as —
+    # loop and replace an element to rebind a name, or assign the array
+    # outright to make your program's world exactly what you say it is.
+    # The environment is not consulted here. A program that wants an
+    # environment variable reads it in its own text, where its reviewer
+    # can see it.
+    if (( ${+functions[:extensions]} )); then
+        :extensions
+    fi
     # Preserve the system fpath for a systemload function.
     zshctl[fpath]=$fpath
     # The value for uncompiled functions is the path to the source, so we use
