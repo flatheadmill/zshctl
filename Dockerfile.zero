@@ -1,3 +1,0 @@
-FROM alpine
-
-RUN mkdir -p /var/zshctl.github.io/ && touch /var/zshctl.github.io/zero

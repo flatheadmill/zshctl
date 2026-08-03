@@ -1,0 +1,114 @@
+emulate -L zsh
+
+# Normalize help source at the front door. The caller owns `help` and `lines`;
+# this helper strips `<!-- ... -->` comments from `help` in place, then fills
+# `lines`, so every help consumer sees the same document.
+[[ -v help && ${(t)help} = scalar* ]] ||
+    abend 'fatal: exception: help source not defined'
+[[ -v lines && ${(t)lines} = array* ]] ||
+    abend 'fatal: exception: help lines not defined'
+
+setopt localoptions extendedglob
+
+# A lexer with three modes; scan looks for the next comment opener, comment
+# discards until the close, fence copies code examples verbatim. A comment
+# span deletes as one piece, interior newlines included, so a prefix on the
+# opening line and a suffix on the closing line splice into one output line.
+#
+# The two states obey different boundaries, and the difference is the point.
+# A fence is MAN DOWN! syntax, rendered per section slice, so fence state
+# resets at each column-one `# ` — an unclosed example in one section must
+# not protect a comment in a later section that the section-local renderer
+# would print as prose. A comment is stripped from the raw source before any
+# parser or slicer exists, so it is source-local: it gobbles across `# `,
+# else commenting out a `# opt` block would end at the `# opt` line and
+# leave the option live, and an unclosed comment eats to the end of this
+# help with no abend, because a comment is author text, not a framework
+# invariant.
+#
+# Every line-shape decision — fence open, fence close, the `# ` reset — is
+# made against the output line under construction, never against a raw line
+# or a rescanned remainder, because the stripped output is the only text the
+# downstream parsers ever read. So a fence opens only when the three
+# backticks begin an output line with nothing kept ahead of them.
+typeset mode=scan line rest prefix backslashes pending
+typeset stripped=()
+integer gobbled=0
+
+for line in "${(@Af)help}"; do
+    if [[ $mode = fence ]]; then
+        if [[ $line = '```' ]]; then
+            stripped+=( "$line" )
+            mode=scan
+            continue
+        fi
+        if [[ $line != '# '* ]]; then
+            stripped+=( "$line" )
+            continue
+        fi
+        # A section boundary; the renderer's fence never crosses it, so this
+        # line belongs to scan, which will strip any comment it carries.
+        mode=scan
+    fi
+    if [[ $mode = comment ]]; then
+        [[ $line = *'-->'* ]] || continue
+        rest=${line#*'-->'}
+        mode=scan
+    else
+        pending= gobbled=0 rest=$line
+        if [[ $rest = '```'* ]]; then
+            stripped+=( "$rest" )
+            mode=fence
+            continue
+        fi
+    fi
+    while true; do
+        prefix=${rest%%'<!--'*}
+        if [[ $prefix = "$rest" ]]; then
+            pending+=$rest
+            break
+        fi
+        # Backslash parity, matching the escape swap's backslash-first order:
+        # `\\` consumes as a literal backslash before `\<` can claim the
+        # marker, so an odd run escapes the opener and an even run leaves it
+        # live.
+        backslashes=${prefix##*[^\\]}
+        if (( ${#backslashes} % 2 )); then
+            pending+="$prefix<!--"
+            rest=$rest[$(( ${#prefix} + 5 )),-1]
+            continue
+        fi
+        pending+=$prefix
+        gobbled=1
+        rest=$rest[$(( ${#prefix} + 5 )),-1]
+        if [[ $rest = *'-->'* ]]; then
+            rest=${rest#*'-->'}
+            if [[ -z $pending && $rest = '```'* ]]; then
+                stripped+=( "$rest" )
+                mode=fence
+                break
+            fi
+            continue
+        fi
+        mode=comment
+        break
+    done
+    [[ $mode = scan ]] || continue
+    # Delete, do not blank: a line the strip has emptied contributes no
+    # output line, or a comment above a `# desc` body would put an empty
+    # first line into the NAME and completion derivations. A line the strip
+    # never touched passes through whatever it is.
+    if (( gobbled )) && [[ $pending = [[:space:]]# ]]; then
+        continue
+    fi
+    stripped+=( "$pending" )
+done
+if [[ $mode = comment ]]; then
+    # Unclosed gobbles all; the text kept ahead of the opener still flushes.
+    if [[ $pending != [[:space:]]# ]]; then
+        stripped+=( "$pending" )
+    fi
+fi
+
+help="${(pj:\n:)stripped}"
+lines=( "${(@)stripped}" )

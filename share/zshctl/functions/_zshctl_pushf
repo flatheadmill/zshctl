@@ -4,6 +4,14 @@ emulate -L zsh
 typeset array=${1:-} string
 shift
 printf -v string -- "$@"
-string=${string//$'\uE000'/\`}
-string=${string//$'\uE001'/_}
+# Same set, same order as _zshctl_mandown. The codepoint mapping is
+# positional from U+E000 — if these diverge, characters restore wrong.
+typeset -a _esc=( $'\\' '!' '"' '#' '$' '%' '&' "'" '(' ')' '*' '+' ',' '-' '.' '/' \
+    ':' ';' '<' '=' '>' '?' '@' '[' ']' '^' '_' '`' '{' '|' '}' '~' )
+integer _ei=0xE000
+typeset _ec
+for _ec in "${(@)_esc}"; do
+    string=${string//${(#)_ei}/$_ec}
+    (( _ei++ ))
+done
 set -A $array "${(@P)array}" "$string"

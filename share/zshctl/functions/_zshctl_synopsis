@@ -1,0 +1,353 @@
+emulate -L zsh
+
+setopt localoptions extendedglob
+
+# Synopsis notation lexer and groff renderer.
+#
+# Converts git-style synopsis notation into a flat tape of annotated tokens,
+# then plays the tape to produce groff inline font markup.
+#
+# Token types:
+#   flag:TEXT         a flag literal: -a, --verbose, --fixup=
+#   placeholder:TEXT  an angle-bracket placeholder: <file>, <commit>
+#   literal:TEXT      bare text: git, commit, amend
+#   opt_open:N        optional block; next N flat tokens are its contents
+#   group_open:N      parenthesis group; next N flat tokens are its contents
+#   join              zero-width source adjacency marker
+#   alt               | alternative separator
+#   repeat            ... repetition marker
+#
+# The worker functions use named variables from the caller's dynamic scope.
+# These are internal helpers, not general-purpose utilities: callers declare
+# the slots they expect a worker to fill, and workers assert those slots before
+# writing them. The render path uses _tape, _pos, _sp, and _out; delimiter
+# matching writes the caller's integer close_at.
+
+function _zshctl_synopsis_is_space {
+    [[ $1 = [[:space:]] ]]
+}
+
+function _zshctl_synopsis_is_delimiter {
+    case $1 in
+    ('' | [[:space:]] | '[' | ']' | '(' | ')' | '<' | '>' | '|')
+        return 0
+        ;;
+    esac
+    return 1
+}
+
+function _zshctl_synopsis_join_if_needed {
+    (( emitted && ! had_space )) && _tape+=( join )
+}
+
+function _zshctl_synopsis_groff {
+    typeset text=$1
+
+    [[ -v _out && ${(t)_out} = scalar* ]] ||
+        abend 'fatal: exception: return variable `_out` not defined'
+
+    text=${text//\\/\\\\}
+    text=${text//-/\\-}
+    if [[ -z $_out ]]; then
+        case $text[1] in
+        ('.' | "'")
+            text='\&'$text
+            ;;
+        esac
+    fi
+    _out+=$text
+}
+
+function _zshctl_synopsis_emit {
+    _out+=$1
+}
+
+function _zshctl_synopsis_append_compound {
+    typeset kind=$1 input=$2
+    integer start=$3 close_at=$4 mark count
+    typeset inner
+
+    inner=${input[$(( start + 1 )),$(( close_at - 1 ))]}
+    mark=${#_tape}
+    _zshctl_synopsis_lex "$inner" "$_zshctl_synopsis_source" $(( offset + start )) || return
+    count=$(( ${#_tape} - mark ))
+    _tape=( "${(@)_tape[1,$mark]}" "$kind:$count" "${(@)_tape[$(( mark + 1 )),-1]}" )
+}
+
+function _zshctl_synopsis_find_close {
+    typeset input=$1 open=$2 close=$3
+    integer i=$4 base=$5 depth=1
+
+    [[ -v close_at && ${(t)close_at} = integer* ]] ||
+        abend 'fatal: exception: return variable `close_at` not defined'
+
+    while (( i <= ${#input} )); do
+        case ${input[i]} in
+        ($open)
+            (( depth++ ))
+            ;;
+        ($close)
+            (( depth-- ))
+            (( depth == 0 )) && {
+                close_at=$i
+                return 0
+            }
+            ;;
+        esac
+        (( i++ ))
+    done
+
+    abend 'fatal: invalid synopsis: unmatched `%s` at offset %d in `%s`.' \
+        $open $base "$_zshctl_synopsis_source"
+}
+
+function _zshctl_synopsis_lex {
+    typeset input=$1
+    typeset _zshctl_synopsis_source=${2:-$1}
+    integer offset=${3:-1}
+    typeset ch token
+    integer i=1 j close_at emitted=0 had_space=0
+
+    while (( i <= ${#input} )); do
+        ch=${input[i]}
+        case $ch in
+        ([[:space:]])
+            had_space=1
+            (( i++ ))
+            ;;
+
+        ('[')
+            _zshctl_synopsis_join_if_needed
+            _zshctl_synopsis_find_close "$input" '[' ']' $(( i + 1 )) $(( offset + i - 1 ))
+            _zshctl_synopsis_append_compound opt_open "$input" $i $close_at || return
+            emitted=1
+            had_space=0
+            i=$(( close_at + 1 ))
+            ;;
+
+        ('(')
+            _zshctl_synopsis_join_if_needed
+            _zshctl_synopsis_find_close "$input" '(' ')' $(( i + 1 )) $(( offset + i - 1 ))
+            _zshctl_synopsis_append_compound group_open "$input" $i $close_at || return
+            emitted=1
+            had_space=0
+            i=$(( close_at + 1 ))
+            ;;
+
+        ('|')
+            if ! _zshctl_synopsis_is_space "${input[$(( i - 1 ))]}" &&
+                    ! _zshctl_synopsis_is_space "${input[$(( i + 1 ))]}"; then
+                _zshctl_synopsis_join_if_needed
+                _tape+=( alt )
+                had_space=0
+            else
+                _tape+=( alt )
+                had_space=1
+            fi
+            emitted=1
+            (( i++ ))
+            ;;
+
+        ('.')
+            if [[ ${input[i,$(( i + 2 ))]} == '...' ]]; then
+                _zshctl_synopsis_join_if_needed
+                _tape+=( repeat )
+                (( i += 3 ))
+            else
+                _zshctl_synopsis_join_if_needed
+                _tape+=( 'literal:.' )
+                (( i++ ))
+            fi
+            emitted=1
+            had_space=0
+            ;;
+
+        ('<')
+            _zshctl_synopsis_join_if_needed
+            j=$(( i + 1 ))
+            while (( j <= ${#input} )) && [[ ${input[j]} != '>' ]]; do
+                (( j++ ))
+            done
+            if (( j > ${#input} )); then
+                abend 'fatal: invalid synopsis: unmatched `<` at offset %d in `%s`.' \
+                    $(( offset + i - 1 )) "$_zshctl_synopsis_source"
+            fi
+            # An angle-bracket label is opaque — its pipes are not read as
+            # structure — but we trim the whitespace just inside the brackets
+            # so a readable declaration like `< a | b | c >` does not render as
+            # an underline that begins and ends on a space, which reads as a
+            # rendering bug. Interior spacing is preserved; only the padding
+            # against the brackets goes.
+            token=${input[$(( i + 1 )),$(( j - 1 ))]}
+            token=${token##[[:space:]]#}
+            token=${token%%[[:space:]]#}
+            _tape+=( "placeholder:$token" )
+            emitted=1
+            had_space=0
+            i=$(( j + 1 ))
+            ;;
+
+        ('-')
+            _zshctl_synopsis_join_if_needed
+            j=$i
+            while (( j <= ${#input} )) && ! _zshctl_synopsis_is_delimiter "${input[j]}"; do
+                (( j++ ))
+            done
+            _tape+=( "flag:${input[i,$(( j - 1 ))]}" )
+            emitted=1
+            had_space=0
+            i=$j
+            ;;
+
+        (*)
+            _zshctl_synopsis_join_if_needed
+            j=$i
+            while (( j <= ${#input} )) && ! _zshctl_synopsis_is_delimiter "${input[j]}" &&
+                    [[ ${input[j]} != '.' ]]; do
+                (( j++ ))
+            done
+            token=${input[i,$(( j - 1 ))]}
+            case $token in
+            (':' | ';' | ',' | '=')
+                _tape+=( "punct:$token" )
+                ;;
+            (*)
+                _tape+=( "literal:$token" )
+                ;;
+            esac
+            emitted=1
+            had_space=0
+            i=$j
+            ;;
+        esac
+    done
+}
+
+function _zshctl_synopsis_space_before {
+    typeset previous=$1
+
+    case $previous in
+    ('' | opt_open:* | group_open:* | join)
+        return 1
+        ;;
+    esac
+    return 0
+}
+
+function _zshctl_synopsis_render_n {
+    integer n=$1
+    integer end=$(( _pos + n ))
+    typeset tok previous
+
+    while (( _pos < end )); do
+        tok=${_tape[$(( _pos + 1 ))]}
+        previous=$_sp
+        (( _pos++ ))
+        case $tok in
+        (opt_open:*)
+            _zshctl_synopsis_space_before "$previous" && _zshctl_synopsis_emit ' '
+            _zshctl_synopsis_emit '['
+            _sp=$tok
+            _zshctl_synopsis_render_n ${tok#opt_open:}
+            _zshctl_synopsis_emit ']'
+            _sp=']'
+            ;;
+
+        (group_open:*)
+            _zshctl_synopsis_space_before "$previous" && _zshctl_synopsis_emit ' '
+            _zshctl_synopsis_emit '('
+            _sp=$tok
+            _zshctl_synopsis_render_n ${tok#group_open:}
+            _zshctl_synopsis_emit ')'
+            _sp=')'
+            ;;
+
+        (flag:*)
+            _zshctl_synopsis_space_before "$previous" && _zshctl_synopsis_emit ' '
+            _zshctl_synopsis_emit '\fB'
+            _zshctl_synopsis_groff "${tok#flag:}"
+            _zshctl_synopsis_emit '\fR'
+            _sp=${tok#flag:}
+            ;;
+
+        (join)
+            _sp=join
+            ;;
+
+        (placeholder:*)
+            _zshctl_synopsis_space_before "$previous" && _zshctl_synopsis_emit ' '
+            _zshctl_synopsis_emit '\fI<'
+            _zshctl_synopsis_groff "${tok#placeholder:}"
+            _zshctl_synopsis_emit '>\fR'
+            _sp='<placeholder>'
+            ;;
+
+        (repeat)
+            _zshctl_synopsis_space_before "$previous" && _zshctl_synopsis_emit ' '
+            _zshctl_synopsis_groff '...'
+            _sp=repeat
+            ;;
+
+        (alt)
+            _zshctl_synopsis_space_before "$previous" && _zshctl_synopsis_emit ' '
+            _zshctl_synopsis_groff '|'
+            _sp=alt
+            ;;
+
+        (punct:*)
+            _zshctl_synopsis_space_before "$previous" && _zshctl_synopsis_emit ' '
+            _zshctl_synopsis_groff "${tok#punct:}"
+            _sp=${tok#punct:}
+            ;;
+
+        (literal:*)
+            _zshctl_synopsis_space_before "$previous" && _zshctl_synopsis_emit ' '
+            _zshctl_synopsis_groff "${tok#literal:}"
+            _sp=${tok#literal:}
+            ;;
+        esac
+    done
+}
+
+typeset mode=render array input=${1:-}
+case $input in
+(-v)
+    array=$2
+    shift 2
+    input=${1:-}
+    ;;
+(-d | --dump)
+    mode=dump
+    shift
+    input=${1:-}
+    ;;
+(--render)
+    shift
+    input=${1:-}
+    ;;
+esac
+(( $# == 1 )) || abend 'fatal: invalid synopsis: expected one synopsis argument.'
+
+typeset -a _tape=()
+integer _pos=0
+typeset _sp='' _out=''
+
+_zshctl_synopsis_lex "$input" || return
+case $mode in
+(dump)
+    integer i=1
+    typeset tok
+    for tok in "${_tape[@]}"; do
+        printf '  %2d  %s\n' $i "$tok"
+        (( i++ ))
+    done
+    ;;
+(render)
+    _zshctl_synopsis_render_n ${#_tape}
+    if [[ -n $array ]]; then
+        _zshctl_pushf $array '%s\n' "$_out"
+    else
+        printf '%s\n' "$_out"
+    fi
+    ;;
+esac

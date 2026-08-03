@@ -3,15 +3,6 @@ emulate -L zsh
 zmodload zsh/terminfo
 zmodload zsh/datetime
 
-# I'm trying to find a way to edit and preview with the formatting which leads
-# me to comment out `| less` and run
-#
-# ```
-# while true; do zshctl gce key | less -XE; sleep 1; done
-# ```
-#
-# Perhaps an enviroment variable?
-
 setopt localoptions extendedglob
 integer top=2
 while [[ $funcstack[$top] != (:execute:*|:execute|:args:*|:args)  ]]; do
@@ -38,7 +29,9 @@ function {
         usage=${cmd//#:execute/:help}
         (( ${+functions[$usage]} )) || continue
         $usage
-        lines=( "${(@Af)help}" ) verbose=() sub=()
+        lines=()
+        _zshctl_help_lines
+        verbose=() sub=()
         _zshctl_help
         (( ${#verbose} )) || continue
         if [[ $verbose[1] =~ $regex[escaped] ]]; then
@@ -51,14 +44,16 @@ function {
 typeset capitalized=$zshctl[program]${usage#:help}
 typeset program_path=( "${(@As,:,)capitalized}" )
 capitalized=${${capitalized//:/-}:u}
-typeset synopsis=() options=() mandown=() man=() mode=scan terse=() verbose=()
+typeset mandown_synopsis_program="${(j: :)program_path}"
+typeset options=() mandown=() man=() mode=scan terse=() verbose=()
 typeset help joined
 $usage
+typeset lines=()
+_zshctl_help_lines
 if [[ $zshctl[help:mode] == __mandown ]]; then
     printf '%s' $help
     return
 fi
-typeset lines=( "${(@Af)help}" )
 typeset -A _zshctl_options
 zshctl+=( args:mode help )
 ${usage//#:help/:args}
@@ -74,6 +69,10 @@ if (( ! ${#terse} && ${#verbose} )); then
     fi
     joined=${joined%.}
     terse=( "$joined" )
+fi
+typeset pager=( less )
+if [[ -n ${ZSHCTL_HELP_TEXT:-} ]]; then
+    pager=( col -bx )
 fi
 function {
     if [[ $zshctl[help:mode] == __man ]]; then
@@ -100,9 +99,8 @@ function {
     printf '%s \- ' "${(j:\ :)program_path}"
     _zshctl_mandown man "${(pj:\n:)terse}"
     printf '%s' "${(j::)man}"
-    printf '%s' "${(j::)synopsis}"
     man=()
     _zshctl_mandown man "${(pj:\n:)mandown}"
     printf '%s' ${(j::)man}
-) | less
+) | "${(@)pager}"
 exit

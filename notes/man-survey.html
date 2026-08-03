@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Man Page Option Conventions — A Survey</title>
+<style>
+  body {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: Georgia, serif;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2em;
+    line-height: 1.7;
+  }
+  h1 { color: #ce9178; font-size: 1.6em; border-bottom: 1px solid #444; padding-bottom: 0.3em; }
+  h2 { color: #9cdcfe; font-size: 1.2em; margin-top: 2em; }
+  h3 { color: #4ec9b0; font-size: 1em; margin-top: 1.5em; margin-bottom: 0.3em; }
+  p { color: #d4d4d4; }
+  pre {
+    background: #0d0d0d;
+    border: 1px solid #333;
+    border-left: 3px solid #4ec9b0;
+    padding: 1em 1.2em;
+    font-family: "Menlo", "Monaco", "Courier New", monospace;
+    font-size: 0.88em;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre;
+    color: #d4d4d4;
+  }
+  pre b { color: #ffffff; font-weight: bold; }
+  pre u { color: #d7ba7d; text-decoration: underline; text-underline-offset: 2px; }
+  .observation { color: #888; font-style: italic; margin: 0.5em 0 1.2em 0; }
+  hr { border: none; border-top: 1px solid #333; margin: 2em 0; }
+</style>
+</head>
+<body>
+<h1>Man Page Option Conventions</h1>
+<p>A survey of how different programs and traditions document their arguments — synopsis style, option presentation, value placeholders, and the typographic conventions that vary by lineage. Written to inform what MAN DOWN! should be able to express when rendering option declarations.</p>
+<hr>
+
+<h2>BSD <code>ls</code> — Short Flags, One Value Option</h2>
+<p class="observation">The canonical BSD short-flag style. Flags cluster in a single bracket group. One value option (<code>--color=<i>when</i></code>) in long form. The <code>-D format</code> option shows a value argument as a bare italic word without brackets. No long equivalents for the short flags. Each flag in bold, value underlined, description on the same or following line.</p>
+<h3>Synopsis</h3>
+<pre><b>ls</b> [<b>-@ABCFGHILOPRSTUWabcdefghiklmnopqrstuvwxy1%,</b>] [<b>--color</b>=<u>when</u>]
+        [<b>-D</b> <u>format</u>] [<u>file</u> <u>...</u>]</pre>
+<h3>Options (sample)</h3>
+<pre>For each operand that names a <u>file</u> of a type other than directory, <b>ls</b>
+     displays its name as well as any requested, associated information.  For
+     each operand that names a <u>file</u> of type directory, <b>ls</b> displays the names of
+     files contained within that directory, as well as any requested, associated
+     information.
+
+     If no operands are given, the contents of the current directory are
+     displayed.  If more than one operand is given, non-directory operands are
+     displayed first; directory and non-directory operands are sorted separately
+     and in lexicographical order.
+
+     The following options are available:
+
+     <b>-@</b>      Display extended attribute keys and sizes in long (<b>-l</b>) output.
+
+     <b>-A</b>      Include directory entries whose names begin with a dot (‘<u>.</u>’) except
+             for <u>.</u> and <u>..</u>.  Automatically set for the super-user unless <b>-I</b> is
+             specified.
+
+     <b>-B</b>      Fo</pre>
+<hr>
+
+<h2>BSD <code>grep</code> — Short and Long, Clustered and Individual</h2>
+<p class="observation">Mixed style: short flags cluster; options with values appear individually with the value underlined. Long options use <code>--binary-files=<i>value</i></code> (equals, no space) and <code>--color[=<i>when</i>]</code> (optional value in brackets). The optional-value bracket notation is a style not all renderers handle gracefully.</p>
+<h3>Synopsis</h3>
+<pre><b>grep</b> [<b>-abcdDEFGHhIiJLlMmnOopqRSsUVvwXxZz</b>] [<b>-A</b> <u>num</u>] [<b>-B</b> <u>num</u>] [<b>-C</b> <u>num</u>]
+          [<b>-e</b> <u>pattern</u>] [<b>-f</b> <u>file</u>] [<b>--binary-files=</b><u>value</u>] [<b>--color</b>[<b>=</b><u>when</u>]]
+          [<b>--colour</b>[<b>=</b><u>when</u>]] [<b>--context=</b><u>num</u>] [<b>--label</b>] [<b>--line-buffered</b>] [<b>--null</b>]
+          [<u>pattern</u>] [<u>file</u> <u>...</u>]</pre>
+<h3>Options (sample)</h3>
+<pre></pre>
+<hr>
+
+<h2><code>git</code> — Subcommand Delegation, Spare Top-Level Synopsis</h2>
+<p class="observation">The top-level synopsis names global options and defers to <i>command</i> [<i>args</i>]. Real documentation lives in per-command man pages. Each option on its own line with long and sometimes short form, value underlined, description on the next line with a blank line between entries — the GNU block style.</p>
+<h3>Synopsis</h3>
+<pre><u>git</u> [-v | --version] [-h | --help] [-C &lt;path&gt;] [-c &lt;name&gt;=&lt;value&gt;]
+           [--exec-path[=&lt;path&gt;]] [--html-path] [--man-path] [--info-path]
+           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--no-lazy-fetch]
+           [--no-optional-locks] [--no-advice] [--bare] [--git-dir=&lt;path&gt;]
+           [--work-tree=&lt;path&gt;] [--namespace=&lt;name&gt;] [--config-env=&lt;name&gt;=&lt;envvar&gt;]
+           &lt;command&gt; [&lt;args&gt;]</pre>
+<h3>Options (sample)</h3>
+<pre>-v, --version
+           Prints the Git suite version that the <u>git</u> program came from.
+
+           This option is internally converted to <b>git</b> <b>version</b> ... and accepts
+           the same options as the <b>git-version</b>(1) command. If <b>--help</b> is also
+           given, it takes precedence over <b>--version</b>.
+
+       -h, --help
+           Prints the synopsis and a list of the most commonly used commands. If
+           the option <b>--all</b> or <b>-a</b> is given then all available commands are
+           printed. If a Git command is named this option will bring up the
+           manual page for that command.
+
+           Other options are available to control how the manual page is
+           displayed. See <b>git-help</b>(1) for more information, because <b>git</b> <b>--help</b>
+           ... is converted internally into <b>git</b> <b>help</b> ....
+
+       -C &lt;path&gt;
+           Run as if git was started in <u>&lt;path&gt;</u> instead of the current working
+       </pre>
+<hr>
+
+<h2><code>curl</code> — Long and Short Paired, Exhaustive Options</h2>
+<p class="observation">curl shows short and long on the same line separated by a comma, value placeholder underlined. The synopsis defers with an ellipsis — full enumeration would be absurd. curl's man page is maintained by hand and is notably well-written prose.</p>
+<h3>Synopsis</h3>
+<pre><b>curl</b> <b>[options</b> <b>/</b> <b>URLs]</b></pre>
+<h3>Options (sample)</h3>
+<pre>Options start with one or two dashes. Many of the options require an
+       additional value next to them. If provided text does not start with a
+       dash, it is presumed to be and treated as a URL.
+
+       The short "single-dash" form of the options, -d for example, may be used
+       with or without a space between it and its value, although a space is a
+       recommended separator. The long "double-dash" form, <u>-d,</u> <u>--data</u> for
+       example, requires a space between it and its value.
+
+       Short version options that do not need any additional values can be used
+       immediately next to each other, like for example you can specify all the
+       options <u>-O</u>, <u>-L</u> and <u>-v</u> at once as <u>-OLv</u>.
+
+       In general, all boolean options are enabled with --<b>option</b> and yet again
+       disabled with --<b>no-</b>option. That is, you use the same option name but
+       prefix it with "no-". However, in this list we mostly only list and show
+      </pre>
+<hr>
+
+<h2><code>find</code> — Positional Expressions, Not Options</h2>
+<p class="observation">find's arguments are predicates composed into an expression, not flags. The synopsis shows <i>path</i> and <i>expression</i>. The PRIMARIES section lists each predicate. No flag clustering. This is what a command looks like when its argument grammar cannot be expressed as a flat list of options and values.</p>
+<h3>Synopsis</h3>
+<pre><b>find</b> [<b>-H</b> | <b>-L</b> | <b>-P</b>] [<b>-EXdsx</b>] [<b>-f</b> <u>path</u>] <u>path</u> <u>...</u> [<u>expression</u>]
+     <b>find</b> [<b>-H</b> | <b>-L</b> | <b>-P</b>] [<b>-EXdsx</b>] <b>-f</b> <u>path</u> [<u>path</u> <u>...</u>] [<u>expression</u>]</pre>
+<h3>Primaries (sample)</h3>
+<pre>All primaries which take a numeric argument allow the number to be preceded
+     by a plus sign (“+”) or a minus sign (“-”).  A preceding plus sign means
+     “more than n”, a preceding minus sign means “less than n” and neither means
+     “exactly n”.
+
+     <b>-Bmin</b> <u>n</u>
+             True if the difference between the time of a file's inode creation
+             and the time <b>find</b> was started, rounded up to the next full minute,
+             is <u>n</u> minutes.
+
+     <b>-Bnewer</b> <u>file</u>
+             Same as <b>-newerBm</b>.
+
+     <b>-Btime</b> <u>n</u>[<b>smhdw</b>]
+             If no units are specified, this primary evaluates to true if the
+             difference between the time of a file's inode creation and the time
+             <b>find</b> was started, ro</pre>
+<hr>
+<h2>Observations on the Taxonomy</h2>
+
+<h3>Bold for flags, underline for values</h3>
+<p class="observation">Universal. Option flags are bold; value placeholders are underlined.
+Bold means literal text the user types verbatim; underline means a slot to fill in.
+MAN DOWN! uses backtick for bold and underscore for italic/underline — direct mapping.</p>
+
+<h3>Short and long on the same line</h3>
+<p class="observation">GNU style puts <code>-v</code>, <code>--verbose</code> on the same
+line separated by a comma. BSD style often omits long forms from the options section.
+This is the pairing that <code>_zshctl_help</code> generates by looking up the short alias
+from <code>_zshctl_options</code>.</p>
+
+<h3>Value syntax varies</h3>
+<p class="observation"><code>--output=</code><u>file</u> (equals, no space),
+<code>--output</code> <u>file</u> (space), <code>-o</code> <u>file</u> (short with space).
+Optional: <code>--color[=</code><u>when</u><code>]</code>. Enumerated:
+<code>--color=</code><u>always</u>|<u>never</u>|<u>auto</u>. The zshctl
+<code>-- &lt; a | b | c &gt;</code> convention has no direct parallel in GNU style.</p>
+
+<h3>Negation</h3>
+<p class="observation">GNU: <code>--no-color</code> as a separate named option, or
+<code>--[no-]color</code> in brackets in the synopsis. Positive and negative listed
+separately in the options section if both appear. The zshctl <code>-!</code> flag
+generates <code>--no-flagname</code> automatically.</p>
+
+<h3>Arrays and maps</h3>
+<p class="observation">No surveyed tool has a first-class array option concept in its man page.
+Options that accumulate multiple values are shown once, with repetition behavior described
+in prose. This is likely right for zshctl array options too.</p>
+
+<h3>Counter and toggle</h3>
+<p class="observation">Counters appear as options where "each use increments verbosity."
+Toggles are rare — most tools use explicit <code>--enable-x</code> / <code>--disable-x</code>.
+These are zshctl-specific patterns without a clear man page precedent.</p>
+
+<hr>
+<p style="color: #555; font-size: 0.85em;">
+Provisional observations for the zshctl project. Subject to markup and correction.<br>
+Survey: BSD ls, BSD grep, curl, git, find (macOS). Generated by notes/man-survey-generate.py.
+</p>
+</body>
+</html>

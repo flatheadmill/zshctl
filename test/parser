@@ -1,5 +1,8 @@
 #!/usr/bin/env zsh
 
+# This is a very broken test, but it serves as a refernece for what a real test
+# would look like.
+
 source ${ZSH_ARGZERO:A:h:h}/lib/parser.zsh
 
 function error {

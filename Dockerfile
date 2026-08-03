@@ -59,7 +59,7 @@ RUN --mount=type=secret,id=rsa,uid=1983 --mount=type=tmpfs,dst=/home/build/.abui
     su -s /bin/sh build -c '/zshctl/pkgctl/bin/pkgctl apk'
 RUN zsh -c '[[ ! -d /home/build/.abuild ]]'
 
-FROM fedora AS yum
+FROM fedora:43 AS yum
 
 RUN dnf install -y git wget gcc rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools zsh groff which glibc-common rpm-sign createrepo less groff-base
 RUN zsh -c '[[ -e /bin/zsh ]]'
@@ -73,6 +73,8 @@ RUN zsh -c '[[ ! -d /root/.gnupg ]]'
 
 FROM archlinux AS aur
 
+# Pacman 7's syscall sandbox is unavailable under amd64 emulation on arm64.
+RUN sed -i 's/^#DisableSandboxSyscalls/DisableSandboxSyscalls/' /etc/pacman.conf
 RUN pacman-key --init
 RUN pacman-key --populate archlinux
 RUN pacman --noconfirm -Syu

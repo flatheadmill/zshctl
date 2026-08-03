@@ -24,12 +24,15 @@ function :execute {
     for distro in "$@"; do
         docker build \
             "${(@)args}" \
+            --platform linux/amd64 \
             --progress plain \
             --build-arg ZSHCTL_VERSION=$version[next] \
             --build-arg ZSHCTL_PREVIOUS_VERSION=$version[previous] \
             -t ghcr.io/flatheadmill/zshctl-$distro:v$version[next] \
             -f Dockerfile.install.$distro . || exit 1
-        (( o_push )) && docker push ghcr.io/flatheadmill/zshctl-$distro:v$version[next]
+        if (( o_push )); then
+            docker push ghcr.io/flatheadmill/zshctl-$distro:v$version[next] || exit 1
+        fi
     done
 }
 

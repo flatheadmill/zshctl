@@ -4,7 +4,7 @@ function :help:version {
     heredoc -v help -q <<'    EOF'
         # desc -- display version
         Display the current version of \`${zshctl[program]}\`.
-        # opt format -- < terse | verbose | shell | json >
+        # opt format -- (terse | verbose | shell | json)
         Display a verbose version as test, JSON, or shell escaped.
             * terse -- Display version number only.
             * verbose -- Display version number and release date.

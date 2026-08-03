@@ -28,4 +28,4 @@ An so, I've solved for some goals in Zsh that I have yet to solve for in Bash. B
 
 Definitions of Zsh completion functions [`compadd`](https://github.com/zsh-users/zsh/blob/master/Completion/Zsh/Command/_compadd) is a primitive of the completion system, [`_main_complete`](https://github.com/zsh-users/zsh/blob/master/Completion/Base/Core/_main_complete) is the entry point for the new completion system, [`_describe`](https://github.com/zsh-users/zsh/blob/master/Completion/Base/Utility/_describe) is the basic way of displaying completions, [`_arguments`](https://github.com/zsh-users/zsh/blob/master/Completion/Base/Utility/_arguments) is an argument parsing way to display completions or select a method to find completion values, and [`_message`](https://github.com/zsh-users/zsh/blob/master/Completion/Base/Core/_message) will display an error message.
 
-Bash completions are limited and replicating a progress indicator or a warning message is probably going to be a kludge in Bash.k
+Bash completions are limited and replicating a progress indicator or a warning message is probably going to be a kludge in Bash.
