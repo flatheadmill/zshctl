@@ -81,6 +81,8 @@ integer fd out
     }
     '
 } 2>/dev/null # awk: unknown option -Winteractive ignored
+# Keep the `awk` pid so that `caught` can reap it deterministically.
+o_block[awk]=${!}
 # Keep both the input and output.
 exec {fd}>&p; o_block[try]=$fd
 exec {fd}<&p; o_block[tried]=$fd
@@ -117,6 +119,7 @@ if (( indent )); then
         tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:indent:: :)}"'\1/' >&$out
         # Close the >&p and <&p of our word count `coproc`.
         coproc :
+        wait $! 2>/dev/null
         # If we had any output at all, print a new line.
         [[ $(<&${count}) != 0 ]] && print >&$out
         # Wait for word count to finish.
@@ -130,6 +133,9 @@ if (( indent )); then
     exec {fd}>&p; o_block[indent]=$fd
     # Close the >&p and <&p of our indent `coproc`.
     coproc :
+    # Reap the no-op `coproc` immediately (see `try` for why transient
+    # children must not exit asynchronously).
+    wait $! 2>/dev/null
     # Set the DIY `try` fd to zero so we know its unallocated.
     o_block[user]=0
 fi

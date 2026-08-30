@@ -22,15 +22,34 @@
 
 #
 function try {
-    # TODO Wait on previous set to exit, if it exists.
     # Close the indent file handle so that a long running process like
     # `ssh-agent` do not inherit it and hold it open.
     _block_close indent
     # Close the user `try` handle if one exists.
     _block_close user
+    # Wait on the previous standard error indent `coproc` if it is still
+    # outstanding, which is the case when it was handed to the user by `try
+    # -v` and we've only just now closed the handle above. We must never let
+    # one of our transient `coproc` processes exit asynchronously. The Zsh
+    # SIGCHLD handler allocates memory to record the exit status and glibc
+    # `malloc` is not reentrant, so a child exiting while the parent is in the
+    # middle of allocator work, `regcomp` in a `[[ =~ ]]` was the observed
+    # case, intermittently corrupts the heap and crashes the shell. Reaping
+    # with `wait` parks the exit at a safe point. Same wait as in `caught`.
+    typeset waited
+    if (( o_block[sed] )); then
+        wait $o_block[sed]
+        waited=$?
+        if (( waited && waited != 127 )); then
+            print -u 2 $waited $o_block[pids]
+            exit 1
+        fi
+        o_block[sed]=0
+    fi
     # Create an indentation `coproc` to feed to our try `coproc`.
     coproc {
         coproc :
+        wait $! 2>/dev/null
         sed -ue 's/^\(..*\)$/    \1/' >&${o_block[try]}
     }
     # We will wait for our standard error intent `coproc` to exit.
@@ -48,6 +67,9 @@ function try {
         exec {1}>&p; o_block[user]=$1
         # Close the >&p and <&p of our standard error indent `coproc`.
         coproc :
+        # Reap the no-op `coproc` immediately, before its asynchronous exit
+        # can interrupt allocator work in the parent (see above).
+        wait $! 2>/dev/null
         # Assign the fd to the variable given by the user.
         : ${(P)2::=$1}
     else
@@ -60,6 +82,21 @@ function try {
             o_block[code]=$?
             # Close the >&p and <&p of our standard error indent `coproc`.
             coproc :
+            # The close above is the EOF that retires our standard error
+            # indent `coproc`, and the no-op `coproc` exits immediately. Reap
+            # them both here at a safe point instead of letting SIGCHLD
+            # interrupt allocator work later (see the wait at the top of
+            # `try`).
+            wait $! 2>/dev/null
+            if (( o_block[sed] )); then
+                wait $o_block[sed]
+                waited=$?
+                if (( waited && waited != 127 )); then
+                    print -u 2 $waited $o_block[pids]
+                    exit 1
+                fi
+                o_block[sed]=0
+            fi
         }
         # Retrun the error code.
         return $o_block[code]
