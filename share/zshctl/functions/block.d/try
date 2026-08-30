@@ -49,6 +49,7 @@ function try {
     # Create an indentation `coproc` to feed to our try `coproc`.
     coproc {
         coproc :
+        wait $! 2>/dev/null
         sed -ue 's/^\(..*\)$/    \1/' >&${o_block[try]}
     }
     # We will wait for our standard error intent `coproc` to exit.

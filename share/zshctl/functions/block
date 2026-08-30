@@ -119,6 +119,7 @@ if (( indent )); then
         tee >(>&p) | sed -ue 's/^\(..*\)$/'"${(l:indent:: :)}"'\1/' >&$out
         # Close the >&p and <&p of our word count `coproc`.
         coproc :
+        wait $! 2>/dev/null
         # If we had any output at all, print a new line.
         [[ $(<&${count}) != 0 ]] && print >&$out
         # Wait for word count to finish.
