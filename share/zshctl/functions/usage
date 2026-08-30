@@ -19,7 +19,7 @@ fi
 typeset execute=${usage//#:help/:execute}
 typeset commands=()
 function {
-    typeset sub=() lines=() verbose=() help usage
+    typeset sub=() lines=() terse=() verbose=() description=() help usage
     typeset -A regex=( escaped '^\\.')
     for cmd in "${(@o)${(@k)zshctl}}"; do
         [[ $cmd = $execute:[^:]## ]] || continue
@@ -31,13 +31,19 @@ function {
         $usage
         lines=()
         _zshctl_help_lines
-        verbose=() sub=()
+        terse=() verbose=() sub=()
         _zshctl_help
-        (( ${#verbose} )) || continue
-        if [[ $verbose[1] =~ $regex[escaped] ]]; then
-            verbose[1]=${verbose[1]#\\}
+        if (( ${#verbose} )); then
+            description=( "${(@)verbose}" )
+        elif (( ${#terse} )); then
+            description=( "${(@)terse}" )
+        else
+            continue
         fi
-        _zshctl_mandown sub "${(pj:\n:)verbose}"
+        if [[ $description[1] =~ $regex[escaped] ]]; then
+            description[1]=${description[1]#\\}
+        fi
+        _zshctl_mandown sub "${(pj:\n:)description}"
         $pushf commands '.HP\n.B %s\n.br\n%s' ${usage##*:} "${(j::)sub}"
     done
 }
