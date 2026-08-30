@@ -249,13 +249,8 @@ function {
     # The `localized` flag means that we will extend our programs with
     # extension commands and includes in our ~/.local directory. (We could
     # also extend from /usr/share/, but not today.)
-    if (( zshctl[commandable] )); then
-        if (( zshctl[extensible] )); then
-            command_path+=( ~/.local/share/${zshctl[program]}/extensions/*(N) )
-            if (( zshctl[localized] )); then
-                command_path+=( ~/.local/share/${zshctl[program]}/extensions/*(N) )
-            fi
-        fi
+    if (( zshctl[commandable] && zshctl[extensible] && zshctl[localized] )); then
+        command_path+=( ~/.local/share/${zshctl[program]}/extensions/*(N) )
     fi
     # Your program has already been sourced, so your `:extensions` hook is
     # defined; the scan below has not yet run, so nothing is decided. This is
