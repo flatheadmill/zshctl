@@ -36,7 +36,7 @@ function :execute:apk {
     pkgrel=0
     pkgdesc=${(qqq)conf[description]}
     url=$conf[url.home]
-    arch="x86_64"
+    arch="noarch"
     license=$conf[license]
     depends=${(qqq)conf[apk.dependencies]}
     depends_dev=""
@@ -68,19 +68,24 @@ function :execute:apk {
     EOF
     abuild checksum || abend '`abuild checksum` failed'
     abuild -r || abend '`abuild -r` failed'
-    # TODO Can I make this a no-arch package?
-    mkdir -p /html/apk/x86_64
-    if [[ ! -e previous/zero ]]; then
-        cp /work/previous/apk/x86_64/*.apk /html/apk/x86_64
-    fi
+    typeset package=/home/build/packages/compiled/$(abuild -A)/$conf[program]-$version-r0.apk
+    [[ -f $package ]] || abend 'fatal: cannot find built APK'
     find /home/build/packages
-    cp /home/build/packages/compiled/x86_64/$conf[program]-$version-r0.apk /html/apk/x86_64
-    pushd /html/apk/x86_64
-    apk index --no-warnings -vU -o APKINDEX.tar.gz *.apk
-    popd
-    abuild-sign -k ~/.abuild/$conf[apk.key.name].rsa /html/apk/x86_64/APKINDEX.tar.gz
-    tar xzvf /html/apk/x86_64/APKINDEX.tar.gz
-    cat APKINDEX
+    typeset architecture previous=()
+    for architecture in x86_64 aarch64; do
+        mkdir -p /html/apk/$architecture
+        previous=( /work/previous/apk/$architecture/*.apk(N) )
+        (( ${#previous} )) && cp "${(@)previous}" /html/apk/$architecture
+        cp $package /html/apk/$architecture
+        pushd /html/apk/$architecture
+        apk index --no-warnings -vU -o APKINDEX.tar.gz *.apk
+        popd
+        abuild-sign \
+            -k ~/.abuild/$conf[apk.key.name].rsa \
+            /html/apk/$architecture/APKINDEX.tar.gz
+        tar xzvf /html/apk/$architecture/APKINDEX.tar.gz
+        cat APKINDEX
+    done
 }
 
 # vim: ft=zsh:

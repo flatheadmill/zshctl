@@ -15,7 +15,7 @@ RUN sh -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
 
 RUN touch /monkey
 
-FROM alpine AS apk
+FROM alpine AS fresh
 
 ARG ZSHCTL_VERSION
 
@@ -29,5 +29,7 @@ RUN echo https://zshctl.sh/apk >> /etc/apk/repositories
 RUN sh Linux-alpine.sh
 RUN sh -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
 RUN sh -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
+
+FROM fresh AS apk
 
 COPY --from=previous /monkey /monkey
