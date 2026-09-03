@@ -72,6 +72,14 @@ function :execute:apk {
     [[ -f $package ]] || abend 'fatal: cannot find built APK'
     find /home/build/packages
     typeset architecture previous=()
+
+    # Clients discover the package through their architecture index, but apk
+    # fetches its payload from the directory named by the package architecture.
+    mkdir -p /html/apk/noarch
+    previous=( /work/previous/apk/noarch/*.apk(N) )
+    (( ${#previous} )) && cp "${(@)previous}" /html/apk/noarch
+    cp $package /html/apk/noarch
+
     for architecture in x86_64 aarch64; do
         mkdir -p /html/apk/$architecture
         previous=( /work/previous/apk/$architecture/*.apk(N) )
