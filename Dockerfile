@@ -99,7 +99,7 @@ FROM gentoo/stage3:latest AS gentoo
 
 COPY --from=portage /var/db/repos/gentoo /var/db/repos/gentoo
 #RUN PORTAGE_QUIET=1 emaint --all sync >/dev/null
-RUN FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox" emerge --quiet app-eselect/eselect-repository emerge dev-vcs/git zsh
+RUN FEATURES="-ipc-sandbox -mount-sandbox -network-sandbox -pid-sandbox -sandbox -usersandbox" emerge --quiet app-eselect/eselect-repository emerge dev-vcs/git zsh
 RUN zsh -c '[[ -e /bin/zsh ]]'
 COPY --from=compiled /work/ /work/compiled/
 COPY --from=previous /html/ /work/previous/

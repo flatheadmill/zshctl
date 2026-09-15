@@ -24,4 +24,4 @@ RUN bash Linux-ubuntu.bash
 RUN bash -c '[[ $(zshctl version) = ${ZSHCTL_VERSION} ]]'
 RUN bash -c 'echo zshctl $(zshctl version) = ${ZSHCTL_VERSION}'
 
-#COPY --from=previous /monkey /monkey
+COPY --from=previous /monkey /monkey
