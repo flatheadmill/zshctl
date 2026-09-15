@@ -191,7 +191,7 @@ function _zshctl_encache {
     if [[ ${${zshctl[$func]}[1]} = '/' ]]; then
         source $zshctl[$func]
         (( ${+functions_source[$func]} )) || abend 'unable to source `%s`.' $func
-        (( ${+functions_source[$enache]} )) || abend 'unable to source `%s`.' $enache
+        (( ${+functions_source[$encache]} )) || abend 'unable to source `%s`.' $encache
         zshctl[$func]=':'
     fi
     typeset -A completions=()
